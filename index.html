@@ -142,67 +142,73 @@ body{background:#f5f5f7;min-height:100vh;overflow:hidden;font-family:'Noto Sans 
   display:none;
   min-height:100vh;
   flex-direction:column;
-  align-items:center;
-  padding:0 20px 40px;
+  background: url('brain-bg.png') center center / cover fixed;
   opacity:0;
   transition:opacity .4s ease;
+  overflow-y:auto;
 }
 #screen-races.show{display:flex;opacity:1;}
 
-.races-back-btn{
-  position:absolute;
-  top:16px;left:16px;
-  display:flex;align-items:center;gap:4px;
-  padding:8px 12px;
-  font-size:13px;font-weight:500;
-  color:#888;
-  background:rgba(255,255,255,.8);
-  border:1px solid rgba(0,0,0,.08);
-  border-radius:8px;
-  cursor:pointer;
-  font-family:inherit;
-  transition:all .15s;
-  z-index:10;
-}
-.races-back-btn:hover{color:#555;background:#fff;}
-.races-back-btn svg{width:16px;height:16px;}
-
-.race-header{
-  display:flex;flex-direction:column;align-items:center;
-  margin-top:50px;margin-bottom:24px;
-  animation:fadeDown .5s cubic-bezier(.22,1,.36,1) both;
-}
-.race-header-title{font-size:18px;font-weight:700;color:#1a1a1a;letter-spacing:.02em;}
-.race-header-count{font-size:12px;color:#888;margin-top:4px;}
-
-.race-cards{
-  width:100%;max-width:420px;
-  display:flex;flex-direction:column;gap:10px;
-  animation:fadeUp .5s .1s cubic-bezier(.22,1,.36,1) both;
+/* 見出し共通 */
+.section-title{
+  font-size:16px;font-weight:700;color:#fff;
+  letter-spacing:.1em;text-align:center;
+  padding:20px 16px 14px;
+  text-shadow:0 2px 12px rgba(160,40,80,.9),0 4px 20px rgba(160,40,80,.7);
+  background:rgba(192,68,110,.75);
 }
 
-.race-card{
-  display:flex;align-items:center;
-  background:#fff;
-  border-radius:14px;
-  padding:14px 16px;
-  gap:12px;
-  border:1px solid rgba(0,0,0,.06);
-  border-left:3px solid #ccc;
-  box-shadow:0 3px 12px rgba(0,0,0,.08), 0 1px 3px rgba(0,0,0,.04);
-  transition:all .2s ease;
+/* 的中レース帯 */
+.hit-band{
+  background:rgba(0,0,0,.70);
+  padding:20px 0;overflow:hidden;
 }
-.race-card:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(0,0,0,.12), 0 2px 6px rgba(0,0,0,.06);}
+.hit-slider-wrap{overflow:hidden;position:relative;}
+.hit-slider{
+  display:flex;gap:16px;
+  animation:slideLeft 25s linear infinite;
+  width:max-content;padding:0 16px;
+}
+@keyframes slideLeft{
+  0%{transform:translateX(0);}
+  100%{transform:translateX(-50%);}
+}
+.hit-item{
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  flex-shrink:0;padding:14px 20px;
+  background:#000;border-radius:10px;
+  border-left:3px solid #c0446e;
+  width:120px;
+}
+.hit-venue{font-size:14px;font-weight:700;color:#fff;}
+.hit-race-points{font-size:13px;color:rgba(255,255,255,.7);}
+.hit-payout{font-size:18px;font-weight:700;color:#f5c842;margin-top:2px;}
 
-.race-main{flex:1;min-width:0;}
-.race-venue-row{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
-.race-venue{font-size:17px;font-weight:700;color:#1a1a1a;}
-.race-num{font-size:17px;font-weight:700;color:#1a1a1a;}
+/* レース一覧ゾーン */
+.race-section{
+  padding:0 16px 40px;
+  background:rgba(192,68,110,.75);
+  flex:1;
+}
 
-.race-grade{
+/* 開催カード */
+.venue-card{
+  background:#fff;border-radius:14px;
+  padding:16px 18px;margin-bottom:12px;
+  box-shadow:0 6px 28px rgba(0,0,0,.25),0 3px 10px rgba(0,0,0,.15);
+  transition:all .25s ease;cursor:pointer;
+}
+.venue-card:active{transform:scale(.98);}
+.venue-card.expanded{padding-bottom:14px;}
+
+.venue-main{display:flex;align-items:flex-start;justify-content:space-between;}
+.venue-left{display:flex;flex-direction:column;gap:6px;}
+.venue-name-row{display:flex;align-items:center;gap:8px;}
+.venue-name{font-size:22px;font-weight:900;color:#333;letter-spacing:.02em;}
+.venue-grade{
   display:inline-flex;align-items:center;justify-content:center;
-  padding:1px 6px;border-radius:3px;
-  font-size:10px;font-weight:700;color:#fff;
+  padding:2px 8px;border-radius:4px;
+  font-size:11px;font-weight:700;color:#fff;
 }
 .grade-f1{background:#e8a860;}
 .grade-f2{background:#7cc5de;}
@@ -210,27 +216,36 @@ body{background:#f5f5f7;min-height:100vh;overflow:hidden;font-family:'Noto Sans 
 .grade-g2{background:#e090b5;}
 .grade-g1{background:#e06868;}
 
-.race-time{font-size:12px;color:#888;}
-.race-deadline{color:#e04848;font-weight:500;}
+.venue-day{font-size:12px;color:#888;font-weight:500;}
 
-.race-gen-btn{
-  flex-shrink:0;
-  padding:10px 18px;
-  font-size:13px;font-weight:600;font-family:inherit;
-  background:#444;color:#fff;
-  border:none;border-radius:10px;cursor:pointer;
-  transition:all .15s ease;
+.venue-right{text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:4px;}
+.venue-start{font-size:14px;font-weight:600;color:#444;}
+.venue-start-label{font-size:10px;color:#999;margin-right:4px;}
+.venue-countdown{
+  font-size:13px;font-weight:700;color:#e03040;
+  display:flex;align-items:center;gap:4px;
 }
-.race-gen-btn:hover{background:#555;}
-.race-gen-btn:active{transform:scale(.96);}
+.countdown-dot{
+  width:6px;height:6px;background:#e03040;border-radius:50%;
+  animation:pulse 1s ease infinite;
+}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
 
-/* Venue colors - subtle */
-.venue-color-0{border-left-color:#a0d4e8;}
-.venue-color-1{border-left-color:#f0c090;}
-.venue-color-2{border-left-color:#a8dab5;}
-.venue-color-3{border-left-color:#e8b8d0;}
-.venue-color-4{border-left-color:#c4b8e8;}
-.venue-color-5{border-left-color:#f0a8b0;}
+/* 展開ボタンエリア */
+.venue-actions{
+  display:none;margin-top:14px;padding-top:14px;
+  border-top:1px solid #eee;gap:8px;
+}
+.venue-card.expanded .venue-actions{display:flex;}
+.venue-action-btn{
+  flex:1;padding:12px 8px;border:none;border-radius:10px;
+  font-family:inherit;font-size:12px;font-weight:600;
+  cursor:pointer;transition:all .15s;
+}
+.venue-action-btn:active{transform:scale(.96);}
+.btn-table{background:#f0f0f0;color:#444;}
+.btn-auto{background:#c0446e;color:#fff;}
+.btn-custom{background:#405999;color:#fff;}
 
 /* ===== RACE TABLE SCREEN ===== */
 :root{
@@ -923,12 +938,31 @@ body{background:#f5f5f7;min-height:100vh;overflow:hidden;font-family:'Noto Sans 
 
 <!-- RACE LIST SCREEN -->
 <div id="screen-races">
-  <div class="race-header">
-    <h1 class="race-header-title">本日の開催</h1>
-    <p class="race-header-count" id="raceCount">読み込み中...</p>
+  <!-- 見出し：本日の的中レース -->
+  <p class="section-title">本日の的中レース</p>
+  
+  <!-- ダーク帯（スライド） -->
+  <div class="hit-band">
+    <div class="hit-slider-wrap">
+      <div class="hit-slider" id="hitSlider">
+        <!-- 的中データがここに動的に追加される（ダミー表示） -->
+        <div class="hit-item"><span class="hit-venue">—</span><span class="hit-race-points">— ・ —</span><span class="hit-payout">—</span></div>
+        <div class="hit-item"><span class="hit-venue">—</span><span class="hit-race-points">— ・ —</span><span class="hit-payout">—</span></div>
+        <div class="hit-item"><span class="hit-venue">—</span><span class="hit-race-points">— ・ —</span><span class="hit-payout">—</span></div>
+        <div class="hit-item"><span class="hit-venue">—</span><span class="hit-race-points">— ・ —</span><span class="hit-payout">—</span></div>
+        <div class="hit-item"><span class="hit-venue">—</span><span class="hit-race-points">— ・ —</span><span class="hit-payout">—</span></div>
+        <div class="hit-item"><span class="hit-venue">—</span><span class="hit-race-points">— ・ —</span><span class="hit-payout">—</span></div>
+        <div class="hit-item"><span class="hit-venue">—</span><span class="hit-race-points">— ・ —</span><span class="hit-payout">—</span></div>
+        <div class="hit-item"><span class="hit-venue">—</span><span class="hit-race-points">— ・ —</span><span class="hit-payout">—</span></div>
+      </div>
+    </div>
   </div>
   
-  <div class="race-cards" id="raceCards">
+  <!-- 見出し：本日開催レース一覧 -->
+  <p class="section-title">本日開催レース一覧<span id="raceCount" style="font-size:12px;opacity:.7;margin-left:8px;"></span></p>
+  
+  <!-- レース一覧 -->
+  <div class="race-section" id="raceCards">
     <!-- 開催場カードがここに動的に追加される -->
   </div>
 </div>
@@ -1200,7 +1234,7 @@ function renderVenueCards(venues) {
   
   if (venues.length === 0) {
     container.innerHTML = `
-      <div class="race-card" style="justify-content:center;">
+      <div class="venue-card" style="text-align:center;">
         <p style="color:#888;">本日の開催はありません</p>
       </div>`;
     return;
@@ -1208,38 +1242,55 @@ function renderVenueCards(venues) {
   
   container.innerHTML = venues.map((v, idx) => {
     const gradeClass = `grade-${v.grade.toLowerCase()}`;
-    const colorClass = `venue-color-${idx % 6}`;
+    // TODO: 発走時刻と締切カウントダウンは後でデータから取得
+    const hasCountdown = idx === 0; // 仮：最初のカードだけカウントダウン表示
     
     return `
-      <div class="race-card ${colorClass}" data-venue-idx="${idx}">
-        <div class="race-main">
-          <div class="race-venue-row">
-            <span class="race-venue">${v.venue}</span>
-            <span class="race-grade ${gradeClass}">${v.grade}</span>
+      <div class="venue-card" data-venue-idx="${idx}" onclick="toggleVenueCard(this)">
+        <div class="venue-main">
+          <div class="venue-left">
+            <div class="venue-name-row">
+              <span class="venue-name">${v.venue}</span>
+              <span class="venue-grade ${gradeClass}">${v.grade}</span>
+            </div>
+            <span class="venue-day">${v.day || ''}</span>
           </div>
-          <div class="race-time">${v.day || ''}</div>
+          <div class="venue-right">
+            <span class="venue-start"><span class="venue-start-label">発走</span>--:--</span>
+            ${hasCountdown ? `<span class="venue-countdown"><span class="countdown-dot"></span>締切まで--分</span>` : ''}
+          </div>
         </div>
-        <button class="race-gen-btn">出走表</button>
+        <div class="venue-actions">
+          <button class="venue-action-btn btn-table" onclick="event.stopPropagation();selectVenueAction(${idx},'table')">出走表</button>
+          <button class="venue-action-btn btn-auto" onclick="event.stopPropagation();selectVenueAction(${idx},'auto')">おまかせ生成</button>
+          <button class="venue-action-btn btn-custom" onclick="event.stopPropagation();selectVenueAction(${idx},'custom')">ユーザー指定</button>
+        </div>
       </div>
     `;
   }).join('');
-  
-  // イベント設定
-  container.querySelectorAll('.race-card').forEach(card => {
-    card.addEventListener('click', async (e) => {
-      const idx = parseInt(card.dataset.venueIdx);
-      const venue = VENUES[idx];
-      CURRENT_VENUE = venue;
-      
-      // ローディング表示
-      card.querySelector('.race-gen-btn').textContent = '読込中...';
-      
-      // その会場の全レースを取得
-      await fetchVenueRaces(venue);
-      
-      card.querySelector('.race-gen-btn').textContent = '出走表';
-    });
+}
+
+function toggleVenueCard(card) {
+  document.querySelectorAll('.venue-card.expanded').forEach(c => {
+    if (c !== card) c.classList.remove('expanded');
   });
+  card.classList.toggle('expanded');
+}
+
+async function selectVenueAction(idx, action) {
+  const venue = VENUES[idx];
+  CURRENT_VENUE = venue;
+  
+  // 対象カードのボタンをローディング表示
+  const card = document.querySelector(`.venue-card[data-venue-idx="${idx}"]`);
+  const btn = card.querySelector(`.btn-${action === 'table' ? 'table' : action}`);
+  const originalText = btn.textContent;
+  btn.textContent = '読込中...';
+  
+  // その会場の全レースを取得
+  await fetchVenueRaces(venue);
+  
+  btn.textContent = originalText;
 }
 
 async function fetchVenueRaces(venue) {
