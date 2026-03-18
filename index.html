@@ -149,6 +149,29 @@ body{background:#f5f5f7;min-height:100vh;overflow:hidden;font-family:'Noto Sans 
 }
 #screen-races.show{display:flex;opacity:1;}
 
+/* ヘッダー */
+.app-header{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:14px 16px;
+  background:#1a1a1a;
+}
+.header-logo{
+  width:36px;height:auto;
+}
+.header-title{
+  font-size:14px;
+  font-weight:600;
+  color:rgba(255,255,255,.85);
+  letter-spacing:.05em;
+}
+
+/* 的中セクション */
+.hit-section{
+  /* 後で的中がない場合は display:none にする */
+}
+
 /* 見出し共通 */
 .section-title{
   font-size:16px;font-weight:700;color:#fff;
@@ -202,11 +225,23 @@ body{background:#f5f5f7;min-height:100vh;overflow:hidden;font-family:'Noto Sans 
   100%{transform:translateX(-50%);}
 }
 .hit-item{
+  position:relative;
   display:flex;flex-direction:column;align-items:center;gap:4px;
   flex-shrink:0;padding:14px 20px;
-  background:#000;border-radius:10px;
-  border-left:3px solid #c0446e;
+  background:rgba(0,0,0,.9);
+  border-radius:10px;
+  border-left:3px solid rgba(192,68,110,.9);
+  box-shadow:0 0 12px rgba(192,68,110,.4), 0 0 24px rgba(192,68,110,.2);
   width:120px;
+}
+.hit-new{
+  position:absolute;
+  top:-6px;right:-6px;
+  font-size:9px;
+  font-weight:700;
+  color:#ff1a1a;
+  background:transparent;
+  letter-spacing:.02em;
 }
 .hit-venue{font-size:14px;font-weight:700;color:#fff;}
 .hit-race-points{font-size:13px;color:rgba(255,255,255,.7);}
@@ -222,7 +257,8 @@ body{background:#f5f5f7;min-height:100vh;overflow:hidden;font-family:'Noto Sans 
 /* 開催カード */
 .venue-card{
   background:#fff;border-radius:14px;
-  padding:16px 18px;margin-bottom:12px;
+  padding:18px 18px;margin-bottom:12px;
+  min-height:80px;
   box-shadow:0 6px 28px rgba(0,0,0,.25),0 3px 10px rgba(0,0,0,.15);
   cursor:pointer;
   opacity:0;
@@ -234,9 +270,8 @@ body{background:#f5f5f7;min-height:100vh;overflow:hidden;font-family:'Noto Sans 
   transform:translateY(0);
 }
 .venue-card:active{transform:scale(.98);}
-.venue-card.expanded{padding-bottom:14px;}
 
-.venue-main{display:flex;align-items:flex-start;justify-content:space-between;}
+.venue-main{display:flex;align-items:center;justify-content:space-between;}
 .venue-left{display:flex;flex-direction:column;gap:6px;}
 .venue-name-row{display:flex;align-items:center;gap:8px;}
 .venue-name{font-size:22px;font-weight:900;color:#333;letter-spacing:.02em;}
@@ -265,22 +300,6 @@ body{background:#f5f5f7;min-height:100vh;overflow:hidden;font-family:'Noto Sans 
   animation:pulse 1s ease infinite;
 }
 @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
-
-/* 展開ボタンエリア */
-.venue-actions{
-  display:none;margin-top:14px;padding-top:14px;
-  border-top:1px solid #eee;gap:8px;
-}
-.venue-card.expanded .venue-actions{display:flex;}
-.venue-action-btn{
-  flex:1;padding:12px 8px;border:none;border-radius:10px;
-  font-family:inherit;font-size:12px;font-weight:600;
-  cursor:pointer;transition:all .15s;
-}
-.venue-action-btn:active{transform:scale(.96);}
-.btn-table{background:#f0f0f0;color:#444;}
-.btn-auto{background:#c0446e;color:#fff;}
-.btn-custom{background:#405999;color:#fff;}
 
 /* ===== RACE TABLE SCREEN ===== */
 :root{
@@ -978,28 +997,38 @@ body{background:#f5f5f7;min-height:100vh;overflow:hidden;font-family:'Noto Sans 
     <img src="brain-logo-white.png" alt="Loading" class="loading-logo">
   </div>
   
-  <!-- 見出し：本日の的中レース -->
-  <p class="section-title">本日の的中レース</p>
+  <!-- ヘッダー -->
+  <header class="app-header">
+    <img src="brain-logo-white.png" alt="Brain" class="header-logo">
+    <span class="header-title">競輪買い目生成AI</span>
+  </header>
   
-  <!-- ダーク帯（スライド） -->
-  <div class="hit-band">
-    <div class="hit-slider-wrap">
-      <div class="hit-slider" id="hitSlider">
-        <!-- 的中データがここに動的に追加される（ダミー表示） -->
-        <div class="hit-item"><span class="hit-venue">—</span><span class="hit-race-points">— ・ —</span><span class="hit-payout">—</span></div>
-        <div class="hit-item"><span class="hit-venue">—</span><span class="hit-race-points">— ・ —</span><span class="hit-payout">—</span></div>
-        <div class="hit-item"><span class="hit-venue">—</span><span class="hit-race-points">— ・ —</span><span class="hit-payout">—</span></div>
-        <div class="hit-item"><span class="hit-venue">—</span><span class="hit-race-points">— ・ —</span><span class="hit-payout">—</span></div>
-        <div class="hit-item"><span class="hit-venue">—</span><span class="hit-race-points">— ・ —</span><span class="hit-payout">—</span></div>
-        <div class="hit-item"><span class="hit-venue">—</span><span class="hit-race-points">— ・ —</span><span class="hit-payout">—</span></div>
-        <div class="hit-item"><span class="hit-venue">—</span><span class="hit-race-points">— ・ —</span><span class="hit-payout">—</span></div>
-        <div class="hit-item"><span class="hit-venue">—</span><span class="hit-race-points">— ・ —</span><span class="hit-payout">—</span></div>
+  <!-- 的中セクション -->
+  <div class="hit-section" id="hitSection">
+    <!-- 見出し：本日の的中レース -->
+    <p class="section-title">本日の的中レース</p>
+    
+    <!-- ダーク帯（スライド） -->
+    <div class="hit-band">
+      <div class="hit-slider-wrap">
+        <div class="hit-slider" id="hitSlider">
+          <!-- 的中データ（ダミー） -->
+          <div class="hit-item"><span class="hit-new">NEW</span><span class="hit-venue">和歌山</span><span class="hit-race-points">3R ・ 5点</span><span class="hit-payout">¥12,340</span></div>
+          <div class="hit-item"><span class="hit-venue">小田原</span><span class="hit-race-points">7R ・ 3点</span><span class="hit-payout">¥8,920</span></div>
+          <div class="hit-item"><span class="hit-new">NEW</span><span class="hit-venue">宇都宮</span><span class="hit-race-points">5R ・ 4点</span><span class="hit-payout">¥5,670</span></div>
+          <div class="hit-item"><span class="hit-venue">名古屋</span><span class="hit-race-points">2R ・ 6点</span><span class="hit-payout">¥21,500</span></div>
+          <!-- ループ用複製 -->
+          <div class="hit-item"><span class="hit-new">NEW</span><span class="hit-venue">和歌山</span><span class="hit-race-points">3R ・ 5点</span><span class="hit-payout">¥12,340</span></div>
+          <div class="hit-item"><span class="hit-venue">小田原</span><span class="hit-race-points">7R ・ 3点</span><span class="hit-payout">¥8,920</span></div>
+          <div class="hit-item"><span class="hit-new">NEW</span><span class="hit-venue">宇都宮</span><span class="hit-race-points">5R ・ 4点</span><span class="hit-payout">¥5,670</span></div>
+          <div class="hit-item"><span class="hit-venue">名古屋</span><span class="hit-race-points">2R ・ 6点</span><span class="hit-payout">¥21,500</span></div>
+        </div>
       </div>
     </div>
   </div>
   
-  <!-- 見出し：本日開催レース一覧 -->
-  <p class="section-title">本日開催レース一覧<span id="raceCount" style="font-size:12px;opacity:.7;margin-left:8px;"></span></p>
+  <!-- 見出し：開催中のレース -->
+  <p class="section-title">開催中のレース</p>
   
   <!-- レース一覧 -->
   <div class="race-section" id="raceCards">
@@ -1210,9 +1239,6 @@ async function showVenueListScreen() {
 }
 
 async function fetchVenueList() {
-  const countEl = document.getElementById('raceCount');
-  countEl.textContent = '読み込み中...';
-  
   try {
     const resp = await fetch(`${PROXY_URL}?url=${encodeURIComponent('https://www.winticket.jp/keirin')}`);
     const html = await resp.text();
@@ -1278,12 +1304,10 @@ async function fetchVenueList() {
     setTimeout(() => title2.classList.add('show'), 200);
     setTimeout(() => {
       renderVenueCards(venues);
-      countEl.textContent = `${venues.length}場開催`;
     }, 300);
     
   } catch (e) {
     console.error('開催場データ取得エラー:', e);
-    countEl.textContent = '取得に失敗しました';
     showToast('開催場データの取得に失敗しました', true);
     // エラー時もローディング非表示
     document.getElementById('loadingOverlay').classList.add('hidden');
@@ -1295,7 +1319,7 @@ function renderVenueCards(venues) {
   
   if (venues.length === 0) {
     container.innerHTML = `
-      <div class="venue-card" style="text-align:center;">
+      <div class="venue-card show" style="text-align:center;">
         <p style="color:#888;">本日の開催はありません</p>
       </div>`;
     return;
@@ -1303,11 +1327,10 @@ function renderVenueCards(venues) {
   
   container.innerHTML = venues.map((v, idx) => {
     const gradeClass = `grade-${v.grade.toLowerCase()}`;
-    // TODO: 発走時刻と締切カウントダウンは後でデータから取得
     const hasCountdown = idx === 0; // 仮：最初のカードだけカウントダウン表示
     
     return `
-      <div class="venue-card" data-venue-idx="${idx}" onclick="toggleVenueCard(this)">
+      <div class="venue-card" data-venue-idx="${idx}" onclick="selectVenue(${idx})">
         <div class="venue-main">
           <div class="venue-left">
             <div class="venue-name-row">
@@ -1321,11 +1344,6 @@ function renderVenueCards(venues) {
             ${hasCountdown ? `<span class="venue-countdown"><span class="countdown-dot"></span>締切まで--分</span>` : ''}
           </div>
         </div>
-        <div class="venue-actions">
-          <button class="venue-action-btn btn-table" onclick="event.stopPropagation();selectVenueAction(${idx},'table')">出走表</button>
-          <button class="venue-action-btn btn-auto" onclick="event.stopPropagation();selectVenueAction(${idx},'auto')">おまかせ生成</button>
-          <button class="venue-action-btn btn-custom" onclick="event.stopPropagation();selectVenueAction(${idx},'custom')">ユーザー指定</button>
-        </div>
       </div>
     `;
   }).join('');
@@ -1335,31 +1353,16 @@ function renderVenueCards(venues) {
   cards.forEach((card, i) => {
     setTimeout(() => {
       card.classList.add('show');
-    }, 80 * i); // 80msずつずらして表示
+    }, 80 * i);
   });
 }
 
-function toggleVenueCard(card) {
-  document.querySelectorAll('.venue-card.expanded').forEach(c => {
-    if (c !== card) c.classList.remove('expanded');
-  });
-  card.classList.toggle('expanded');
-}
-
-async function selectVenueAction(idx, action) {
+async function selectVenue(idx) {
   const venue = VENUES[idx];
   CURRENT_VENUE = venue;
   
-  // 対象カードのボタンをローディング表示
-  const card = document.querySelector(`.venue-card[data-venue-idx="${idx}"]`);
-  const btn = card.querySelector(`.btn-${action === 'table' ? 'table' : action}`);
-  const originalText = btn.textContent;
-  btn.textContent = '読込中...';
-  
-  // その会場の全レースを取得
+  // その会場の全レースを取得して出走表へ遷移
   await fetchVenueRaces(venue);
-  
-  btn.textContent = originalText;
 }
 
 async function fetchVenueRaces(venue) {
@@ -1861,12 +1864,9 @@ function extractLineup(doc) {
   return lineup.length > 0 ? lineup : null;
 }
 
-// レースカードをレンダリング
+// レースカードをレンダリング（旧関数、参考用）
 function renderRaceCards(races) {
   const container = document.getElementById('raceCards');
-  const countEl = document.getElementById('raceCount');
-  
-  countEl.textContent = `${races.length}件のレース`;
   
   const venueColors = {};
   let colorIdx = 0;
