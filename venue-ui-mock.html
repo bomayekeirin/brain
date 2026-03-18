@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Brain - 開催一覧UIモック</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Noto Sans JP', sans-serif;
+  background: url('brain-bg.png') center center / cover fixed;
+  min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* ===== 見出し共通 ===== */
+.section-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: .1em;
+  text-align: center;
+  padding: 20px 16px 14px;
+  text-shadow: 0 2px 8px rgba(0,0,0,.3);
+  background: rgba(192, 68, 110, 0.75);
+}
+
+/* ===== 的中レースゾーン（ダーク帯） ===== */
+.hit-band {
+  background: rgba(0, 0, 0, 0.70);
+  padding: 20px 0;
+  overflow: hidden;
+}
+.hit-slider-wrap {
+  overflow: hidden;
+  position: relative;
+}
+.hit-slider {
+  display: flex;
+  gap: 16px;
+  animation: slideLeft 25s linear infinite;
+  width: max-content;
+  padding: 0 16px;
+}
+@keyframes slideLeft {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.hit-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 14px 24px;
+  background: #000;
+  border-radius: 10px;
+  border-left: 3px solid #c0446e;
+  min-width: 110px;
+}
+.hit-venue {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+}
+.hit-race-points {
+  font-size: 11px;
+  color: rgba(255,255,255,.6);
+}
+.hit-payout {
+  font-size: 18px;
+  font-weight: 700;
+  color: #ffd54f;
+  margin-top: 2px;
+}
+
+/* ===== レース一覧ゾーン ===== */
+.race-section {
+  padding: 0 16px 40px;
+  background: rgba(192, 68, 110, 0.75);
+}
+
+/* 開催カード */
+.venue-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 16px 18px;
+  margin-bottom: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.15), 0 2px 6px rgba(0,0,0,.1);
+  transition: all .25s ease;
+  cursor: pointer;
+}
+.venue-card:active {
+  transform: scale(.98);
+}
+.venue-card.expanded {
+  padding-bottom: 14px;
+}
+
+.venue-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.venue-left {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.venue-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.venue-name {
+  font-size: 20px;
+  font-weight: 900;
+  color: #1a1a1a;
+  letter-spacing: .02em;
+}
+.venue-grade {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+}
+.grade-f1 { background: #e8a860; }
+.grade-f2 { background: #7cc5de; }
+.grade-g3 { background: #7dca94; }
+.grade-g2 { background: #e090b5; }
+.grade-g1 { background: #e06868; }
+
+.venue-day {
+  font-size: 12px;
+  color: #888;
+  font-weight: 500;
+}
+
+.venue-right {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+.venue-start {
+  font-size: 14px;
+  font-weight: 600;
+  color: #444;
+}
+.venue-start-label {
+  font-size: 10px;
+  color: #999;
+  margin-right: 4px;
+}
+.venue-countdown {
+  font-size: 13px;
+  font-weight: 700;
+  color: #e03040;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.countdown-dot {
+  width: 6px;
+  height: 6px;
+  background: #e03040;
+  border-radius: 50%;
+  animation: pulse 1s ease infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .4; }
+}
+
+/* 展開ボタンエリア */
+.venue-actions {
+  display: none;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #eee;
+  gap: 8px;
+}
+.venue-card.expanded .venue-actions {
+  display: flex;
+}
+.venue-action-btn {
+  flex: 1;
+  padding: 12px 8px;
+  border: none;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s;
+}
+.venue-action-btn:active {
+  transform: scale(.96);
+}
+.btn-table {
+  background: #f0f0f0;
+  color: #444;
+}
+.btn-auto {
+  background: #c0446e;
+  color: #fff;
+}
+.btn-custom {
+  background: #405999;
+  color: #fff;
+}
+
+/* ===== ダミーデータ表示用 ===== */
+.mock-label {
+  position: fixed;
+  bottom: 10px;
+  right: 10px;
+  background: rgba(0,0,0,.6);
+  color: #fff;
+  font-size: 10px;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+</style>
+</head>
+<body>
+
+<!-- 見出し：本日の的中レース -->
+<p class="section-title">本日の的中レース</p>
+
+<!-- ダーク帯（スライド） -->
+<div class="hit-band">
+  <div class="hit-slider-wrap">
+    <div class="hit-slider">
+      <!-- 2セット同じ内容（無限ループ用） -->
+      <div class="hit-item">
+        <span class="hit-venue">和歌山</span>
+        <span class="hit-race-points">3R ・ 5点</span>
+        <span class="hit-payout">¥12,340</span>
+      </div>
+      <div class="hit-item">
+        <span class="hit-venue">小田原</span>
+        <span class="hit-race-points">7R ・ 3点</span>
+        <span class="hit-payout">¥8,920</span>
+      </div>
+      <div class="hit-item">
+        <span class="hit-venue">宇都宮</span>
+        <span class="hit-race-points">5R ・ 4点</span>
+        <span class="hit-payout">¥5,670</span>
+      </div>
+      <div class="hit-item">
+        <span class="hit-venue">名古屋</span>
+        <span class="hit-race-points">2R ・ 6点</span>
+        <span class="hit-payout">¥21,500</span>
+      </div>
+      <!-- 2セット目 -->
+      <div class="hit-item">
+        <span class="hit-venue">和歌山</span>
+        <span class="hit-race-points">3R ・ 5点</span>
+        <span class="hit-payout">¥12,340</span>
+      </div>
+      <div class="hit-item">
+        <span class="hit-venue">小田原</span>
+        <span class="hit-race-points">7R ・ 3点</span>
+        <span class="hit-payout">¥8,920</span>
+      </div>
+      <div class="hit-item">
+        <span class="hit-venue">宇都宮</span>
+        <span class="hit-race-points">5R ・ 4点</span>
+        <span class="hit-payout">¥5,670</span>
+      </div>
+      <div class="hit-item">
+        <span class="hit-venue">名古屋</span>
+        <span class="hit-race-points">2R ・ 6点</span>
+        <span class="hit-payout">¥21,500</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 見出し：本日開催レース一覧 -->
+<p class="section-title">本日開催レース一覧</p>
+
+<!-- レース一覧 -->
+<div class="race-section">
+  
+  <!-- カード：締切間近 -->
+  <div class="venue-card" onclick="toggleCard(this)">
+    <div class="venue-main">
+      <div class="venue-left">
+        <div class="venue-name-row">
+          <span class="venue-name">和歌山</span>
+          <span class="venue-grade grade-f2">F2</span>
+        </div>
+        <span class="venue-day">2日目</span>
+      </div>
+      <div class="venue-right">
+        <span class="venue-start"><span class="venue-start-label">発走</span>10:50</span>
+        <span class="venue-countdown"><span class="countdown-dot"></span>締切まで4分</span>
+      </div>
+    </div>
+    <div class="venue-actions">
+      <button class="venue-action-btn btn-table">出走表</button>
+      <button class="venue-action-btn btn-auto">おまかせ生成</button>
+      <button class="venue-action-btn btn-custom">ユーザー指定</button>
+    </div>
+  </div>
+  
+  <!-- カード：通常 -->
+  <div class="venue-card" onclick="toggleCard(this)">
+    <div class="venue-main">
+      <div class="venue-left">
+        <div class="venue-name-row">
+          <span class="venue-name">小田原</span>
+          <span class="venue-grade grade-f1">F1</span>
+        </div>
+        <span class="venue-day">最終日</span>
+      </div>
+      <div class="venue-right">
+        <span class="venue-start"><span class="venue-start-label">発走</span>11:05</span>
+      </div>
+    </div>
+    <div class="venue-actions">
+      <button class="venue-action-btn btn-table">出走表</button>
+      <button class="venue-action-btn btn-auto">おまかせ生成</button>
+      <button class="venue-action-btn btn-custom">ユーザー指定</button>
+    </div>
+  </div>
+  
+  <!-- カード：通常 -->
+  <div class="venue-card" onclick="toggleCard(this)">
+    <div class="venue-main">
+      <div class="venue-left">
+        <div class="venue-name-row">
+          <span class="venue-name">宇都宮</span>
+          <span class="venue-grade grade-f2">F2</span>
+        </div>
+        <span class="venue-day">2日目</span>
+      </div>
+      <div class="venue-right">
+        <span class="venue-start"><span class="venue-start-label">発走</span>11:16</span>
+      </div>
+    </div>
+    <div class="venue-actions">
+      <button class="venue-action-btn btn-table">出走表</button>
+      <button class="venue-action-btn btn-auto">おまかせ生成</button>
+      <button class="venue-action-btn btn-custom">ユーザー指定</button>
+    </div>
+  </div>
+  
+  <!-- カード：通常 -->
+  <div class="venue-card" onclick="toggleCard(this)">
+    <div class="venue-main">
+      <div class="venue-left">
+        <div class="venue-name-row">
+          <span class="venue-name">名古屋</span>
+          <span class="venue-grade grade-f1">F1</span>
+        </div>
+        <span class="venue-day">2日目</span>
+      </div>
+      <div class="venue-right">
+        <span class="venue-start"><span class="venue-start-label">発走</span>15:47</span>
+      </div>
+    </div>
+    <div class="venue-actions">
+      <button class="venue-action-btn btn-table">出走表</button>
+      <button class="venue-action-btn btn-auto">おまかせ生成</button>
+      <button class="venue-action-btn btn-custom">ユーザー指定</button>
+    </div>
+  </div>
+  
+  <!-- カード：通常 -->
+  <div class="venue-card" onclick="toggleCard(this)">
+    <div class="venue-main">
+      <div class="venue-left">
+        <div class="venue-name-row">
+          <span class="venue-name">玉野</span>
+          <span class="venue-grade grade-f1">F1</span>
+        </div>
+        <span class="venue-day">最終日</span>
+      </div>
+      <div class="venue-right">
+        <span class="venue-start"><span class="venue-start-label">発走</span>16:30</span>
+      </div>
+    </div>
+    <div class="venue-actions">
+      <button class="venue-action-btn btn-table">出走表</button>
+      <button class="venue-action-btn btn-auto">おまかせ生成</button>
+      <button class="venue-action-btn btn-custom">ユーザー指定</button>
+    </div>
+  </div>
+  
+  <!-- カード：通常 -->
+  <div class="venue-card" onclick="toggleCard(this)">
+    <div class="venue-main">
+      <div class="venue-left">
+        <div class="venue-name-row">
+          <span class="venue-name">高知</span>
+          <span class="venue-grade grade-f2">F2</span>
+        </div>
+        <span class="venue-day">最終日</span>
+      </div>
+      <div class="venue-right">
+        <span class="venue-start"><span class="venue-start-label">発走</span>20:35</span>
+      </div>
+    </div>
+    <div class="venue-actions">
+      <button class="venue-action-btn btn-table">出走表</button>
+      <button class="venue-action-btn btn-auto">おまかせ生成</button>
+      <button class="venue-action-btn btn-custom">ユーザー指定</button>
+    </div>
+  </div>
+  
+  <!-- カード：通常 -->
+  <div class="venue-card" onclick="toggleCard(this)">
+    <div class="venue-main">
+      <div class="venue-left">
+        <div class="venue-name-row">
+          <span class="venue-name">松戸</span>
+          <span class="venue-grade grade-f2">F2</span>
+        </div>
+        <span class="venue-day">最終日</span>
+      </div>
+      <div class="venue-right">
+        <span class="venue-start"><span class="venue-start-label">発走</span>21:03</span>
+      </div>
+    </div>
+    <div class="venue-actions">
+      <button class="venue-action-btn btn-table">出走表</button>
+      <button class="venue-action-btn btn-auto">おまかせ生成</button>
+      <button class="venue-action-btn btn-custom">ユーザー指定</button>
+    </div>
+  </div>
+  
+</div>
+
+<div class="mock-label">UI MOCK</div>
+
+<script>
+function toggleCard(card) {
+  document.querySelectorAll('.venue-card.expanded').forEach(c => {
+    if (c !== card) c.classList.remove('expanded');
+  });
+  card.classList.toggle('expanded');
+}
+</script>
+
+</body>
+</html>
