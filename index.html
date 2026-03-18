@@ -156,6 +156,13 @@ body{background:#f5f5f7;min-height:100vh;overflow:hidden;font-family:'Noto Sans 
   padding:20px 16px 14px;
   text-shadow:0 2px 12px rgba(160,40,80,.9),0 4px 20px rgba(160,40,80,.7);
   background:rgba(192,68,110,.75);
+  opacity:0;
+  transform:translateY(15px);
+  transition:opacity .4s ease, transform .4s ease;
+}
+.section-title.show{
+  opacity:1;
+  transform:translateY(0);
 }
 
 /* ローディングオーバーレイ */
@@ -183,6 +190,13 @@ body{background:#f5f5f7;min-height:100vh;overflow:hidden;font-family:'Noto Sans 
 .hit-band{
   background:rgba(0,0,0,.70);
   padding:20px 0;overflow:hidden;
+  opacity:0;
+  transform:translateY(15px);
+  transition:opacity .4s ease, transform .4s ease;
+}
+.hit-band.show{
+  opacity:1;
+  transform:translateY(0);
 }
 .hit-slider-wrap{overflow:hidden;position:relative;}
 .hit-slider{
@@ -217,7 +231,14 @@ body{background:#f5f5f7;min-height:100vh;overflow:hidden;font-family:'Noto Sans 
   background:#fff;border-radius:14px;
   padding:16px 18px;margin-bottom:12px;
   box-shadow:0 6px 28px rgba(0,0,0,.25),0 3px 10px rgba(0,0,0,.15);
-  transition:all .25s ease;cursor:pointer;
+  cursor:pointer;
+  opacity:0;
+  transform:translateY(30px);
+  transition:opacity .5s ease, transform .5s cubic-bezier(.22,1,.36,1);
+}
+.venue-card.show{
+  opacity:1;
+  transform:translateY(0);
 }
 .venue-card:active{transform:scale(.98);}
 .venue-card.expanded{padding-bottom:14px;}
@@ -1186,6 +1207,10 @@ async function showVenueListScreen() {
   // ローディング表示をリセット
   document.getElementById('loadingOverlay').classList.remove('hidden');
   
+  // 見出し・帯のアニメーションをリセット
+  document.querySelectorAll('#screen-races .section-title').forEach(el => el.classList.remove('show'));
+  document.querySelector('.hit-band').classList.remove('show');
+  
   setTimeout(() => racesScreen.classList.add('show'), 50);
   
   // 開催場データを取得
@@ -1249,11 +1274,22 @@ async function fetchVenueList() {
     });
     
     VENUES = venues;
-    renderVenueCards(venues);
-    countEl.textContent = `${venues.length}場開催`;
     
     // ローディング非表示
     document.getElementById('loadingOverlay').classList.add('hidden');
+    
+    // 見出し・帯・カードを順番にスゥーん表示
+    const title1 = document.querySelector('#screen-races .section-title');
+    const hitBand = document.querySelector('.hit-band');
+    const title2 = document.querySelectorAll('#screen-races .section-title')[1];
+    
+    setTimeout(() => title1.classList.add('show'), 100);
+    setTimeout(() => hitBand.classList.add('show'), 200);
+    setTimeout(() => title2.classList.add('show'), 300);
+    setTimeout(() => {
+      renderVenueCards(venues);
+      countEl.textContent = `${venues.length}場開催`;
+    }, 400);
     
   } catch (e) {
     console.error('開催場データ取得エラー:', e);
@@ -1303,6 +1339,14 @@ function renderVenueCards(venues) {
       </div>
     `;
   }).join('');
+  
+  // カードを順番にスゥーんと表示
+  const cards = container.querySelectorAll('.venue-card');
+  cards.forEach((card, i) => {
+    setTimeout(() => {
+      card.classList.add('show');
+    }, 80 * i); // 80msずつずらして表示
+  });
 }
 
 function toggleVenueCard(card) {
