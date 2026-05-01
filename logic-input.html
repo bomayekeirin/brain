@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>ロジック入力ツール</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html{
+  background:#1a1a1a;
+}
+body{
+  background:#fafafa;
+  min-height:100vh;
+  font-family:'Noto Sans JP',sans-serif;
+  color:#333;
+  padding-bottom:100px;
+}
+:root{
+  --pink:#c0446e;
+  --pink-light:#d4607f;
+  --dark:#1a1a1a;
+  --card:#eee;
+  --border:#ddd;
+  --text:#333;
+  --sub:#aaa;
+  --input-bg:#fff;
+}
+
+/* ヘッダー */
+.header{
+  background:#1a1a1a;
+  padding:16px 16px;
+  text-align:center;
+  color:#fff;
+}
+.header h1{
+  font-size:18px;
+  font-weight:600;
+  letter-spacing:0.5px;
+  font-family:'Helvetica Neue', 'Arial', 'Noto Sans JP', sans-serif;
+}
+.header p{
+  font-size:11px;
+  opacity:0.6;
+  margin-top:6px;
+  letter-spacing:0.3px;
+}
+
+/* コンテナ */
+.container{
+  padding:16px 24px;
+  max-width:540px;
+  margin:0 auto;
+}
+
+/* セクション */
+.section{
+  background:var(--card);
+  border:1px solid #bbb;
+  border-radius:12px;
+  padding:14px;
+  margin-bottom:28px;
+  box-shadow:0 2px 8px rgba(0,0,0,0.08);
+}
+.section-title{
+  font-size:16px;
+  font-weight:700;
+  color:#1a1a1a;
+  margin-bottom:14px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.section-title::before{
+  content:'';
+  width:4px;
+  height:18px;
+  background:#1a1a1a;
+  border-radius:2px;
+}
+
+/* 入力フィールド */
+.field{
+  margin-bottom:16px;
+}
+.field:last-child{
+  margin-bottom:0;
+}
+.field-label{
+  font-size:12px;
+  color:#666;
+  margin-bottom:6px;
+  display:block;
+}
+.field-label-dark{
+  color:#333;
+  font-weight:500;
+}
+.field-hint{
+  font-size:11px;
+  color:#555;
+  margin-top:4px;
+}
+.field-note{
+  font-size:11px;
+  color:#888;
+  margin-top:8px;
+  line-height:1.5;
+}
+input[type="text"],
+input[type="number"],
+textarea,
+select{
+  width:100%;
+  background:var(--input-bg);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:12px;
+  font-size:16px;
+  color:#333;
+  font-family:inherit;
+  box-shadow:inset 0 3px 6px rgba(0,0,0,0.1);
+}
+input:focus,
+textarea:focus,
+select:focus{
+  outline:none;
+  border-color:var(--pink);
+  box-shadow:inset 0 3px 6px rgba(0,0,0,0.1), 0 0 0 2px rgba(192,68,110,0.15);
+}
+textarea{
+  min-height:100px;
+  resize:vertical;
+}
+select{
+  appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23999' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;
+  background-position:right 12px center;
+  padding-right:36px;
+}
+
+/* 並びプレビュー */
+.lineup-preview{
+  background:var(--input-bg);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:16px;
+  margin-top:12px;
+  font-family:monospace;
+  font-size:14px;
+  text-align:center;
+  box-shadow:inset 0 3px 6px rgba(0,0,0,0.1);
+}
+.lineup-row{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:0;
+  margin-bottom:8px;
+}
+.lineup-group{
+  display:flex;
+  align-items:center;
+  gap:0;
+}
+.lineup-sep{
+  margin:0 6px;
+  color:#999;
+}
+.car-item{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:4px;
+  cursor:pointer;
+  padding:4px 4px;
+  border-radius:6px;
+  transition:background 0.15s;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:rgba(192,68,110,0.3);
+  user-select:none;
+  -webkit-user-select:none;
+}
+.car-item:hover,
+.car-item:active{
+  background:rgba(192,68,110,0.15);
+}
+.car-mark{
+  min-height:22px;
+  font-size:18px;
+  font-weight:900;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#111;
+}
+.car-mark.tan-mark{
+  font-size:11px;
+  letter-spacing:-1px;
+}
+.car-mark.empty{
+  color:#ccc;
+}
+.car-num{
+  width:28px;
+  height:28px;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:14px;
+  font-weight:700;
+}
+.car-num.c1{background:#F0F0F0;color:#333;border:1px solid #ccc;}
+.car-num.c2{background:#333;color:#fff;}
+.car-num.c3{background:#C62828;color:#fff;}
+.car-num.c4{background:#1565C0;color:#fff;}
+.car-num.c5{background:#FFD54F;color:#333;}
+.car-num.c6{background:#2E7D32;color:#fff;}
+.car-num.c7{background:#EF6C00;color:#fff;}
+.car-num.c8{background:#AD1457;color:#fff;}
+.car-num.c9{background:#6A1B9A;color:#fff;}
+
+/* 印選択パネル */
+.mark-panel{
+  display:none;
+  position:fixed;
+  bottom:0;
+  left:0;
+  right:0;
+  background:#fff;
+  border-top:1px solid var(--border);
+  padding:16px;
+  z-index:100;
+  animation:slideUp 0.3s ease;
+  box-shadow:0 -4px 20px rgba(0,0,0,0.1);
+}
+.mark-panel.show{
+  display:block;
+}
+@keyframes slideUp{
+  from{transform:translateY(100%);}
+  to{transform:translateY(0);}
+}
+.mark-panel-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:12px;
+}
+.mark-panel-title{
+  font-size:14px;
+  font-weight:700;
+  color:#333;
+}
+.mark-panel-close{
+  background:none;
+  border:none;
+  color:#999;
+  font-size:24px;
+  cursor:pointer;
+}
+.mark-options{
+  display:grid;
+  grid-template-columns:repeat(6,1fr);
+  gap:10px;
+}
+.mark-option{
+  background:#f5f5f7;
+  border:2px solid #ddd;
+  border-radius:10px;
+  padding:18px 10px;
+  text-align:center;
+  font-size:24px;
+  cursor:pointer;
+  transition:all 0.15s;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:rgba(192,68,110,0.3);
+  user-select:none;
+  -webkit-user-select:none;
+}
+.mark-option *{
+  pointer-events:none;
+}
+.mark-option:hover,
+.mark-option:active,
+.mark-option.selected{
+  border-color:var(--pink);
+  background:rgba(192,68,110,0.15);
+}
+.mark-option:active{
+  transform:scale(0.95);
+}
+.mark-none{
+  padding:8px 10px;
+  font-size:12px;
+  color:#666;
+}
+.mark-tan{
+  font-size:13px;
+  font-weight:700;
+  letter-spacing:-1px;
+  pointer-events:none;
+}
+
+/* 紐付け表示 */
+.mapping-display{
+  background:#f9f9f9;
+  border-radius:8px;
+  padding:12px;
+  margin-top:12px;
+  font-size:12px;
+  color:#999;
+}
+.mapping-item{
+  display:inline-block;
+  margin-right:12px;
+}
+
+/* 買い目入力 */
+.bet-input{
+  font-family:monospace;
+}
+
+/* 点数入力 */
+.points-field{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.points-label{
+  font-size:12px;
+  color:#666;
+}
+.points-input{
+  width:36px;
+  background:var(--input-bg);
+  border:1px solid var(--border);
+  border-radius:6px;
+  padding:8px 4px;
+  font-size:14px;
+  color:#333;
+  font-family:inherit;
+  box-shadow:inset 0 3px 6px rgba(0,0,0,0.1);
+  text-align:center;
+}
+.points-input:focus{
+  outline:none;
+  border-color:var(--pink);
+  box-shadow:inset 0 3px 6px rgba(0,0,0,0.1), 0 0 0 2px rgba(192,68,110,0.15);
+}
+
+/* 確認画面 */
+.confirm-overlay{
+  display:none;
+  position:fixed;
+  top:0;left:0;right:0;bottom:0;
+  background:rgba(0,0,0,0.5);
+  z-index:200;
+  overflow-y:auto;
+  padding:16px;
+}
+.confirm-overlay.show{
+  display:block;
+}
+.confirm-content{
+  background:#fff;
+  border-radius:12px;
+  padding:20px;
+  max-width:600px;
+  margin:0 auto;
+}
+.confirm-title{
+  font-size:16px;
+  font-weight:700;
+  margin-bottom:16px;
+  text-align:center;
+  color:#1a1a1a;
+}
+.confirm-section{
+  margin-bottom:16px;
+  padding-bottom:16px;
+  border-bottom:1px solid #eee;
+}
+.confirm-section:last-of-type{
+  border-bottom:none;
+}
+.confirm-label{
+  font-size:11px;
+  color:#aaa;
+  margin-bottom:4px;
+}
+.confirm-value{
+  font-size:14px;
+  white-space:pre-wrap;
+  word-break:break-all;
+  color:#333;
+}
+.confirm-actions{
+  display:flex;
+  gap:12px;
+  margin-top:20px;
+}
+.confirm-btn{
+  flex:1;
+  padding:14px;
+  border-radius:8px;
+  font-size:14px;
+  font-weight:700;
+  cursor:pointer;
+  border:none;
+}
+.confirm-btn.back{
+  background:#ddd;
+  color:#333;
+}
+.confirm-btn.copy{
+  background:linear-gradient(135deg,var(--pink),var(--pink-light));
+  color:#fff;
+}
+
+/* 送信ボタン */
+.submit-btn{
+  width:100%;
+  padding:16px;
+  background:#1a1a1a;
+  border:2px solid #444;
+  border-radius:12px;
+  color:#fff;
+  font-size:18px;
+  font-weight:700;
+  cursor:pointer;
+  margin-top:8px;
+}
+.submit-btn:active{
+  transform:scale(0.98);
+  opacity:0.9;
+}
+
+/* コピー完了トースト */
+.toast{
+  position:fixed;
+  bottom:100px;
+  left:50%;
+  transform:translateX(-50%);
+  background:#333;
+  color:#fff;
+  padding:12px 24px;
+  border-radius:8px;
+  font-size:14px;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity 0.3s;
+  z-index:300;
+}
+.toast.show{
+  opacity:1;
+  pointer-events:auto;
+}
+
+/* オーバーレイ背景 */
+.panel-backdrop{
+  display:none;
+  position:fixed;
+  top:0;left:0;right:0;bottom:0;
+  background:rgba(0,0,0,0.3);
+  z-index:99;
+}
+.panel-backdrop.show{
+  display:block;
+}
+
+/* フッター */
+.footer{
+  background:#1a1a1a;
+  padding:16px;
+  text-align:center;
+  color:#666;
+  font-size:11px;
+  position:fixed;
+  bottom:0;
+  left:0;
+  right:0;
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>買い目パターン入力フォーム</h1>
+  <p>買い目構成を構造化して共有します</p>
+</div>
+
+<div class="container">
+  <!-- 基本情報 -->
+  <div class="section">
+    <div class="section-title">基本情報</div>
+    
+    <div class="field">
+      <label class="field-label">パターン名</label>
+      <input type="text" id="patternName" placeholder="">
+      <div class="field-hint">任意。</div>
+      <div class="field-note">※パターン名を「 1 」とした場合、7.3.3ren-1と区分コード付きで出力されます。<br>例) 7車3分戦.3連単の「1」を表す</div>
+    </div>
+    
+    <div class="field">
+      <label class="field-label">賭式</label>
+      <select id="betType">
+        <option value="3連単">3連単</option>
+        <option value="2車単">2車単</option>
+      </select>
+    </div>
+    
+    <div class="field">
+      <label class="field-label">レース形式・ライン構成</label>
+      <select id="raceFormat">
+        <option value="7車立て2分戦">7車立て2分戦</option>
+        <option value="7車立て3分戦" selected>7車立て3分戦</option>
+        <option value="9車立て2分戦">9車立て2分戦</option>
+        <option value="9車立て3分戦">9車立て3分戦</option>
+      </select>
+    </div>
+  </div>
+  
+  <!-- ライン並び -->
+  <div class="section">
+    <div class="section-title">ライン並び・印配置</div>
+    
+    <div class="field">
+      <label class="field-label field-label-dark">ライン並び例</label>
+      <input type="text" id="lineupInput" placeholder="例: 123/45/67">
+      <div class="field-hint">スラッシュ(/)でラインを区切って入力</div>
+      <div class="field-hint">1234567 or 123456789の順番に限る / を使用してライン構成だけを区別してください</div>
+    </div>
+    
+    <div class="lineup-preview" id="lineupPreview" style="display:none;">
+      <div class="field-label field-label-dark" style="text-align:left;margin-bottom:12px;">車番をタップして印を配置</div>
+      <div class="lineup-row" id="lineupRow"></div>
+      <div class="mapping-display" id="mappingDisplay"></div>
+    </div>
+  </div>
+  
+  <!-- 発動条件 -->
+  <div class="section">
+    <div class="section-title">発動条件</div>
+    
+    <div class="field">
+      <label class="field-label">このパターンを発動させる条件を入力してください</label>
+      <textarea id="triggerCondition" placeholder=""></textarea>
+    </div>
+  </div>
+  
+  <!-- 通常買い目 -->
+  <div class="section">
+    <div class="section-title"><span id="betTypeLabel1">3連単</span>買い目（通常）</div>
+    
+    <div class="field">
+      <label class="field-label">買い目を入力してください</label>
+      <textarea id="normalBets" class="bet-input" placeholder=""></textarea>
+      <div class="field-hint">例）1-2-3</div>
+    </div>
+    
+    <div class="field points-field">
+      <span class="points-label">買い目点数</span>
+      <input type="number" id="normalPoints" class="points-input" min="1" max="99">
+      <span class="points-label">点</span>
+    </div>
+  </div>
+  
+  <!-- 絞り買い目 -->
+  <div class="section">
+    <div class="section-title"><span id="betTypeLabel2">3連単</span>買い目（絞り）</div>
+    
+    <div class="field">
+      <label class="field-label">買い目を入力してください <span class="field-hint" style="display:inline;">未入力可</span></label>
+      <textarea id="narrowBets" class="bet-input" placeholder=""></textarea>
+      <div class="field-hint">例）1-2-3</div>
+    </div>
+    
+    <div class="field points-field">
+      <span class="points-label">買い目点数</span>
+      <input type="number" id="narrowPoints" class="points-input" min="1" max="99">
+      <span class="points-label">点</span>
+    </div>
+  </div>
+  
+  <!-- 補足事項 -->
+  <div class="section">
+    <div class="section-title">補足事項</div>
+    
+    <div class="field">
+      <label class="field-label">自由入力</label>
+      <textarea id="notes" placeholder="その他補足があれば入力してください"></textarea>
+    </div>
+  </div>
+  
+  <button class="submit-btn" id="confirmBtn">入力内容を確認</button>
+</div>
+
+<div class="footer">© 2026 Brain</div>
+
+<!-- 印選択パネル背景 -->
+<div class="panel-backdrop" id="panelBackdrop"></div>
+
+<!-- 印選択パネル -->
+<div class="mark-panel" id="markPanel">
+  <div class="mark-panel-header">
+    <span class="mark-panel-title"><span id="selectedCarNum">1</span>番車の印を選択</span>
+    <button class="mark-panel-close" id="markPanelClose">✕</button>
+  </div>
+  <div class="mark-options" id="markOptionsContainer">
+    <div class="mark-option" data-idx="0">◎</div>
+    <div class="mark-option" data-idx="1">⑳</div>
+    <div class="mark-option" data-idx="2">○</div>
+    <div class="mark-option" data-idx="3">●</div>
+    <div class="mark-option" data-idx="4">△</div>
+    <div class="mark-option" data-idx="5">▲</div>
+    <div class="mark-option" data-idx="6">×</div>
+    <div class="mark-option" data-idx="7">✖</div>
+    <div class="mark-option" data-idx="8">⭐︎</div>
+    <div class="mark-option" data-idx="9">★</div>
+    <div class="mark-option" data-idx="10"><span class="mark-tan">単1</span></div>
+    <div class="mark-option" data-idx="11"><span class="mark-tan">単2</span></div>
+    <div class="mark-option mark-none" data-idx="12">印なし</div>
+  </div>
+</div>
+
+<!-- 確認画面 -->
+<div class="confirm-overlay" id="confirmOverlay">
+  <div class="confirm-content">
+    <div class="confirm-title">📋 入力内容の確認</div>
+    <div id="confirmBody"></div>
+    <div class="confirm-actions">
+      <button class="confirm-btn back" id="confirmBack">戻る</button>
+      <button class="confirm-btn copy" id="confirmCopy">コピーする</button>
+    </div>
+  </div>
+</div>
+
+<!-- トースト -->
+<div class="toast" id="toast">コピーしました！</div>
+
+<script>
+// ========================================
+// データ管理
+// ========================================
+let carMarks = {}; // { 車番: 印 }
+let selectedCar = null;
+let lineupGroups = []; // [[1,2,3], [4,5], [6,7]]
+
+// 印の配列（インデックスでマッピング）
+const MARK_LIST = ['◎', '⑳', '○', '●', '△', '▲', '×', '✖', '⭐︎', '★', '単1', '単2', '-'];
+
+// ========================================
+// 並び入力の処理
+// ========================================
+document.getElementById('lineupInput').addEventListener('input', function() {
+  const input = this.value.trim();
+  parseLineup(input);
+});
+
+function parseLineup(input) {
+  // 全角→半角、スペース除去、統一
+  let normalized = input
+    .replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
+    .replace(/／/g, '/')
+    .replace(/\s+/g, '')
+    .replace(/[ー−―]/g, '-');
+  
+  // スラッシュで分割
+  const groups = normalized.split('/').filter(g => g.length > 0);
+  
+  if (groups.length < 2) {
+    document.getElementById('lineupPreview').style.display = 'none';
+    lineupGroups = [];
+    return;
+  }
+  
+  // 各グループを数字配列に
+  lineupGroups = groups.map(g => {
+    return g.split('').map(Number).filter(n => n >= 1 && n <= 9);
+  });
+  
+  renderLineupPreview();
+}
+
+function renderLineupPreview() {
+  const preview = document.getElementById('lineupPreview');
+  const row = document.getElementById('lineupRow');
+  
+  if (lineupGroups.length === 0) {
+    preview.style.display = 'none';
+    return;
+  }
+  
+  preview.style.display = 'block';
+  row.innerHTML = '';
+  
+  lineupGroups.forEach((group, gi) => {
+    const groupEl = document.createElement('div');
+    groupEl.className = 'lineup-group';
+    
+    group.forEach(num => {
+      const item = document.createElement('div');
+      item.className = 'car-item';
+      item.dataset.car = num;
+      
+      const mark = carMarks[num] || '';
+      const isTan = mark.startsWith('単');
+      item.innerHTML = `
+        <div class="car-mark ${mark ? (isTan ? 'tan-mark' : '') : 'empty'}">${mark || '＿'}</div>
+        <div class="car-num c${num}">${num}</div>
+      `;
+      
+      // タッチイベントで即座に反応
+      let touched = false;
+      item.addEventListener('touchstart', (e) => {
+        touched = true;
+        e.preventDefault();
+        openMarkPanel(num);
+      }, {passive: false});
+      
+      item.addEventListener('click', () => {
+        if (!touched) openMarkPanel(num);
+        touched = false;
+      });
+      
+      groupEl.appendChild(item);
+    });
+    
+    row.appendChild(groupEl);
+    
+    // セパレータ
+    if (gi < lineupGroups.length - 1) {
+      const sep = document.createElement('div');
+      sep.className = 'lineup-sep';
+      sep.textContent = '/';
+      row.appendChild(sep);
+    }
+  });
+  
+  updateMappingDisplay();
+}
+
+function updateMappingDisplay() {
+  const display = document.getElementById('mappingDisplay');
+  const allCars = lineupGroups.flat();
+  
+  const mappings = allCars.map(num => {
+    const mark = carMarks[num] || '-';
+    return `<span class="mapping-item">${num}=${mark}</span>`;
+  }).join('');
+  
+  display.innerHTML = '紐付け: ' + mappings;
+}
+
+// ========================================
+// 印選択パネル
+// ========================================
+function openMarkPanel(carNum) {
+  selectedCar = carNum;
+  document.getElementById('selectedCarNum').textContent = carNum;
+  document.getElementById('markPanel').classList.add('show');
+  document.getElementById('panelBackdrop').classList.add('show');
+  
+  // 現在の印をハイライト
+  const currentMark = carMarks[carNum] || '';
+  const currentIdx = MARK_LIST.indexOf(currentMark);
+  document.querySelectorAll('.mark-option').forEach(opt => {
+    const idx = parseInt(opt.getAttribute('data-idx'), 10);
+    opt.classList.toggle('selected', idx === currentIdx);
+  });
+}
+
+function closeMarkPanel() {
+  document.getElementById('markPanel').classList.remove('show');
+  document.getElementById('panelBackdrop').classList.remove('show');
+  selectedCar = null;
+}
+
+document.getElementById('markPanelClose').addEventListener('click', closeMarkPanel);
+document.getElementById('panelBackdrop').addEventListener('click', closeMarkPanel);
+
+// 印選択イベント
+document.querySelectorAll('.mark-option').forEach((opt, i) => {
+  opt.ontouchstart = function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (selectedCar === null) return;
+    
+    const idx = parseInt(this.getAttribute('data-idx'), 10);
+    const mark = MARK_LIST[idx];
+    
+    if (mark && mark !== '-') {
+      carMarks[selectedCar] = mark;
+    } else {
+      delete carMarks[selectedCar];
+    }
+    renderLineupPreview();
+    closeMarkPanel();
+  };
+  
+  // PC用fallback
+  opt.onclick = function(e) {
+    e.stopPropagation();
+    if (selectedCar === null) return;
+    
+    const idx = parseInt(this.getAttribute('data-idx'), 10);
+    const mark = MARK_LIST[idx];
+    
+    if (mark && mark !== '-') {
+      carMarks[selectedCar] = mark;
+    } else {
+      delete carMarks[selectedCar];
+    }
+    renderLineupPreview();
+    closeMarkPanel();
+  };
+});
+
+// ========================================
+// 賭式ラベル連動
+// ========================================
+document.getElementById('betType').addEventListener('change', function() {
+  document.getElementById('betTypeLabel1').textContent = this.value;
+  document.getElementById('betTypeLabel2').textContent = this.value;
+});
+
+// ========================================
+// 買い目変換（記号⇔車番）圧縮形式対応
+// ========================================
+function convertBets(betsText, toType) {
+  const lines = betsText.trim().split('\n').filter(l => l.trim());
+  
+  return lines.map(line => {
+    // 全角→半角、スペース・ハイフン統一
+    let normalized = line
+      .replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
+      .replace(/\s+/g, '')
+      .replace(/[ー−―－]/g, '-');
+    
+    const parts = normalized.split('-');
+    
+    if (toType === 'mark') {
+      // 車番を記号に変換（複数文字＝圧縮形式対応）
+      return parts.map(p => {
+        // 各文字を個別に変換して連結
+        return p.split('').map(c => {
+          const num = parseInt(c);
+          if (num >= 1 && num <= 9 && carMarks[num]) {
+            return carMarks[num];
+          }
+          return c;
+        }).join('');
+      }).join('-');
+    } else {
+      // 記号を車番に変換（複数記号対応）
+      return parts.map(p => {
+        let result = '';
+        for (const char of p) {
+          let found = false;
+          for (const [car, mark] of Object.entries(carMarks)) {
+            if (mark === char) {
+              result += car;
+              found = true;
+              break;
+            }
+          }
+          if (!found) result += char;
+        }
+        return result;
+      }).join('-');
+    }
+  }).join('\n');
+}
+
+// ========================================
+// 点数計算（圧縮形式対応・重複排除）
+// ========================================
+function countBetPoints(betsText) {
+  if (!betsText || !betsText.trim()) return 0;
+  
+  const lines = betsText.trim().split('\n').filter(l => l.trim());
+  let total = 0;
+  
+  lines.forEach(line => {
+    let normalized = line
+      .replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
+      .replace(/\s+/g, '')
+      .replace(/[ー−―－]/g, '-');
+    
+    const parts = normalized.split('-');
+    
+    if (parts.length === 3) {
+      // 3連単: 1着-2着-3着
+      const first = parts[0].split('');
+      const second = parts[1].split('');
+      const third = parts[2].split('');
+      
+      // 全組み合わせを展開し、有効なもののみカウント
+      let validCount = 0;
+      for (const f of first) {
+        for (const s of second) {
+          for (const t of third) {
+            // 同じ車番が複数着にいたら無効
+            if (f !== s && s !== t && f !== t) {
+              validCount++;
+            }
+          }
+        }
+      }
+      total += validCount;
+      
+    } else if (parts.length === 2) {
+      // 2車単: 1着-2着
+      const first = parts[0].split('');
+      const second = parts[1].split('');
+      
+      let validCount = 0;
+      for (const f of first) {
+        for (const s of second) {
+          if (f !== s) {
+            validCount++;
+          }
+        }
+      }
+      total += validCount;
+    }
+  });
+  
+  return total;
+}
+
+// ========================================
+// 確認画面
+// ========================================
+document.getElementById('confirmBtn').addEventListener('click', showConfirm);
+
+function showConfirm() {
+  const data = collectData();
+  const body = document.getElementById('confirmBody');
+  
+  // 区分コード生成
+  const formatMatch = data.raceFormat.match(/(\d)車立て(\d)分戦/);
+  const cars = formatMatch ? formatMatch[1] : '7';
+  const lines = formatMatch ? formatMatch[2] : '3';
+  const betCode = data.betType === '3連単' ? '3ren' : '2tan';
+  const patternCode = `${cars}.${lines}.${betCode}-${data.patternName || '未入力'}`;
+  
+  // 並び文字列を生成
+  const lineupStr = lineupGroups.map(g => g.join('')).join('/');
+  
+  // 印文字列を生成
+  const markStr = lineupGroups.map(g => {
+    return g.map(n => carMarks[n] || '-').join(' ');
+  }).join(' / ');
+  
+  // 買い目を2形式で表示
+  const normalBetsRaw = document.getElementById('normalBets').value.trim();
+  const narrowBetsRaw = document.getElementById('narrowBets').value.trim();
+  
+  const normalBetsCar = convertBets(normalBetsRaw, 'car');
+  const normalBetsMark = convertBets(normalBetsRaw, 'mark');
+  const narrowBetsCar = convertBets(narrowBetsRaw, 'car');
+  const narrowBetsMark = convertBets(narrowBetsRaw, 'mark');
+  
+  // 点数を自動計算（手入力があればそちらを優先）
+  const normalPointsCalc = countBetPoints(normalBetsRaw);
+  const narrowPointsCalc = countBetPoints(narrowBetsRaw);
+  const normalPointsDisplay = data.normalPoints || normalPointsCalc || '?';
+  const narrowPointsDisplay = data.narrowPoints || narrowPointsCalc || '?';
+  
+  body.innerHTML = `
+    <div class="confirm-section">
+      <div class="confirm-label">パターン名称</div>
+      <div class="confirm-value">${patternCode}</div>
+    </div>
+    
+    <div class="confirm-section">
+      <div class="confirm-label">賭式 / 形式</div>
+      <div class="confirm-value">${data.betType} / ${data.raceFormat}</div>
+    </div>
+    
+    <div class="confirm-section">
+      <div class="confirm-label">ライン並び</div>
+      <div class="confirm-value">${lineupStr || '(未入力)'}</div>
+    </div>
+    
+    <div class="confirm-section">
+      <div class="confirm-label">印配置</div>
+      <div class="confirm-value">${markStr}</div>
+      <div class="confirm-value" style="margin-top:8px;font-size:12px;color:#999;">
+        ${Object.entries(carMarks).map(([c,m]) => `${c}=${m}`).join(' ')}
+      </div>
+    </div>
+    
+    <div class="confirm-section">
+      <div class="confirm-label">発動条件</div>
+      <div class="confirm-value">${data.triggerCondition || '(未入力)'}</div>
+    </div>
+    
+    <div class="confirm-section">
+      <div class="confirm-label">通常買い目（車番）${normalPointsDisplay}点</div>
+      <div class="confirm-value" style="font-family:monospace;">${normalBetsCar || '(未入力)'}</div>
+    </div>
+    
+    <div class="confirm-section">
+      <div class="confirm-label">通常買い目（記号）${normalPointsDisplay}点</div>
+      <div class="confirm-value" style="font-family:monospace;">${normalBetsMark || '(未入力)'}</div>
+    </div>
+    
+    <div class="confirm-section">
+      <div class="confirm-label">絞り買い目（車番）${narrowPointsDisplay}点</div>
+      <div class="confirm-value" style="font-family:monospace;">${narrowBetsCar || '(未入力)'}</div>
+    </div>
+    
+    <div class="confirm-section">
+      <div class="confirm-label">絞り買い目（記号）${narrowPointsDisplay}点</div>
+      <div class="confirm-value" style="font-family:monospace;">${narrowBetsMark || '(未入力)'}</div>
+    </div>
+    
+    <div class="confirm-section">
+      <div class="confirm-label">補足事項</div>
+      <div class="confirm-value">${data.notes || '(なし)'}</div>
+    </div>
+  `;
+  
+  document.getElementById('confirmOverlay').classList.add('show');
+}
+
+function collectData() {
+  return {
+    patternName: document.getElementById('patternName').value.trim(),
+    betType: document.getElementById('betType').value,
+    raceFormat: document.getElementById('raceFormat').value,
+    lineup: lineupGroups.map(g => g.join('')).join('/'),
+    marks: { ...carMarks },
+    triggerCondition: document.getElementById('triggerCondition').value.trim(),
+    normalBets: document.getElementById('normalBets').value.trim(),
+    normalPoints: document.getElementById('normalPoints').value,
+    narrowBets: document.getElementById('narrowBets').value.trim(),
+    narrowPoints: document.getElementById('narrowPoints').value,
+    notes: document.getElementById('notes').value.trim(),
+    createdAt: new Date().toISOString()
+  };
+}
+
+document.getElementById('confirmBack').addEventListener('click', () => {
+  document.getElementById('confirmOverlay').classList.remove('show');
+});
+
+document.getElementById('confirmCopy').addEventListener('click', () => {
+  const data = collectData();
+  
+  // 区分コード生成
+  const formatMatch = data.raceFormat.match(/(\d)車立て(\d)分戦/);
+  const cars = formatMatch ? formatMatch[1] : '7';
+  const lines = formatMatch ? formatMatch[2] : '3';
+  const betCode = data.betType === '3連単' ? '3ren' : '2tan';
+  const patternCode = `${cars}.${lines}.${betCode}-${data.patternName || '未入力'}`;
+  
+  // テキスト形式で出力
+  const lineupStr = data.lineup;
+  const markStr = lineupGroups.map(g => {
+    return g.map(n => carMarks[n] || '-').join(' ');
+  }).join(' / ');
+  
+  const normalBetsCar = convertBets(data.normalBets, 'car');
+  const normalBetsMark = convertBets(data.normalBets, 'mark');
+  const narrowBetsCar = convertBets(data.narrowBets, 'car');
+  const narrowBetsMark = convertBets(data.narrowBets, 'mark');
+  
+  // 点数を自動計算（手入力があればそちらを優先）
+  const normalPointsCalc = countBetPoints(data.normalBets);
+  const narrowPointsCalc = countBetPoints(data.narrowBets);
+  const normalPointsOut = data.normalPoints || normalPointsCalc || '?';
+  const narrowPointsOut = data.narrowPoints || narrowPointsCalc || '?';
+  
+  const output = `【◼︎名称】${patternCode}
+${data.betType} / ${data.raceFormat}
+【◼︎並び】${lineupStr}
+【◼︎印】${markStr}
+【◼︎発動条件】
+${data.triggerCondition || '(未入力)'}
+
+【◼︎通常買い目】${normalPointsOut}点
+${normalBetsCar}
+【◼︎通常買い目・印】
+${normalBetsMark}
+
+【◼︎絞り買い目】${narrowPointsOut}点
+${narrowBetsCar}
+【◼︎絞り買い目・印】${narrowPointsOut}点
+${narrowBetsMark}
+
+【◼︎補足事項】
+${data.notes || '(なし)'}
+
+━━━━━━━━━
+出力日時: ${new Date().getMonth() + 1}/${new Date().getDate()} ${new Date().getHours()}:${String(new Date().getMinutes()).padStart(2, '0')}
+━━━━━━━━━`.trim();
+  
+  navigator.clipboard.writeText(output).then(() => {
+    showToast('コピーしました！DMにペーストして送信してください');
+    document.getElementById('confirmOverlay').classList.remove('show');
+  }).catch(() => {
+    // フォールバック
+    const ta = document.createElement('textarea');
+    ta.value = output;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('コピーしました！DMにペーストして送信してください');
+    document.getElementById('confirmOverlay').classList.remove('show');
+  });
+});
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
+}
+</script>
+
+</body>
+</html>
