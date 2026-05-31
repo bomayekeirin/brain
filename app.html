@@ -1926,6 +1926,23 @@ body{background:#0f0f0f;min-height:100vh;font-family:'Noto Sans JP',sans-serif;}
   80%{transform:translate(1px,1.6px) rotate(1deg);}
   100%{transform:translate(0,0) rotate(0);}
 }
+/* ===== 「思考中」ローディング文字（ボールドゴシック・点滅・影ズーム＆揺れ）===== */
+.arebuy-thinking{
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+  font-weight:800;
+  font-size:30px;
+  letter-spacing:.14em;
+  color:#5c5c5c;
+  animation:thinkBlink 1.15s ease-in-out infinite, thinkWobble .42s ease-in-out infinite;
+}
+@keyframes thinkBlink{0%,100%{opacity:1;}50%{opacity:.4;}}
+@keyframes thinkWobble{
+  0%{text-shadow:2px 2px 1px #000;transform:translate(0,0) rotate(0);}
+  25%{text-shadow:-4px 3px 9px #000;transform:translate(-1px,1px) rotate(-.6deg);}
+  50%{text-shadow:4px -3px 3px #000;transform:translate(1px,-1px) rotate(.6deg);}
+  75%{text-shadow:-3px -3px 11px #000;transform:translate(-1px,-1px) rotate(-.4deg);}
+  100%{text-shadow:2px 2px 1px #000;transform:translate(0,0) rotate(0);}
+}
 /* ===== 荒れ買い目モード（screen-racetable 流用）===== */
 #screen-racetable.arebuy-mode .rt-race-selector,
 #screen-racetable.arebuy-mode .rt-tabs-wrap,
@@ -1935,23 +1952,61 @@ body{background:#0f0f0f;min-height:100vh;font-family:'Noto Sans JP',sans-serif;}
 #screen-racetable.arebuy-mode #tabOdds,
 #screen-racetable.arebuy-mode #tabResult,
 #screen-racetable.arebuy-mode #rtHeaderCenter{display:none !important;}
-.arebuy-header-title{display:none;flex:1;text-align:center;font-weight:700;font-size:15px;color:#fff;letter-spacing:.04em;}
-#screen-racetable.arebuy-mode .arebuy-header-title{display:block;}
-/* 出走表トグル（デフォルト非表示・モード時のみ表示）*/
+/* ヘッダー：< のすぐ右に「一覧へ」 */
+.arebuy-back-label{display:none;}
+#screen-racetable.arebuy-mode .arebuy-back-label{display:inline-block;font-size:13px;font-weight:600;color:#fff;margin-left:-2px;}
+/* ヘッダーにくっつくバナー画像 */
+.arebuy-banner{display:none;width:100%;height:auto;vertical-align:top;}
+#screen-racetable.arebuy-mode .arebuy-banner{display:block;}
+/* 出走表トグル（ライトグレー帯・モード時のみ表示）*/
 .arebuy-table-toggle{display:none;width:calc(100% - 24px);margin:10px 12px;padding:11px 0;background:#fff;border:1px solid #e2e2e6;border-radius:12px;font-size:14px;font-weight:600;color:#1a1a1a;cursor:pointer;}
 #screen-racetable.arebuy-mode .arebuy-table-toggle{display:block;}
-#screen-racetable.arebuy-mode #rtTableWrapAuto{display:none;}
-#screen-racetable.arebuy-mode.table-open #rtTableWrapAuto{display:block;animation:arebuyReveal .45s ease forwards;}
-@keyframes arebuyReveal{from{opacity:0;clip-path:inset(0 50% 0 50%);}to{opacity:1;clip-path:inset(0 0 0 0);}}
+/* ロールカーテン：見る→上から降りる／閉じる→巻き上げ（下のコンテンツを押し下げ/スライド）*/
+#screen-racetable.arebuy-mode #rtTableWrapAuto{max-height:0;overflow:hidden;transition:max-height .55s cubic-bezier(.33,0,.2,1);}
+#screen-racetable.arebuy-mode.table-open #rtTableWrapAuto{max-height:1600px;}
 /* フェードイン（ヘッダー以下）*/
 #screen-racetable.arebuy-mode .rt-info-bar,
 #screen-racetable.arebuy-mode #tabAuto{opacity:0;}
 #screen-racetable.arebuy-mode.arebuy-fadein .rt-info-bar,
 #screen-racetable.arebuy-mode.arebuy-fadein #tabAuto{animation:arebuyFadeIn .55s ease .05s forwards;}
 @keyframes arebuyFadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
-/* カレッタカードゾーン（中身はフェーズ3/4）*/
+/* カレッタゾーン（背景＝ヘッダー/フッター同色）*/
 .arebuy-cards{display:none;}
-#screen-racetable.arebuy-mode .arebuy-cards{display:block;padding:4px 12px 28px;}
+#screen-racetable.arebuy-mode .arebuy-cards{display:block;background:#1a1a1a;margin:0 -0px;padding:16px 12px 34px;border-radius:0;}
+/* カレッタカード */
+.crt-card{background:#232325;border:1px solid #333;border-radius:16px;padding:16px 16px 18px;margin-bottom:14px;}
+.crt-card-head{font-size:15px;font-weight:800;color:#fff;letter-spacing:.03em;margin-bottom:14px;}
+.crt-card-head .crt-flame{background:linear-gradient(90deg,#ff5a18,#ffb347);-webkit-background-clip:text;background-clip:text;color:transparent;}
+.crt-block-row{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:9px;gap:8px;}
+.crt-block-title{font-size:13.5px;font-weight:700;color:#fff;white-space:nowrap;}
+.crt-block-title .crt-pt{color:#ff8a5c;margin-left:5px;}
+.crt-block-meta{font-size:11px;color:#9a9a9a;text-align:right;}
+.crt-block-meta .crt-gosei{color:#ffd24a;font-weight:700;}
+.crt-bets{font-size:14px;color:#ececec;line-height:1.95;font-variant-numeric:tabular-nums;}
+.crt-bets .crt-bet-line{display:inline-block;margin-right:14px;}
+.crt-expand-btn{margin-top:10px;font-size:12px;color:#f0a0bc;background:transparent;border:1px solid #c0446e;border-radius:9px;padding:6px 13px;cursor:pointer;}
+.crt-expanded{display:none;margin-top:10px;}
+.crt-expanded.open{display:block;}
+.crt-exp-row{display:flex;justify-content:space-between;padding:6px 3px;border-bottom:1px solid #2f2f31;font-size:13px;color:#ddd;}
+.crt-exp-odds{color:#ffd24a;font-weight:600;}
+.crt-divider{height:1px;background:#3a3a3c;margin:15px 0;}
+.crt-na{font-size:13px;color:#9a9a9a;padding:4px 0 2px;line-height:1.6;}
+/* ===== コンテンツC：生成ゾーン・演出 ===== */
+.crt-c-zone{margin-top:18px;text-align:center;}
+.crt-c-head{font-size:15px;font-weight:800;color:#fff;letter-spacing:.03em;margin-bottom:14px;}
+.crt-c-genbtn{display:inline-flex;align-items:center;justify-content:center;min-width:170px;min-height:48px;padding:13px 32px;font-size:15px;font-weight:800;color:#fff;background:linear-gradient(135deg,#c0446e,#e0566a);border:none;border-radius:26px;cursor:pointer;box-shadow:0 6px 20px rgba(192,68,110,.45);letter-spacing:.06em;}
+.crt-c-genbtn:active{transform:scale(.97);}
+.crt-c-genbtn.loading{pointer-events:none;background:linear-gradient(135deg,#8a3350,#a23d4e);box-shadow:none;}
+.crt-c-spinner{display:inline-block;width:20px;height:20px;border:3px solid rgba(255,255,255,.28);border-top-color:#fff;border-radius:50%;animation:crtSpin .7s linear infinite;}
+@keyframes crtSpin{to{transform:rotate(360deg);}}
+.crt-c-result{margin-top:14px;text-align:left;}
+.crt-c-card{border-color:#c0446e !important;}
+.crt-pop{animation:crtPop .36s cubic-bezier(.2,1.2,.4,1) both;}
+@keyframes crtPop{0%{transform:scale(.4);opacity:0;}70%{transform:scale(1.06);opacity:1;}100%{transform:scale(1);opacity:1;}}
+.crt-wobble{animation:crtWobbleAnim .55s ease;}
+@keyframes crtWobbleAnim{0%,100%{transform:translate(0,0) rotate(0);}20%{transform:translate(-3px,0) rotate(-1deg);}40%{transform:translate(3px,0) rotate(1deg);}60%{transform:translate(-2px,0) rotate(-.6deg);}80%{transform:translate(2px,0) rotate(.6deg);}}
+.crt-sparkle{position:fixed;width:7px;height:7px;border-radius:50%;background:radial-gradient(circle,#fff 20%,#ffd24a 55%,rgba(255,179,71,0) 72%);box-shadow:0 0 9px #ffb347;pointer-events:none;z-index:3000;transform:translate(-50%,-50%);animation:crtSpark .6s ease-out forwards;}
+@keyframes crtSpark{0%{opacity:1;transform:translate(-50%,-50%) translate(0,0) scale(1.3);}100%{opacity:0;transform:translate(-50%,-50%) translate(var(--dx),var(--dy)) scale(.2);}}
 /* 荒れ予報遷移オーバーレイ（ブラックアウト） */
 .arerace-blackout{
   position:fixed;inset:0;
@@ -5522,7 +5577,7 @@ body{background:#0f0f0f;min-height:100vh;font-family:'Noto Sans JP',sans-serif;}
         <polyline points="14 17 9 12 14 7"/>
       </svg>
     </button>
-    <span class="arebuy-header-title">荒れレース買い目</span>
+    <span class="arebuy-back-label">一覧へ</span>
     <div class="rt-header-center visible" id="rtHeaderCenter">
       <span class="rt-header-info" id="rtHeaderInfo"></span>
       <span class="rt-header-deadline" id="rtHeaderDeadline"></span>
@@ -5534,6 +5589,8 @@ body{background:#0f0f0f;min-height:100vh;font-family:'Noto Sans JP',sans-serif;}
       </svg>
     </button>
   </div>
+  
+  <img class="arebuy-banner" src="arebuy-header.jpg" alt="荒れレース専用買い目">
   
   <div class="rt-info-bar" id="rtInfoBar">
     <div class="rt-info-left">
@@ -6121,7 +6178,7 @@ body{background:#0f0f0f;min-height:100vh;font-family:'Noto Sans JP',sans-serif;}
 </div>
 <div class="arerace-loading-overlay" id="areLoadingOverlay">
   <img src="brain-logo-pink.png" alt="" class="arebuy-loading-logo">
-  <div class="arerace-loading-text">買い目を選定中</div>
+  <div class="arebuy-thinking">思考中</div>
 </div>
 
 <div class="arerace-popup-overlay" id="arePopupOverlay">
@@ -15204,6 +15261,8 @@ function renderAreRaceCards(races) {
               const _minDelay = new Promise(r => setTimeout(r, 3500));
               await fetchVenueRaces(venue, race.raceNum);
               enterAreBuyMode();
+              try { await Promise.all([fetchOddsData('2t'), fetchOddsData('3t')]); } catch(e){}
+              renderAreBuyCards();
               await _minDelay;
             }
           } finally {
@@ -15236,6 +15295,208 @@ function revealAreBuyPage() {
 function exitAreBuyMode() {
   document.getElementById('screen-racetable').classList.remove('arebuy-mode', 'table-open', 'arebuy-fadein');
 }
+
+/* ===== カレッタ式ロジック（A/B/C） ===== */
+const CARETTA_BASE_SUMS = [6,7,8,9,12];
+const CARETTA_A_EXCEPTIONS = ['7-3','5-6'];
+function carettaOddsVal(o){ return (o && typeof o === 'object') ? o.value : o; }
+function carettaGosei(arr){ if(!arr.length) return null; return Math.round((1/arr.reduce((s,o)=>s+1/o,0))*100)/100; }
+function carettaRange(arr){ if(!arr.length) return null; return {min:Math.min(...arr),max:Math.max(...arr)}; }
+function carettaCompress2(combos){
+  const g={}; combos.forEach(c=>{const a=c.split('-')[0],b=c.split('-')[1];(g[a]=g[a]||[]).push(b);});
+  return Object.keys(g).sort().map(a=>`${a}-${g[a].sort().join('')}`);
+}
+function carettaCompress3(combos){
+  const g={}; combos.forEach(c=>{const p=c.split('-');g[p[0]]=g[p[0]]||{};(g[p[0]][p[1]]=g[p[0]][p[1]]||[]).push(p[2]);});
+  const out=[]; Object.keys(g).sort().forEach(a=>Object.keys(g[a]).sort().forEach(b=>out.push(`${a}-${b}-${g[a][b].sort().join('')}`)));
+  return out;
+}
+function getCarettaABase(){
+  const base=[]; for(let a=1;a<=7;a++)for(let b=1;b<=7;b++)if(a!==b&&CARETTA_BASE_SUMS.includes(a+b))base.push(`${a}-${b}`);
+  return base.concat(CARETTA_A_EXCEPTIONS);
+}
+function generateCarettaA(odds2t){
+  if(!odds2t) return null;
+  const passed=[];
+  getCarettaABase().forEach(c=>{ if(!(c in odds2t)) return; const o=carettaOddsVal(odds2t[c]); if(o>=12.0&&o<100.0) passed.push({combo:c,odds:o}); });
+  passed.sort((x,y)=>x.odds-y.odds);
+  const arr=passed.map(p=>p.odds);
+  return {bets:passed,count:passed.length,range:carettaRange(arr),gosei:carettaGosei(arr),compressed:carettaCompress2(passed.map(p=>p.combo))};
+}
+function extractCarettaB(omakaseBets,odds3t){
+  const kept=(omakaseBets||[]).filter(c=>{const p=c.split('-');return CARETTA_BASE_SUMS.includes(Number(p[0])+Number(p[1]));});
+  const arr=odds3t?kept.map(c=>carettaOddsVal(odds3t[c])).filter(v=>v!=null):[];
+  return {bets:kept,count:kept.length,range:arr.length?carettaRange(arr):null,gosei:arr.length?carettaGosei(arr):null,compressed:carettaCompress3(kept)};
+}
+function filterCarettaC(swappedBets,odds3t){
+  const kept=(swappedBets||[]).filter(c=>{const o=(odds3t&&c in odds3t)?carettaOddsVal(odds3t[c]):null;return o!=null&&o>10.0;});
+  const arr=kept.map(c=>carettaOddsVal(odds3t[c]));
+  return {bets:kept,count:kept.length,range:carettaRange(arr),gosei:carettaGosei(arr),compressed:carettaCompress3(kept)};
+}
+
+/* ===== ヘッドレスオッズ取得（fetchOddsをDOM非依存で再利用）===== */
+async function fetchOddsData(type){
+  const currentRace=CURRENT_VENUE_RACES[CURRENT_RACE_INDEX];
+  const currentVenue=CURRENT_VENUE;
+  if(!currentVenue||!currentRace) return null;
+  const config=BET_TYPE_CONFIG[type];
+  const joCode=ODDSPARK_JO_CODES[currentVenue.venueId];
+  if(!config||!joCode) return null;
+  try{
+    const raceCode=currentVenue.raceCode||'';
+    const dateStr=raceCode.substring(0,8);
+    const dayNum=String(currentVenue.dayNum||1).padStart(2,'0');
+    const raceNum=String(currentRace.raceNum).padStart(4,'0');
+    const kdreamsCode=`${joCode}${dateStr}${dayNum}${raceNum}`;
+    const oddsUrl=`https://keirin.kdreams.jp/${currentVenue.venueId}/racedetail/${kdreamsCode}/?pageType=odds&kakeshikiType=${config.kakeshiki}`;
+    const resp=await fetch(`${PROXY_URL}?url=${encodeURIComponent(oddsUrl)}`);
+    const html=await resp.text();
+    const doc=new DOMParser().parseFromString(html,'text/html');
+    let odds;
+    if(config.cars===3) odds=parseKdreamsOdds(doc,config);
+    else odds=parseKdreamsOdds2car(doc,config.ordered,config);
+    if(!odds||odds.length===0) odds=parseKdreamsPopularityTable(doc,config);
+    if(odds&&odds.length>0&&currentRace.players){
+      const maxCar=currentRace.players.length;
+      odds=odds.filter(o=>!(o.car1>maxCar||o.car2>maxCar||(o.car3!=null&&o.car3>maxCar)));
+      odds.sort((a,b)=>a.value-b.value); odds.forEach((o,i)=>o.rank=i+1);
+    }
+    if(odds&&odds.length>0){
+      if(!window.ALL_ODDS_DATA) window.ALL_ODDS_DATA={};
+      const m={}; odds.forEach(o=>{const k=(o.car3!=null)?`${o.car1}-${o.car2}-${o.car3}`:`${o.car1}-${o.car2}`;m[k]={value:o.value,rank:o.rank};});
+      window.ALL_ODDS_DATA[type]=m; return m;
+    }
+    return null;
+  }catch(e){ console.error('fetchOddsData',type,e); return null; }
+}
+
+/* ===== カレッタカード描画（A／B）===== */
+function crtBlockHTML(label,res,oddsMap,type){
+  if(!res||res.count===0){
+    return `<div class="crt-block-row"><span class="crt-block-title">${label} <span class="crt-pt">-点</span></span></div><div class="crt-na">該当する買い目がありません。</div>`;
+  }
+  const rg=res.range?`(${res.range.min.toFixed(1)}倍〜${res.range.max.toFixed(1)}倍)`:'';
+  const gs=res.gosei!=null?`合成<span class="crt-gosei">${res.gosei.toFixed(2)}倍</span>`:'';
+  let h=`<div class="crt-block-row"><span class="crt-block-title">${label} <span class="crt-pt">${res.count}点</span></span><span class="crt-block-meta">${rg} ${gs}</span></div>`;
+  h+='<div class="crt-bets">'+res.compressed.map(b=>`<span class="crt-bet-line">${b}</span>`).join('')+'</div>';
+  const expId='crtexp_'+type+'_'+Math.floor(Math.random()*1e6);
+  h+=`<button class="crt-expand-btn" data-exp="${expId}">買い目を展開</button>`;
+  h+=`<div class="crt-expanded" id="${expId}">`;
+  (res.bets||[]).forEach(b=>{
+    const combo=(typeof b==='string')?b:b.combo;
+    const od=(oddsMap&&oddsMap[combo]!=null)?carettaOddsVal(oddsMap[combo]):null;
+    h+=`<div class="crt-exp-row"><span>${combo}</span><span class="crt-exp-odds">${od!=null?od.toFixed(1)+'倍':'-'}</span></div>`;
+  });
+  h+='</div>';
+  return h;
+}
+function renderAreBuyCards(){
+  const container=document.getElementById('arebuyCards');
+  if(!container) return;
+  const currentRace=CURRENT_VENUE_RACES[CURRENT_RACE_INDEX];
+  const odds2t=(window.ALL_ODDS_DATA&&window.ALL_ODDS_DATA['2t'])||null;
+  const odds3t=(window.ALL_ODDS_DATA&&window.ALL_ODDS_DATA['3t'])||null;
+  const A=generateCarettaA(odds2t);
+  let aiDiff=null, omakaseBets=null;
+  if(currentRace){
+    try{
+      const lineupStr=currentRace.lineupStr||(currentRace.lineup?currentRace.lineup.map(g=>g.join('')).join('-'):'');
+      const marks=calcAllMarks(currentRace.players,lineupStr,currentRace.cls||'');
+      let ace=null,tai=null;
+      Object.keys(marks).forEach(c=>{const m=marks[c].mark;if(m==='◎')ace=c;if(m==='○')tai=c;});
+      if(ace&&tai&&currentRace.lineup){
+        const grp=car=>currentRace.lineup.findIndex(g=>g.map(String).includes(String(car)));
+        aiDiff=grp(ace)!==grp(tai);
+      }
+      if(aiDiff&&is3BunsenOrCBunsen(currentRace.lineup)){
+        const cv=VENUES.find(v=>v.venue===currentRace.venue);
+        const ts=(cv&&cv.timeSlot)||'day';
+        const r=generateBets(currentRace.lineup,currentRace.players,15,ts);
+        if(!r.error) omakaseBets=r.bets;
+      }
+    }catch(e){ console.error('areBuy mark/gen error',e); }
+  }
+  let B=null;
+  if(aiDiff===true&&omakaseBets) B=extractCarettaB(omakaseBets,odds3t);
+
+  let html='<div class="crt-card">';
+  html+='<div class="crt-card-head"><span class="crt-flame">カレッタ式</span> 荒れレース買い目</div>';
+  html+=crtBlockHTML('2車単',A,odds2t,'2t');
+  html+='<div class="crt-divider"></div>';
+  if(aiDiff===true&&B&&B.count>0){
+    html+=crtBlockHTML('3連単',B,odds3t,'3t');
+  }else{
+    html+='<div class="crt-block-row"><span class="crt-block-title">3連単 <span class="crt-pt">-点</span></span></div>';
+    html+='<div class="crt-na">このレースはカレッタ式3連単の対象外です。</div>';
+  }
+  html+='</div>';
+  // ===== コンテンツC：荒れ対応買い目生成ゾーン =====
+  html+='<div class="crt-c-zone" id="crtCZone"><div class="crt-c-head">荒れ対応買い目生成</div><button class="crt-c-genbtn" id="crtCGenBtn">生成する</button><div class="crt-c-result" id="crtCResult"></div></div>';
+  container.innerHTML=html;
+  bindCrtExpand(container);
+  const cgen=document.getElementById('crtCGenBtn');
+  if(cgen) cgen.onclick=startCarettaCGen;
+}
+function bindCrtExpand(root){
+  root.querySelectorAll('.crt-expand-btn').forEach(btn=>{
+    btn.onclick=function(){ const el=document.getElementById(btn.dataset.exp); if(!el)return; const open=el.classList.toggle('open'); btn.textContent=open?'閉じる':'買い目を展開'; };
+  });
+}
+/* ===== コンテンツC：軸対抗スワップ→赤オッズ(≤10.0)除外 ===== */
+function generateCarettaC(){
+  const currentRace=CURRENT_VENUE_RACES[CURRENT_RACE_INDEX];
+  const odds3t=(window.ALL_ODDS_DATA&&window.ALL_ODDS_DATA['3t'])||null;
+  if(!currentRace||!currentRace.lineup) return null;
+  if(!is3BunsenOrCBunsen(currentRace.lineup)) return null;
+  try{
+    const cv=VENUES.find(v=>v.venue===currentRace.venue);
+    const ts=(cv&&cv.timeSlot)||'day';
+    const r=generateBets(currentRace.lineup,currentRace.players,15,ts,{swapAxisTaisho:true});
+    if(r.error) return null;
+    return filterCarettaC(r.bets,odds3t);
+  }catch(e){ console.error('carettaC error',e); return null; }
+}
+function spawnCrtSparkles(anchor){
+  const rect=anchor.getBoundingClientRect();
+  const cx=rect.left+rect.width/2, cy=rect.top+rect.height/2;
+  for(let i=0;i<16;i++){
+    const s=document.createElement('div'); s.className='crt-sparkle';
+    const ang=(Math.PI*2*i)/16 + Math.random()*0.4;
+    const dist=42+Math.random()*46;
+    s.style.left=cx+'px'; s.style.top=cy+'px';
+    s.style.setProperty('--dx',(Math.cos(ang)*dist).toFixed(1)+'px');
+    s.style.setProperty('--dy',(Math.sin(ang)*dist).toFixed(1)+'px');
+    document.body.appendChild(s);
+    setTimeout(()=>s.remove(),650);
+  }
+}
+function startCarettaCGen(){
+  const btn=document.getElementById('crtCGenBtn');
+  const result=document.getElementById('crtCResult');
+  if(!btn||btn.dataset.busy) return;
+  btn.dataset.busy='1';
+  spawnCrtSparkles(btn);                                  // スパークル噴射→すぐ消滅
+  btn.classList.add('loading');
+  btn.innerHTML='<span class="crt-c-spinner"></span>';     // くるくる
+  setTimeout(()=>{                                         // あえて4秒待つ
+    const C=generateCarettaC();
+    const odds3t=(window.ALL_ODDS_DATA&&window.ALL_ODDS_DATA['3t'])||null;
+    btn.style.display='none';                              // ボタン消える
+    let html='<div class="crt-card crt-c-card crt-pop">';
+    html+='<div class="crt-card-head"><span class="crt-flame">荒れレース対応</span> 買い目</div>';
+    if(C&&C.count>0){
+      html+=crtBlockHTML('3連単',C,odds3t,'3c');
+    }else{
+      html+='<div class="crt-na">該当する荒れ対応買い目がありませんでした。</div>';
+    }
+    html+='</div>';
+    result.innerHTML=html;                                // カード出現ポンっ！
+    bindCrtExpand(result);
+    const card=result.querySelector('.crt-c-card');
+    if(card) setTimeout(()=>{ card.classList.add('crt-wobble'); setTimeout(()=>card.classList.remove('crt-wobble'),600); },360);  // ブルブルっ
+  },4000);
+}
+
 
 // ===== 結果ポップアップ =====
 // ===== 荒れ予報結果一覧 =====
