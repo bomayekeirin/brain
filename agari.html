@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FFFDFD">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>今節の上がりタイム | Brain</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Oswald:wght@300;500;600&display=swap" rel="stylesheet">
+<style>
+/* =====================================================================
+   Brain / 今節の上がりタイム   2026-08-06
+   Brain のテーマカラーを主軸にしたライト基調。淡い面の上にガラスを浮かべる。
+   タイムは「光の帯」で長さに置き換え、数字を読む前に速さが目に入るようにする。
+   ===================================================================== */
+:root{
+  /* Brain のテーマカラー #c0446e を主軸にしたライト基調。
+     #c0446e は白背景に対しコントラスト4.89で、本文の色としても使える。 */
+  --bg-hi:#FFFDFD;
+  --bg-lo:#F6E6EC;
+  --sun:#e06090;      /* 帯の明るい側 */
+  --ember:#c0446e;    /* Brain テーマ本体 */
+  --deep:#8e1140;     /* 濃い側（文字・押下） */
+  --ink:#241A1E;
+  --ink-2:rgba(36,26,30,.58);
+  --ink-3:rgba(36,26,30,.36);
+  --glass:rgba(255,255,255,.66);
+  --glass-2:rgba(255,255,255,.46);
+  --glass-line:rgba(255,255,255,.92);
+  --hair:rgba(192,68,110,.16);
+  --shadow:0 8px 28px rgba(150,40,80,.12);
+  --r:18px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;}
+body{
+  min-height:100dvh;
+  background:linear-gradient(180deg,var(--bg-hi) 0%,#FCF2F5 44%,var(--bg-lo) 100%) fixed;
+  color:var(--ink);
+  font-family:'Noto Sans JP',sans-serif;
+  font-size:14px;line-height:1.6;
+  overflow-x:hidden;
+  padding-bottom:56px;
+}
+
+/* ---------- 泡：朝もやの中を上っていく。常時動くが視線は奪わない ---------- */
+#bubbles{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;}
+.bub{
+  position:absolute;border-radius:50%;
+  background:radial-gradient(circle at 32% 28%,rgba(255,255,255,.95),rgba(255,255,255,.30) 42%,rgba(224,96,144,.13) 70%,rgba(224,96,144,0) 72%);
+  filter:blur(.4px);
+  animation:rise linear infinite;
+  will-change:transform,opacity;
+}
+@keyframes rise{
+  0%  {transform:translate3d(0,110vh,0) scale(.82);opacity:0;}
+  12% {opacity:var(--o);}
+  84% {opacity:var(--o);}
+  100%{transform:translate3d(var(--dx),-18vh,0) scale(1.08);opacity:0;}
+}
+@media (prefers-reduced-motion:reduce){ .bub{animation:none;opacity:.14;} }
+
+/* ---------- 版面 ---------- */
+.wrap{position:relative;z-index:1;max-width:560px;margin:0 auto;padding:0 16px;}
+
+header.top{padding:26px 0 18px;}
+.eyebrow{
+  font-family:'Oswald',sans-serif;font-weight:300;font-size:11px;letter-spacing:.22em;
+  color:var(--ink-3);text-transform:uppercase;
+}
+h1{
+  margin:5px 0 0;font-size:23px;font-weight:700;letter-spacing:.01em;line-height:1.3;
+}
+.lede{margin:8px 0 0;color:var(--ink-2);font-size:12.5px;}
+
+/* ---------- ガラスの面 ---------- */
+.glass{
+  background:var(--glass);
+  -webkit-backdrop-filter:blur(16px) saturate(150%);
+  backdrop-filter:blur(16px) saturate(150%);
+  border:1px solid var(--glass-line);
+  border-radius:var(--r);
+  box-shadow:var(--shadow);
+}
+
+/* ---------- 開催カード ---------- */
+.venues{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin:4px 0 8px;}
+.vcard{
+  position:relative;overflow:hidden;
+  padding:15px 14px 14px;text-align:left;
+  font:inherit;color:inherit;cursor:pointer;
+  transition:transform .22s cubic-bezier(.2,.8,.3,1),box-shadow .22s;
+}
+.vcard::after{
+  content:'';position:absolute;inset:0;border-radius:var(--r);
+  background:linear-gradient(135deg,rgba(255,255,255,.6),rgba(255,255,255,0) 46%);
+  pointer-events:none;
+}
+.vcard:active{transform:scale(.975);box-shadow:0 4px 14px rgba(150,40,80,.15);}
+.vname{font-size:17px;font-weight:700;letter-spacing:.01em;}
+.vmeta{margin-top:3px;font-size:11.5px;color:var(--ink-2);}
+.vday{
+  display:inline-block;margin-top:9px;padding:2px 9px;border-radius:999px;
+  background:rgba(192,68,110,.13);border:1px solid rgba(192,68,110,.24);
+  font-family:'Oswald',sans-serif;font-weight:500;font-size:11px;letter-spacing:.08em;
+  color:var(--deep);
+}
+.vgrade{
+  position:absolute;top:13px;right:13px;
+  font-family:'Oswald',sans-serif;font-weight:600;font-size:11px;letter-spacing:.06em;
+  color:var(--ember);
+}
+
+/* ---------- 開催ヘッダー ---------- */
+.meet{padding:15px 16px;margin:2px 0 14px;}
+.meet-row{display:flex;align-items:baseline;gap:9px;}
+.meet-name{font-size:18px;font-weight:700;}
+.meet-sub{font-size:11.5px;color:var(--ink-2);}
+.meet-bank{
+  margin-top:9px;padding-top:9px;border-top:1px solid var(--hair);
+  display:flex;gap:16px;font-size:11.5px;color:var(--ink-2);flex-wrap:wrap;
+}
+.meet-bank b{font-family:'Oswald',sans-serif;font-weight:500;font-size:14px;color:var(--ink);}
+
+/* ---------- 操作 ---------- */
+.controls{margin:0 0 12px;}
+.seg{display:flex;gap:5px;padding:4px;border-radius:13px;background:var(--glass-2);
+  border:1px solid var(--glass-line);margin-bottom:8px;overflow-x:auto;scrollbar-width:none;}
+.seg::-webkit-scrollbar{display:none;}
+.seg button{
+  flex:1 0 auto;min-width:64px;padding:7px 12px;border:0;border-radius:10px;background:transparent;
+  font:inherit;font-size:12.5px;font-weight:500;color:var(--ink-2);cursor:pointer;white-space:nowrap;
+  transition:background .18s,color .18s;
+}
+.seg button.on{background:#fff;color:var(--ink);font-weight:700;box-shadow:0 1px 4px rgba(150,40,80,.13);}
+.seg.tiny button{font-size:11.5px;padding:6px 10px;min-width:auto;}
+.ctl-label{font-size:10.5px;letter-spacing:.14em;color:var(--ink-3);margin:0 0 4px 3px;
+  font-family:'Oswald',sans-serif;font-weight:300;text-transform:uppercase;}
+
+/* ---------- 絞り込み中のバー ---------- */
+.filterbar{
+  display:none;align-items:center;gap:10px;margin:0 0 11px;padding:10px 13px;
+  border-radius:13px;background:rgba(192,68,110,.11);border:1px solid rgba(192,68,110,.28);
+  font-size:12.5px;
+}
+.filterbar.on{display:flex;}
+.filterbar b{font-weight:700;}
+.filterbar button{
+  margin-left:auto;padding:5px 11px;border:1px solid rgba(192,68,110,.36);border-radius:999px;
+  background:#fff;font:inherit;font-size:11.5px;color:var(--deep);cursor:pointer;white-space:nowrap;
+}
+
+/* ---------- ランキング ---------- */
+.rows{display:flex;flex-direction:column;gap:8px;}
+.row{
+  position:relative;display:grid;
+  grid-template-columns:32px 1fr auto;grid-template-rows:auto auto auto;
+  column-gap:11px;row-gap:5px;align-items:baseline;
+  padding:13px 14px 12px;overflow:hidden;
+}
+.row.no-time{opacity:.62;}
+.rk{
+  grid-row:1/3;align-self:center;
+  font-family:'Oswald',sans-serif;font-weight:600;font-size:21px;line-height:1;
+  color:var(--ink-3);text-align:right;font-variant-numeric:tabular-nums;
+}
+.row.top1 .rk{color:var(--ember);}
+.nm{font-size:15px;font-weight:700;letter-spacing:.01em;}
+.nm .kb{margin-left:7px;font-size:10.5px;font-weight:500;color:var(--ink-3);}
+.tm{
+  font-family:'Oswald',sans-serif;font-weight:500;font-size:23px;line-height:1;
+  font-variant-numeric:tabular-nums;letter-spacing:.01em;
+}
+.tm small{font-size:11px;font-weight:300;color:var(--ink-3);margin-left:3px;}
+.sub{grid-column:2/4;font-size:11.5px;color:var(--ink-2);display:flex;gap:9px;flex-wrap:wrap;}
+.sub .dot{color:var(--ink-3);}
+
+/* 光の帯：その絞り込み内の最速〜最遅でタイムを正規化した長さ */
+.ray{grid-column:1/4;height:5px;border-radius:999px;background:rgba(192,68,110,.10);overflow:hidden;margin-top:2px;}
+.ray i{
+  display:block;height:100%;border-radius:999px;
+  background:linear-gradient(90deg,var(--sun),var(--ember));
+  box-shadow:0 0 9px rgba(192,68,110,.42);
+  transform-origin:left center;
+  animation:ray-in .55s cubic-bezier(.2,.9,.3,1) both;
+}
+@keyframes ray-in{from{transform:scaleX(0);}to{transform:scaleX(1);}}
+@media (prefers-reduced-motion:reduce){ .ray i{animation:none;} }
+
+.rbtn{
+  grid-column:3;grid-row:3;justify-self:end;
+  padding:5px 11px;border:1px solid rgba(192,68,110,.3);border-radius:999px;
+  background:rgba(255,255,255,.72);font:inherit;font-size:11.5px;font-weight:500;
+  color:var(--deep);cursor:pointer;white-space:nowrap;
+}
+.rbtn:active{background:rgba(192,68,110,.14);}
+
+/* ---------- 状態表示 ---------- */
+.state{padding:34px 18px;text-align:center;color:var(--ink-2);font-size:13px;}
+.state b{display:block;font-size:15px;color:var(--ink);margin-bottom:5px;font-weight:700;}
+.spin{
+  width:26px;height:26px;margin:0 auto 13px;border-radius:50%;
+  border:2px solid rgba(192,68,110,.2);border-top-color:var(--ember);
+  animation:sp .8s linear infinite;
+}
+@keyframes sp{to{transform:rotate(360deg);}}
+.prog{margin-top:9px;font-family:'Oswald',sans-serif;font-weight:300;font-size:12px;color:var(--ink-3);letter-spacing:.08em;}
+
+.back{
+  display:inline-flex;align-items:center;gap:6px;margin:2px 0 12px;padding:7px 13px;
+  border:1px solid var(--glass-line);border-radius:999px;background:var(--glass-2);
+  font:inherit;font-size:12.5px;color:var(--ink-2);cursor:pointer;
+}
+footer{margin:26px 0 0;text-align:center;font-size:10.5px;color:var(--ink-3);line-height:1.8;}
+.hide{display:none !important;}
+</style>
+</head>
+<body>
+
+<div id="bubbles" aria-hidden="true"></div>
+
+<div class="wrap">
+
+  <!-- ========== 開催を選ぶ ========== -->
+  <section id="pick">
+    <header class="top">
+      <div class="eyebrow">Brain</div>
+      <h1>今節の上がりタイム</h1>
+      <p class="lede">同じ開催で走った選手のラスト200mを並べます。初日は記録がないため2日目以降の開催のみ出ます。</p>
+    </header>
+    <div id="venues" class="venues"></div>
+    <div id="pickState" class="state glass">
+      <div class="spin"></div>本日の開催を読み込んでいます
+    </div>
+  </section>
+
+  <!-- ========== ランキング ========== -->
+  <section id="board" class="hide">
+    <button class="back" id="backBtn">← 開催を選び直す</button>
+
+    <div class="meet glass">
+      <div class="meet-row">
+        <span class="meet-name" id="mName"></span>
+        <span class="meet-sub" id="mSub"></span>
+      </div>
+      <div class="meet-bank">
+        <span>周長 <b id="mBank">-</b> m</span>
+        <span>バンクレコード <b id="mRec">-</b> 秒</span>
+        <span id="mRecBy" style="color:var(--ink-3)"></span>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="ctl-label">級班</div>
+      <div class="seg" id="segClass"></div>
+      <div class="ctl-label">表示</div>
+      <div class="seg tiny" id="segMode">
+        <button data-mode="all" class="on">全走を並べる</button>
+        <button data-mode="best">選手ごとに最速</button>
+      </div>
+      <div class="ctl-label">走った日</div>
+      <div class="seg tiny" id="segDay"></div>
+    </div>
+
+    <div class="filterbar" id="filterBar">
+      <span><b id="fbText"></b> の出走メンバーで比較中</span>
+      <button id="fbClear">解除</button>
+    </div>
+
+    <div id="rows" class="rows"></div>
+    <div id="boardState" class="state glass hide"></div>
+
+    <footer>
+      上がりタイムはラスト200mの所要時間です。<br>
+      先行して脚を使った選手は落ち、後方で待機した選手は速く出ます。
+    </footer>
+  </section>
+
+</div>
+
+<script>
+'use strict';
+
+/* ===================================================================
+   取得経路（既存 Brain と同じ）
+     開催一覧 : winticket.jp のトップを CORSプロキシ経由で読む
+     出走表   : oddspark RaceList.do を CORSプロキシ経由で読む
+   出走表の「今場所成績」に 日付・種別・着順・上がりタイムが入っているため、
+   結果ページとの突合は不要。今日の出走表だけで完結する。
+   =================================================================== */
+const PROXY_URL = 'https://royal-mode-67a9.bomayekeirin.workers.dev';
+
+const ODDSPARK_JO_CODES = {
+  'hakodate':'11','aomori':'12','iwakidaira':'13',
+  'yahiko':'21','maebashi':'22','toride':'23','utsunomiya':'24',
+  'omiya':'25','seibuen':'26','keiokaku':'27','tachikawa':'28',
+  'matsudo':'31','chiba':'32','kawasaki':'34','hiratsuka':'35',
+  'odawara':'36','ito':'37','shizuoka':'38',
+  'nagoya':'42','gifu':'43','ogaki':'44','toyohashi':'45',
+  'toyama':'46','matsusaka':'47','yokkaichi':'48',
+  'fukui':'51','nara':'53','mukomachi':'54','wakayama':'55','kishiwada':'56',
+  'tamano':'61','hiroshima':'62','hofu':'63',
+  'takamatsu':'71','komatsushima':'73','kochi':'74','matsuyama':'75',
+  'kokura':'81','kurume':'83','takeo':'84','sasebo':'85','beppu':'86','kumamoto':'87'
+};
+
+// バンク周長（app.html の BANK_LENGTH と同一）
+const BANK_LENGTH = {
+  '函館':400,'青森':400,'いわき平':400,'弥彦':400,'前橋':335,'取手':400,'宇都宮':500,'大宮':500,
+  '西武園':400,'京王閣':400,'立川':400,'松戸':333,'川崎':400,'平塚':400,'小田原':333,'伊東':333,
+  '静岡':400,'名古屋':400,'岐阜':400,'大垣':400,'豊橋':400,'富山':333,'松阪':400,'四日市':400,
+  '福井':400,'奈良':333,'向日町':400,'和歌山':400,'岸和田':400,'玉野':400,'広島':400,'防府':333,
+  '高松':400,'小松島':400,'高知':500,'松山':400,'小倉':400,'久留米':400,'武雄':400,'佐世保':400,
+  '別府':400,'熊本':400,'千葉':250
+};
+
+// バンクレコード（輪pedia 2026-08-06 時点）t=秒 p=保持者 d=達成日
+// ★実行時に外部サイトを叩かない。半年に一度は出典を確認して更新すること。
+const BANK_RECORD = {
+  '函館':{t:10.6,p:'脇本雄太',d:'2023.7.16'},'青森':{t:10.5,p:'ベイリー',d:'2004.4.18'},
+  'いわき平':{t:10.5,p:'山崎芳仁',d:'2010.9.4'},'弥彦':{t:10.6,p:'山崎芳仁',d:'2010.6.15'},
+  '前橋':{t:8.8,p:'中川誠一郎',d:'2014.9.13'},'取手':{t:10.7,p:'吉岡稔真',d:'1998.6.20'},
+  '宇都宮':{t:13.1,p:'中川誠一郎',d:'2018.6.28'},'大宮':{t:12.8,p:'ブフリ',d:'2017.7.19'},
+  '西武園':{t:10.6,p:'會田正一',d:'1996.4.29'},'京王閣':{t:10.4,p:'パーキンス',d:'2015.8.14'},
+  '立川':{t:10.6,p:'深谷知広',d:'2013.3.23'},'松戸':{t:9.0,p:'中村浩士',d:'2008.8.13'},
+  '千葉':{t:13.4,p:'滝澤正光',d:'1998.9.2'},'川崎':{t:10.5,p:'脇本雄太',d:'2025.4.20'},
+  '平塚':{t:10.4,p:'荒井崇博',d:'2018.5.1'},'小田原':{t:8.7,p:'ボティシャー',d:'2014.7.15'},
+  '伊東':{t:8.9,p:'山田庸平',d:'2025.3.23'},'静岡':{t:10.6,p:'犬伏湧也',d:'2026.4.23'},
+  '名古屋':{t:10.4,p:'パーキンス',d:'2013.9.8'},'岐阜':{t:10.7,p:'伊勢崎彰大',d:'2004.8.14'},
+  '大垣':{t:10.5,p:'ネイワンド',d:'1994.5.8'},'豊橋':{t:10.5,p:'金子貴志',d:'2013.7.21'},
+  '富山':{t:8.8,p:'山口拳矢',d:'2025.8.3'},'松阪':{t:10.4,p:'井上昌己',d:'2014.5.11'},
+  '四日市':{t:10.5,p:'ボス',d:'2019.8.20'},'福井':{t:10.5,p:'脇本雄太',d:'2025.9.13'},
+  '奈良':{t:8.9,p:'太田海也',d:'2022.8.26'},'向日町':{t:10.4,p:'深谷知広',d:'2014.8.1'},
+  '和歌山':{t:10.6,p:'ぺルビス',d:'2014.5.13'},'岸和田':{t:10.3,p:'ぺルビス',d:'2014.7.23'},
+  '玉野':{t:10.5,p:'太田竜馬',d:'2016.8.14'},'広島':{t:10.8,p:'石橋慎太郎',d:'2008.6.13'},
+  '防府':{t:8.8,p:'新田祐大',d:'2015.4.27'},'高松':{t:10.6,p:'高城信雄',d:'2000.7.27'},
+  '小松島':{t:10.5,p:'吉村和之',d:'2004.7.5'},'高知':{t:13.1,p:'島川将貴',d:'2021.7.31'},
+  '松山':{t:10.5,p:'ぺルビス',d:'2013.5.15'},'小倉':{t:10.5,p:'エスクレド',d:'2006.7.6'},
+  '久留米':{t:10.4,p:'グレーツァー',d:'2019.5.22'},'武雄':{t:10.6,p:'寺崎浩平',d:'2025.4.13'},
+  '佐世保':{t:10.6,p:'中川誠一郎',d:'2022.7.24'},'別府':{t:10.5,p:'ボス',d:'2019.9.19'},
+  '熊本':{t:10.7,p:'嘉永泰斗',d:'2024.7.21'}
+};
+
+/* ---------------------------------------------------------------- 泡 */
+(function bubbles(){
+  const host = document.getElementById('bubbles');
+  const N = 12;
+  for (let i = 0; i < N; i++) {
+    const b = document.createElement('div');
+    b.className = 'bub';
+    const size = 46 + Math.random() * 170;
+    b.style.width = b.style.height = size + 'px';
+    b.style.left = (Math.random() * 104 - 4) + '%';
+    b.style.setProperty('--o', (0.16 + Math.random() * 0.2).toFixed(2));
+    b.style.setProperty('--dx', (Math.random() * 90 - 45) + 'px');
+    b.style.animationDuration = (26 + Math.random() * 22).toFixed(1) + 's';
+    b.style.animationDelay = (-Math.random() * 42).toFixed(1) + 's';
+    host.appendChild(b);
+  }
+})();
+
+/* ---------------------------------------------------------------- 共通 */
+const $ = id => document.getElementById(id);
+const zen2han = s => String(s).replace(/[０-９]/g, c => '０１２３４５６７８９'.indexOf(c));
+
+function jstToday(){
+  const d = new Date(Date.now() + (new Date().getTimezoneOffset() + 540) * 60000);
+  const p = n => String(n).padStart(2, '0');
+  return { ymd: `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}`, date: d };
+}
+function ymdToDate(s){
+  return new Date(+s.slice(0,4), +s.slice(4,6)-1, +s.slice(6,8));
+}
+async function proxyText(url){
+  const r = await fetch(`${PROXY_URL}?url=${encodeURIComponent(url)}`);
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.text();
+}
+
+/* ---------------------------------------------------------------- 開催一覧 */
+async function loadVenues(){
+  const today = jstToday();
+  let doc;
+  try {
+    const html = await proxyText('https://www.winticket.jp/keirin');
+    doc = new DOMParser().parseFromString(html, 'text/html');
+  } catch (e) {
+    $('pickState').innerHTML = '<b>開催を読み込めませんでした</b>通信を確認してもう一度開いてください。';
+    return;
+  }
+  const panel = doc.querySelector('#panel-keirin-race-today');
+  if (!panel) {
+    $('pickState').innerHTML = '<b>開催を読み込めませんでした</b>本日開催の一覧が取得できませんでした。';
+    return;
+  }
+
+  const out = [];
+  panel.querySelectorAll('[class*="RecentRaceListItem___Wrapper-sc"]').forEach(el => {
+    const nameEl = el.querySelector('[class*="VenueName"]');
+    const gradeEl = el.querySelector('[class*="GradeIcon"]');
+    const a = el.querySelector('a[href*="racecard"]') || el.querySelector('a[href*="raceresult"]');
+    if (!nameEl || !a) return;
+    // /keirin/{venueId}/racecard/{raceCode}/{dayNum}/{raceNum}
+    const m = a.getAttribute('href').match(/\/keirin\/([a-z]+)\/(?:racecard|raceresult)\/(\d{10})/);
+    if (!m) return;
+    const venueId = m[1], raceCode = m[2];
+    const joCode = ODDSPARK_JO_CODES[venueId];
+    if (!joCode) return;
+    // raceCode = 開催初日YYYYMMDD + joCode → 開催日目を出す
+    const first = raceCode.slice(0, 8);
+    const dayNum = Math.round((ymdToDate(today.ymd) - ymdToDate(first)) / 86400000) + 1;
+    out.push({
+      venue: nameEl.textContent.trim().replace(/競輪$/, ''),
+      venueId, joCode, raceCode, dayNum,
+      grade: gradeEl ? gradeEl.textContent.trim() : ''
+    });
+  });
+
+  // 初日は今節の記録がないため出さない
+  const usable = out.filter(v => v.dayNum >= 2);
+  if (!usable.length) {
+    $('pickState').innerHTML = out.length
+      ? '<b>今日は初日開催だけです</b>今節の上がりタイムは2日目以降に出ます。'
+      : '<b>本日の開催が見つかりません</b>時間をおいてもう一度開いてください。';
+    return;
+  }
+  $('pickState').classList.add('hide');
+
+  const host = $('venues');
+  host.innerHTML = '';
+  usable.forEach(v => {
+    const b = document.createElement('button');
+    b.className = 'vcard glass';
+    b.innerHTML =
+      `<span class="vgrade">${v.grade}</span>` +
+      `<div class="vname">${v.venue}</div>` +
+      `<div class="vmeta">${BANK_LENGTH[v.venue] ? BANK_LENGTH[v.venue] + 'm バンク' : ''}</div>` +
+      `<span class="vday">${v.dayNum}日目</span>`;
+    b.addEventListener('click', () => openMeet(v));
+    host.appendChild(b);
+  });
+}
+
+/* ---------------------------------------------------------------- 出走表の解析 */
+
+// 「今場所成績」セル →  [{date:'8/3', type:'予選', rank:5, agari:11.6}]
+// 例: "8/ 3 予 選 ５着 11.6     8/ 4 一 般 ７着 12.3"
+//     "7/25 特一般 落"           ← 着順もタイムも無い（除外対象）
+function parseRuns(text){
+  const s = zen2han(String(text)).replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!s) return [];
+  const marks = [...s.matchAll(/(\d{1,2})\/\s*(\d{1,2})/g)];
+  const runs = [];
+  marks.forEach((m, i) => {
+    const seg = s.slice(m.index + m[0].length, i + 1 < marks.length ? marks[i + 1].index : undefined).trim();
+    const rm = seg.match(/(\d+)\s*着/);
+    const tm = seg.match(/(\d+(?:\.\d+)?)\s*$/);
+    // 種別は先頭から着順（または 落/失/欠）までの文字列
+    const type = seg.split(/\d+\s*着|落|失|欠|故/)[0].replace(/\s+/g, '');
+    if (!rm || !tm) return;             // 落車・失格などタイムが無い走は除外
+    runs.push({
+      date: `${+m[1]}/${+m[2]}`,
+      type: type || '-',
+      rank: parseInt(rm[1], 10),
+      agari: parseFloat(tm[1])
+    });
+  });
+  return runs;
+}
+
+// 級班（Ａ２ / Ｓ１ / Ｌ１）→ タブの区分
+function classGroup(kb){
+  const c = String(kb).trim().charAt(0);
+  if (c === 'Ｓ' || c === 'S') return 'S級';
+  if (c === 'Ｌ' || c === 'L') return 'ガールズ';
+  if (c === 'Ａ' || c === 'A') return 'A級';
+  return 'その他';
+}
+
+// 出走表1ページから選手を抜く
+function parseEntry(html, raceNo){
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  // 選手詳細リンクを含む表が出走表
+  const link = doc.querySelector('a[href*="PlayerDetail.do"]');
+  if (!link) return { players: [], raceType: '', raceCount: 0 };
+  let table = link.closest('table');
+  if (!table) return { players: [], raceType: '', raceCount: 0 };
+
+  // ヘッダーから「今場所」「級班」「選手名」の列位置を得る
+  const headCells = [...(table.querySelectorAll('tr')[0]?.querySelectorAll('th,td') || [])]
+                      .map(c => c.textContent.replace(/\s+/g, ''));
+  const idxOf = kw => headCells.findIndex(h => h.includes(kw));
+  let iNow = idxOf('今場所'), iKlass = idxOf('級班');
+
+  const players = [];
+  table.querySelectorAll('tr').forEach(tr => {
+    const a = tr.querySelector('a[href*="PlayerDetail.do"]');
+    if (!a) return;
+    const cells = [...tr.querySelectorAll('td')];
+    const cd = (a.getAttribute('href').match(/playerCd=(\d+)/) || [])[1] || null;
+
+    // 今場所セル：ヘッダーで引けない場合は「日付で始まるセル」を探す。
+    // 前場所セルは会場名＋グレードで始まるので、この条件で区別できる。
+    let nowCell = iNow >= 0 ? cells[iNow] : null;
+    if (!nowCell || !/^\s*\d{1,2}\/\s*\d{1,2}/.test(nowCell.textContent.replace(/\u00a0/g,' '))) {
+      nowCell = cells.find(c => /^\s*\d{1,2}\/\s*\d{1,2}\s/.test(c.textContent.replace(/\u00a0/g,' '))) || nowCell;
+    }
+    let klass = iKlass >= 0 && cells[iKlass] ? cells[iKlass].textContent.trim() : '';
+    if (!/^[ＡＳＬASL]/.test(klass)) {
+      const k = cells.find(c => /^[ＡＳＬ][１２３1231-9]?$/.test(c.textContent.trim()));
+      if (k) klass = k.textContent.trim();
+    }
+
+    players.push({
+      cd, name: a.textContent.replace(/\s+/g, ''),
+      klass, group: classGroup(klass),
+      race: raceNo,
+      runs: nowCell ? parseRuns(nowCell.textContent) : []
+    });
+  });
+
+  // レース種別（見出し「第1レース (Ａ級チ一般)」）
+  const t = doc.body.textContent.match(/第\s*\d{1,2}\s*レース\s*[（(]([^）)]+)[)）]/);
+  // レース数（ナビの raceNo リンク）
+  const nos = [...doc.querySelectorAll('a[href*="RaceList.do"]')]
+    .map(a => +(a.getAttribute('href').match(/raceNo=(\d+)/) || [])[1]).filter(Boolean);
+  return { players, raceType: t ? t[1] : '', raceCount: nos.length ? Math.max(...nos) : 0 };
+}
+
+/* ---------------------------------------------------------------- 状態 */
+const S = { venue:null, races:[], players:[], group:null, mode:'all', day:'all', raceFilter:null };
+
+async function openMeet(v){
+  S.venue = v; S.races = []; S.players = []; S.raceFilter = null; S.day = 'all'; S.mode = 'all';
+  $('pick').classList.add('hide');
+  $('board').classList.remove('hide');
+  $('rows').innerHTML = '';
+  $('filterBar').classList.remove('on');
+  $('mName').textContent = v.venue;
+  $('mSub').textContent = `${v.grade || ''} ${v.dayNum}日目`.trim();
+  const bl = BANK_LENGTH[v.venue], br = BANK_RECORD[v.venue];
+  $('mBank').textContent = bl || '-';
+  $('mRec').textContent = br ? br.t.toFixed(1) : '-';
+  $('mRecBy').textContent = br ? `${br.p} ${br.d}` : '';
+
+  const st = $('boardState');
+  st.classList.remove('hide');
+  st.innerHTML = '<div class="spin"></div>出走表を読み込んでいます<div class="prog" id="prog">1 / ?</div>';
+  window.scrollTo(0, 0);
+
+  const today = jstToday().ymd;
+  const base = n => `https://www.oddspark.com/keirin/RaceList.do?joCode=${v.joCode}&kaisaiBi=${today}&raceNo=${n}`;
+
+  let total = 0;
+  try {
+    const first = parseEntry(await proxyText(base(1)), 1);
+    total = first.raceCount || 12;
+    S.races.push({ no:1, type:first.raceType });
+    first.players.forEach(p => S.players.push(p));
+    $('prog') && ($('prog').textContent = `1 / ${total}`);
+  } catch (e) {
+    st.innerHTML = '<b>出走表を読み込めませんでした</b>通信を確認してもう一度開いてください。';
+    return;
+  }
+
+  for (let n = 2; n <= total; n++) {
+    try {
+      const r = parseEntry(await proxyText(base(n)), n);
+      if (r.players.length) {
+        S.races.push({ no:n, type:r.raceType });
+        r.players.forEach(p => S.players.push(p));
+      }
+    } catch (e) { /* 個別レースの失敗は飛ばす */ }
+    $('prog') && ($('prog').textContent = `${n} / ${total}`);
+  }
+
+  st.classList.add('hide');
+  buildTabs();
+  render();
+}
+
+/* ---------------------------------------------------------------- タブ */
+function buildTabs(){
+  const order = ['S級','A級','ガールズ','その他'];
+  const groups = order.filter(g => S.players.some(p => p.group === g));
+  S.group = groups.includes('A級') ? 'A級' : (groups[0] || null);
+
+  const sc = $('segClass'); sc.innerHTML = '';
+  groups.forEach(g => {
+    const b = document.createElement('button');
+    b.textContent = g;
+    if (g === S.group) b.className = 'on';
+    b.addEventListener('click', () => { S.group = g; S.raceFilter = null; syncSeg(sc, b); render(); });
+    sc.appendChild(b);
+  });
+
+  const days = [...new Set(S.players.flatMap(p => p.runs.map(r => r.date)))]
+    .sort((a,b) => {
+      const [am,ad] = a.split('/').map(Number), [bm,bd] = b.split('/').map(Number);
+      return am - bm || ad - bd;
+    });
+  const sd = $('segDay'); sd.innerHTML = '';
+  [['all','全日'], ...days.map((d,i) => [d, `${i+1}日目 ${d}`])].forEach(([val,label]) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    if (val === 'all') b.className = 'on';
+    b.addEventListener('click', () => { S.day = val; syncSeg(sd, b); render(); });
+    sd.appendChild(b);
+  });
+}
+function syncSeg(host, on){ [...host.children].forEach(c => c.classList.toggle('on', c === on)); }
+
+$('segMode').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  S.mode = b.dataset.mode; syncSeg($('segMode'), b); render();
+});
+$('backBtn').addEventListener('click', () => {
+  $('board').classList.add('hide'); $('pick').classList.remove('hide'); window.scrollTo(0,0);
+});
+$('fbClear').addEventListener('click', () => { S.raceFilter = null; render(); });
+
+/* ---------------------------------------------------------------- 描画 */
+function render(){
+  let pool = S.players.filter(p => p.group === S.group);
+  if (S.raceFilter) pool = pool.filter(p => p.race === S.raceFilter);
+
+  // 行を作る。mode=all は全走、best は選手ごとの最速1件
+  const rows = [];
+  const noRun = [];
+  pool.forEach(p => {
+    let runs = p.runs;
+    if (S.day !== 'all') runs = runs.filter(r => r.date === S.day);
+    if (!runs.length) { noRun.push(p); return; }
+    if (S.mode === 'best') {
+      const b = runs.reduce((a,c) => (c.agari < a.agari || (c.agari === a.agari && c.rank < a.rank)) ? c : a);
+      rows.push({ p, r:b, n:runs.length });
+    } else {
+      runs.forEach(r => rows.push({ p, r, n:1 }));
+    }
+  });
+
+  // 上がりの速い順。同タイムは着順が良い方を上に置くが、順位は同じにする
+  rows.sort((a,b) => a.r.agari - b.r.agari || a.r.rank - b.r.rank);
+
+  const host = $('rows'); host.innerHTML = '';
+  const bar = $('filterBar');
+  if (S.raceFilter) {
+    const rc = S.races.find(x => x.no === S.raceFilter);
+    $('fbText').textContent = `${S.venue.venue} ${S.raceFilter}R${rc && rc.type ? ' ' + rc.type : ''}`;
+    bar.classList.add('on');
+  } else bar.classList.remove('on');
+
+  if (!rows.length && !noRun.length) {
+    host.innerHTML = '<div class="state glass"><b>該当する記録がありません</b>級班や日の絞り込みを変えてみてください。</div>';
+    return;
+  }
+
+  const times = rows.map(x => x.r.agari);
+  const fast = Math.min(...times), slow = Math.max(...times);
+  const rec = BANK_RECORD[S.venue.venue];
+
+  let rank = 0, prev = null;
+  rows.forEach((x, i) => {
+    if (prev === null || x.r.agari !== prev) { rank = i + 1; prev = x.r.agari; }
+    host.appendChild(rowEl(x, rank, fast, slow, rec));
+  });
+  // 未出走は末尾
+  noRun.forEach(p => host.appendChild(noRunEl(p)));
+}
+
+function rowEl(x, rank, fast, slow, rec){
+  const { p, r } = x;
+  const el = document.createElement('div');
+  el.className = 'row glass' + (rank === 1 ? ' top1' : '');
+  // 光の帯：速いほど長い。全員同タイムのときは満長にする
+  const span = (slow - fast) || 1;
+  const w = slow === fast ? 100 : (1 - (r.agari - fast) / span) * 88 + 12;
+  const diff = rec ? (r.agari - rec.t) : null;
+
+  el.innerHTML =
+    `<div class="rk">${rank}</div>` +
+    `<div class="nm">${p.name}<span class="kb">${p.klass}</span></div>` +
+    `<div class="tm">${r.agari.toFixed(1)}${diff !== null ? `<small>+${diff.toFixed(1)}</small>` : ''}</div>` +
+    `<div class="sub"><span>${r.date}</span><span class="dot">/</span><span>${r.type}</span>` +
+    `<span class="dot">/</span><span>${r.rank}着</span></div>` +
+    `<div class="ray"><i style="width:${w.toFixed(1)}%"></i></div>`;
+
+  const btn = document.createElement('button');
+  btn.className = 'rbtn';
+  btn.textContent = `本日 ${p.race}R`;
+  btn.addEventListener('click', () => { S.raceFilter = p.race; render(); window.scrollTo({top:0,behavior:'smooth'}); });
+  el.appendChild(btn);
+  return el;
+}
+
+function noRunEl(p){
+  const el = document.createElement('div');
+  el.className = 'row glass no-time';
+  el.innerHTML =
+    `<div class="rk">-</div>` +
+    `<div class="nm">${p.name}<span class="kb">${p.klass}</span></div>` +
+    `<div class="tm">-</div>` +
+    `<div class="sub"><span>今節はまだ走っていません</span></div>`;
+  const btn = document.createElement('button');
+  btn.className = 'rbtn';
+  btn.textContent = `本日 ${p.race}R`;
+  btn.addEventListener('click', () => { S.raceFilter = p.race; render(); window.scrollTo({top:0,behavior:'smooth'}); });
+  el.appendChild(btn);
+  return el;
+}
+
+loadVenues();
+</script>
+</body>
+</html>
