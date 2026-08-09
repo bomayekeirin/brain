@@ -2023,6 +2023,12 @@ document.getElementById('toTop').addEventListener('click', ()=>{
          *   lv は generateForRace の内部で決まるため入口では判定できない。
          *   よって一度生成させ、条件に合わなければ下の DAY_2BUNSEN_GATE で捨てる。
          *   モーニングは従来どおりセル判定を使う（app.html と同じ扱い）。 */
+        /* ★2026-08-09：セル生成を止めている間は、デイ・ナイターのセル経路を通さない。
+         *   app.html 側で二分戦25セルを含むセル生成を停止したため、
+         *   ここを塞がないと result.html だけがセル由来のカードを出してしまう。
+         *   モーニングは従来どおりセル判定を使う（app.html と同じ扱い）。 */
+        if(typeof OMAKASE_CELL_ENABLED !== 'undefined' && !OMAKASE_CELL_ENABLED
+           && typeof mid3IsDayNighter==='function' && mid3IsDayNighter(race, v.timeSlot)) continue;
         let _dn2 = false;
         if(typeof mid3IsDayNighter==='function' && mid3IsDayNighter(race, v.timeSlot)){
           // ★判定は app.html と共通の dn2CellAllowed に寄せる（2026-08-07）
@@ -2414,6 +2420,18 @@ document.getElementById('toTop').addEventListener('click', ()=>{
    G戦（三分戦のみ）にしか掛からない閾値。非G戦の生成条件は変わらない。 */
 const GRADE_MIN_ARE = 30.0;
 
+/* ===== おまかせ生成の対象範囲（2026-08-09・app.html と同期） =====
+ *   OMAKASE_CELL_ENABLED = false … v3セル分類による生成を止める。
+ *                                   デイ・ナイターは三分戦（mid3）のみ対象。
+ *   MID3_MIN_ARE = 30.0          … 三分戦の荒れ下限。G戦の GRADE_MIN_ARE とは別定数。
+ *   ★初日特選・決勝（lv='全'）はこの判定を通さない＝荒れ指数に関わらず生成対象。 */
+const OMAKASE_CELL_ENABLED = false;
+const MID3_MIN_ARE = 30.0;
+
+/* ★2026-08-09：デイ・ナイターの1着2着入れ替えを取り止め（app.html と同期）。
+   判定・変換のコードは残し、SWAP12_ENABLED で無効化している。
+   ★ミッドナイト（midrace.html）は別実装のため影響しない。 */
+const SWAP12_ENABLED  = false;
 const SWAP12_PATTERNS = ['A-2', 'A-3', 'C-1', 'C-2'];
 
 const SWAP12_MIN_ARE  = 30.0;
@@ -2437,7 +2455,8 @@ const AXIS_V3_NIGHTER = {
   //   EX系の係数を 1/100 にして数値結果が従来と完全に一致するようにした。
   //   （例：先頭1着率 旧 率×14.0 → 新 %生値×0.14。どちらも100%で +14）
   //   ★調子・同周長バンク・3車ライン加点の項目は持たない＝ナイターでは加算されない。
-  W_JIRIKI:     3.0,
+  // ★2026-08-09：自力の比重を引き上げ（3.0 → 6.0、×2.0）。app.html と同期。
+  W_JIRIKI:     6.0,
   W_B:          1.2,
   W_RENTAI3:    0.35,
   W_PT:         0.10,
@@ -2498,7 +2517,8 @@ const AXIS_V3 = {
   //
   // --- 軸・対抗（同一計算）---
   W_B:          2.5,   // B（バック）回数 × 回数        最大 32.5（13回）
-  W_JIRIKI:     2.5,   // 自力（逃+捲）  × 回数        最大 25（10回）
+  // ★2026-08-09：自力の比重を引き上げ（2.5 → 5.0、×2.0）。app.html と同期。
+  W_JIRIKI:     5.0,   // 自力（逃+捲）  × 回数        最大 50（10回）
   W_RENTAI3:    0.25,  // 3連対率        × %生値       最大 25
   W_MID_P1:     0.25,  // ミッドナイト1着率 × %生値     最大 25 ※ミッドのみ
   W_HEAD_P1:    0.2,   // ライン先頭での1着率 × %生値   最大 20
@@ -5815,6 +5835,7 @@ function swap12Trio(str){
 }
 
 function shouldSwap12(pattern, arePct){
+  if (!SWAP12_ENABLED) return false;   // ★2026-08-09 無効化
   if (SWAP12_PATTERNS.indexOf(pattern) < 0) return false;
   const v = Number(arePct);
   if (arePct == null || isNaN(v)) return false;
@@ -5869,6 +5890,23 @@ function gradeAreOk(arePct){
   return Number(arePct) >= GRADE_MIN_ARE;
 }
 
+/* 初日特選・決勝か（v1エンジンの lv='全' と同じ判定）。app.html と同期。 */
+function mid3IsShoketsuRace(race){
+  try{
+    var rt3 = race && race.raceType3;
+    if(!rt3) return false;
+    var map = (typeof window !== 'undefined') ? window.RACETYPE_MAP_V3 : null;
+    var cat = map ? map[rt3] : null;
+    return (cat === '初' || cat === '決');
+  }catch(e){ return false; }
+}
+
+/* 三分戦おまかせの荒れ下限を満たすか。初日特選・決勝は無条件で true。 */
+function mid3AreOk(arePct, race){
+  if(mid3IsShoketsuRace(race)) return true;
+  return Number(arePct) >= MID3_MIN_ARE;
+}
+
 function gradePointCandidates(pct){
   var v = (pct == null || isNaN(pct)) ? 0 : Number(pct);
   if (v <= 40) return [8, 9, 10, 12];
@@ -5914,6 +5952,11 @@ async function runMid3BunsenGeneration(race, ctx){
   if(_isGrade && typeof gradeAreOk === 'function' && !gradeAreOk(arePct)){
     return { target:false, mid3:true,
              reason:'荒れ予報' + arePct + '%（G戦は70%以上のみ生成）' };
+  }
+  // ★非G戦（三分戦）は荒れ30.0%以上のみ生成する（2026-08-09・app.html と同期）
+  if(!_isGrade && typeof mid3AreOk === 'function' && !mid3AreOk(arePct, race)){
+    return { target:false, mid3:true,
+             reason:'荒れ予報' + arePct + '%（' + MID3_MIN_ARE + '%未満は見送り）' };
   }
 
   // 点数（決定論的抽選）
