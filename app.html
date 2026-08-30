@@ -24346,6 +24346,21 @@ const TL_WINDOW_LAST_DAY = '';
      終日表示したい日ができたら 'YYYY-MM-DD' を入れる。 */
 const TL_WINDOW_ALLDAY = '';
 
+/* ★日付限定の時間帯上書き（JST）。2026-08-30 追加。
+   ここに日付を書いた日だけ、下の WIN_START_MIN / WIN_END_MIN を無視して
+   この時間帯でホームの窓を出す。
+
+   ★★1行消す必要はない。日付が変われば自動で通常の 15:00〜20:30 に戻る。
+     手で戻す運用にすると戻し忘れが起きるので、必ずこの形で入れること。
+   ★これは【表示側だけ】。Xのポスト取得は brain-timeline Worker の
+     FETCH_WINDOW 側を別途合わせないと、取得していない時間帯に
+     窓を出そうとするだけになる。
+
+   例：{ '2026-08-30': { start: '10:30', end: '16:00' } } */
+const TL_WINDOW_OVERRIDE = {
+  '2026-08-30': { start: '10:30', end: '16:00' }   /* 本日限定（2026-08-30 ボンバイエ指示） */
+};
+
 (function () {
   'use strict';
   if (typeof TL_WINDOW_ENABLED !== 'undefined' && !TL_WINDOW_ENABLED) return;
@@ -24356,20 +24371,49 @@ const TL_WINDOW_ALLDAY = '';
   var SHOW = 3;                 /* 窓に出す件数 */
   var API  = '/api/timeline';
 
-  /* 取得ウィンドウ（JST）。brain-timeline Worker の FETCH_WINDOW と揃えること。 */
+  /* 取得ウィンドウ（JST）。brain-timeline Worker の FETCH_WINDOW と揃えること。
+     日付限定で変えたいときはここを直さず TL_WINDOW_OVERRIDE を使う。 */
   var WIN_START_MIN = 15 * 60;        /* 15:00（2026-08-11：G1開催に合わせ変更） */
   var WIN_END_MIN   = 20 * 60 + 30;   /* 20:30 */
 
   /* 端末のタイムゾーンに依存しないよう、UTCから+9時間でJSTを作る */
   function jstNow(){ return new Date(Date.now() + 9 * 3600 * 1000); }
 
+  /* "HH:MM" → 分。不正な値なら null。 */
+  function tlHM(v){
+    if (typeof v === 'number') return v;
+    var p = String(v || '').split(':');
+    var h = Number(p[0]), mi = Number(p[1]);
+    if (isNaN(h) || isNaN(mi)) return null;
+    return h * 60 + mi;
+  }
+
+  /* ★本日のウィンドウを返す。2026-08-30 追加。
+     TL_WINDOW_OVERRIDE に今日の日付があればそちらを優先する。
+     ★値が壊れていたら黙って通常値に戻す（窓が一日中出っ改なしになる事故を防ぐ）。 */
+  function winRangeJst(d) {
+    try {
+      if (typeof TL_WINDOW_OVERRIDE !== 'undefined' && TL_WINDOW_OVERRIDE) {
+        var key = d.toISOString().slice(0, 10);
+        var ov = TL_WINDOW_OVERRIDE[key];
+        if (ov) {
+          var st = tlHM(ov.start), en = tlHM(ov.end);
+          if (st !== null && en !== null && st <= en) return { start: st, end: en };
+          console.warn('TL_WINDOW_OVERRIDE の値が不正なため通常値を使用:', key, ov);
+        }
+      }
+    } catch (e) {}
+    return { start: WIN_START_MIN, end: WIN_END_MIN };
+  }
+
   function inWindowJst() {
     var d = jstNow();
     /* ★終日表示の指定日はグレーアウトしない（2026-08-14） */
     if (typeof TL_WINDOW_ALLDAY !== 'undefined' && TL_WINDOW_ALLDAY
         && d.toISOString().slice(0, 10) === TL_WINDOW_ALLDAY) return true;
+    var r = winRangeJst(d);
     var m = d.getUTCHours() * 60 + d.getUTCMinutes();
-    return m >= WIN_START_MIN && m <= WIN_END_MIN;
+    return m >= r.start && m <= r.end;
   }
 
   /* 稼働期間内か（TL_WINDOW_LAST_DAY を含む日まで） */
