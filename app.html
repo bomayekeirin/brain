@@ -24346,19 +24346,29 @@ const TL_WINDOW_LAST_DAY = '';
      終日表示したい日ができたら 'YYYY-MM-DD' を入れる。 */
 const TL_WINDOW_ALLDAY = '';
 
-/* ★日付限定の時間帯上書き（JST）。2026-08-30 追加。
-   ここに日付を書いた日だけ、下の WIN_START_MIN / WIN_END_MIN を無視して
-   この時間帯でホームの窓を出す。
+/* ★★ホームTL窓の稼働時間帯（JST）。2026-08-30 二部制へ変更。
+   複数の帯を並べられる。どれか1つの帯に入っていれば表示対象。
+   境界は両端とも含む（start 以上 start 以下）。
 
-   ★★1行消す必要はない。日付が変われば自動で通常の 15:00〜20:30 に戻る。
-     手で戻す運用にすると戻し忘れが起きるので、必ずこの形で入れること。
    ★これは【表示側だけ】。Xのポスト取得は brain-timeline Worker の
-     FETCH_WINDOW 側を別途合わせないと、取得していない時間帯に
-     窓を出そうとするだけになる。
+     FETCH_WINDOW で決まる。取得側を合わせないと
+     「取得していない時間帯に窓を出そうとする」だけになる。必ず両方揃えること。 */
+const TL_WINDOW_RANGES = [
+  { start: '08:30', end: '13:00' },   /* 第1部 */
+  { start: '17:00', end: '20:30' }    /* 第2部 */
+];
 
-   例：{ '2026-08-30': { start: '10:30', end: '16:00' } } */
+/* ★日付限定の時間帯上書き（JST）。2026-08-30 追加。
+   ここに日付を書いた日だけ、上の TL_WINDOW_RANGES を無視してこの時間帯を使う。
+
+   ★★行を消す必要はない。日付が変われば自動で TL_WINDOW_RANGES に戻る。
+     手で戻す運用にすると戻し忘れが起きるので、必ずこの形で入れること。
+
+   単一の帯でも複数の帯でも書ける。
+     '2026-09-01': { start: '10:30', end: '16:00' }
+     '2026-09-02': [ { start: '09:00', end: '12:00' }, { start: '18:00', end: '21:00' } ] */
 const TL_WINDOW_OVERRIDE = {
-  '2026-08-30': { start: '10:30', end: '16:00' }   /* 本日限定（2026-08-30 ボンバイエ指示） */
+  /* 例：'2026-09-01': { start: '10:30', end: '16:00' } */
 };
 
 (function () {
@@ -24370,11 +24380,6 @@ const TL_WINDOW_OVERRIDE = {
 
   var SHOW = 3;                 /* 窓に出す件数 */
   var API  = '/api/timeline';
-
-  /* 取得ウィンドウ（JST）。brain-timeline Worker の FETCH_WINDOW と揃えること。
-     日付限定で変えたいときはここを直さず TL_WINDOW_OVERRIDE を使う。 */
-  var WIN_START_MIN = 15 * 60;        /* 15:00（2026-08-11：G1開催に合わせ変更） */
-  var WIN_END_MIN   = 20 * 60 + 30;   /* 20:30 */
 
   /* 端末のタイムゾーンに依存しないよう、UTCから+9時間でJSTを作る */
   function jstNow(){ return new Date(Date.now() + 9 * 3600 * 1000); }
@@ -24388,32 +24393,49 @@ const TL_WINDOW_OVERRIDE = {
     return h * 60 + mi;
   }
 
-  /* ★本日のウィンドウを返す。2026-08-30 追加。
-     TL_WINDOW_OVERRIDE に今日の日付があればそちらを優先する。
-     ★値が壊れていたら黙って通常値に戻す（窓が一日中出っ改なしになる事故を防ぐ）。 */
-  function winRangeJst(d) {
+  /* 帯の配列を正規化する。単体オブジェクトでも配列でも受ける。
+     ★不正な帯は黙って捨てる。全部捨てられたら null を返し、
+       呼び出し側で通常値にフォールバックさせる。 */
+  function tlNormalizeRanges(src){
+    if (!src) return null;
+    var list = Array.isArray(src) ? src : [src];
+    var out = [];
+    for (var i = 0; i < list.length; i++) {
+      var st = tlHM(list[i] && list[i].start), en = tlHM(list[i] && list[i].end);
+      if (st !== null && en !== null && st <= en) out.push({ start: st, end: en });
+      else console.warn('TL窓：不正な時間帯を無視しました:', list[i]);
+    }
+    return out.length ? out : null;
+  }
+
+  /* 本日適用の帯を返す。日付限定上書きがあればそちらを優先。
+     ★上書きが壊れていたら通常値へ。通常値も壊れていたら
+       15:00〜20:30 のハードコードへ。窓が一日中出っ改なしになる事故を防ぐ。 */
+  function winRangesJst(d){
     try {
       if (typeof TL_WINDOW_OVERRIDE !== 'undefined' && TL_WINDOW_OVERRIDE) {
-        var key = d.toISOString().slice(0, 10);
-        var ov = TL_WINDOW_OVERRIDE[key];
-        if (ov) {
-          var st = tlHM(ov.start), en = tlHM(ov.end);
-          if (st !== null && en !== null && st <= en) return { start: st, end: en };
-          console.warn('TL_WINDOW_OVERRIDE の値が不正なため通常値を使用:', key, ov);
-        }
+        var ov = tlNormalizeRanges(TL_WINDOW_OVERRIDE[d.toISOString().slice(0, 10)]);
+        if (ov) return ov;
       }
     } catch (e) {}
-    return { start: WIN_START_MIN, end: WIN_END_MIN };
+    try {
+      var base = tlNormalizeRanges(typeof TL_WINDOW_RANGES !== 'undefined' ? TL_WINDOW_RANGES : null);
+      if (base) return base;
+    } catch (e) {}
+    return [{ start: 15 * 60, end: 20 * 60 + 30 }];
   }
 
   function inWindowJst() {
     var d = jstNow();
-    /* ★終日表示の指定日はグレーアウトしない（2026-08-14） */
+    /* ★終日表示の指定日は時刻ゲートを無視（2026-08-14） */
     if (typeof TL_WINDOW_ALLDAY !== 'undefined' && TL_WINDOW_ALLDAY
         && d.toISOString().slice(0, 10) === TL_WINDOW_ALLDAY) return true;
-    var r = winRangeJst(d);
     var m = d.getUTCHours() * 60 + d.getUTCMinutes();
-    return m >= r.start && m <= r.end;
+    var rs = winRangesJst(d);
+    for (var i = 0; i < rs.length; i++) {
+      if (m >= rs[i].start && m <= rs[i].end) return true;
+    }
+    return false;
   }
 
   /* 稼働期間内か（TL_WINDOW_LAST_DAY を含む日まで） */
