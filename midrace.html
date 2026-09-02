@@ -11533,8 +11533,20 @@ function calcAxisScore(player, isMidnight = false) {
 }
 
 // --- 軸選出 ---
-function selectAxis(leaders, isMidnight = false, ex = null, timeSlot = 'day', line3Bonus = null, extraBonus = null) {
+function selectAxis(leaders, isMidnight = false, ex = null, timeSlot = 'day', line3Bonus = null, extraBonus = null, lineMeta = null) {
+  /* ★★2026-09-01：lineMeta が渡され、かつ EX がある場合はミッド用 v4 スコアを使う。
+     判定材料を lineMeta の有無に置いているのは、フラグ判定を呼び出し側に一本化するため。
+     ここにもフラグ判定を書くと、条件が2か所に散って食い違う。
+     ★v4 経路では line3Bonus / extraBonus を加算しない。
+       3車ライン加点は W_LINE_SIZE、ライン位置加点は W_LINE_POS に統合済みで、
+       直近平均加点は廃止した。15〜20点のスケールに +9 や +7.5 を乗せると設計が壊れる。 */
+  const useV4Mid = !!(lineMeta && ex && typeof calcAxisScoreV4Mid === 'function');
   const scores = leaders.map(player => {
+    if (useV4Mid) {
+      const _m = lineMeta[String(player.car)] || { lineIndex: 0, lineSize: 2 };
+      const r4 = calcAxisScoreV4Mid(player, ex, _m.lineIndex, _m.lineSize);
+      return { player, score: r4.score, breakdown: r4.breakdown };
+    }
     // ★v3：EXデータがあれば新スコア、無ければ旧スコアにフォールバック
     const result = (ex && typeof calcAxisScoreV3 === 'function')
       ? calcAxisScoreV3(player, ex, isMidnight, timeSlot)
@@ -11597,6 +11609,26 @@ function getStyle(player) {
  * =================================================================== */
 const SWAP_TAISHO_LINE     = false;
 const AXIS_LOCK_BY_HONMEI1 = true;
+
+/* ===================================================================
+ * ミッドナイト軸ロジック v4 の有効化フラグ（2026-09-01）
+ *
+ * ENABLED を false にすると以下すべてが無効になり、
+ * 2026-08-31 時点の動作に完全に戻る。事故時はここだけ触ればよい。
+ *
+ * サブフラグは切り分け用。どれが原因かを1つずつ落として特定する。
+ *   AXIS   … 変更1+5：軸スコアV4／直近平均・ライン位置・3車ライン加点の統合
+ *   TAISHO … 変更2：対抗＝軸を除いた2車以上ラインのうち並びが前
+ *   AXIS3  … 変更3+4：軸3を3着に追加＋圧縮形の再導出
+ *
+ * ★ミッドナイト専用。isMidnight が false の呼び出しでは全サブフラグが効かない。
+ *   midrace.html でも timeSlot が day/nighter の会場を開ける可能性があるため。
+ * ★app.html / result.html には移植しない。
+ * =================================================================== */
+const MID_V4 = { ENABLED: true, AXIS: true, TAISHO: true, AXIS3: true };
+function midV4(key, isMidnight) {
+  return !!(MID_V4.ENABLED && MID_V4[key] && isMidnight);
+}
 
 /* 1番車に◎が付いていれば、その1番車が属するラインの「先頭選手」を返す。
    付いていない／ラインが特定できない場合は null。
@@ -11667,6 +11699,51 @@ function selectTaishoForA2(lineStr, axisCar, leaders) {
   const taishoPlayer = leaders.find(p => String(p.car) === threeLine.head);
   if (!taishoPlayer) return null;
   return { taisho: taishoPlayer, reason: `A-2: ${threeLine.size}車ライン先頭を対抗に選出` };
+}
+
+/* ===================================================================
+ * 対抗ライン選定 v4（2026-09-01）
+ *
+ * 対抗＝軸を除いた「2車以上ライン」のうち、並びが最も前のもの。
+ * スコア選定・A-2無条件選出・別ライン振替をすべて通さない。
+ *
+ * 根拠：軸を除いた2ラインのうち3着内に絡むのは
+ *   中団 57/83 = 68.7%（p=0.0009）。現行は43%が後方を対抗にしていた。
+ *
+ * ★戻り値は現行の selectTaisho と同じ形にする。
+ *   呼び出し側が taishoResult.taisho.name / .taishoScore / .reason を使うため、
+ *   ラインの配列をそのまま返すと TypeError になる。
+ * ★otherLeaders に居なければ null を返して従来経路に委ねる。
+ *   G戦の単騎除外などで候補が絞られている可能性があるため、
+ *   無条件に差し替えず必ずフォールバックを持たせる。
+ * =================================================================== */
+function selectTaishoLineV4(lineup, otherLeaders, axisCar) {
+  if (typeof buildLineMeta !== 'function') return null;
+  const meta = buildLineMeta(lineup);
+  const axisMeta = meta[String(axisCar)];
+  const axisIdx = axisMeta ? axisMeta.lineIndex : -1;
+
+  let idx = 0;
+  const big = [];
+  for (const g of (lineup || [])) {
+    if (!g || g.length < 2) continue;
+    big.push({ head: String(g[0]), idx: idx });
+    idx++;
+  }
+  const rest = big.filter(o => o.idx !== axisIdx);
+  if (!rest.length) return null;
+
+  const headCar = rest[0].head;
+  const player = (otherLeaders || []).find(p => String(p.car) === headCar);
+  if (!player) return null;
+
+  return {
+    taisho: player,
+    taishoScore: null,
+    reason: '対抗v4: 軸を除いた2車以上ラインのうち並びが前（lineIndex=' + rest[0].idx + '）',
+    lineIndex: rest[0].idx,
+    taishoVer: 'v4'
+  };
 }
 
 function selectTaisho(axis, otherLeaders, isMidnight = false, ex = null, timeSlot = 'day', line3Bonus = null, extraBonus = null, lineStr = null, swapTaishoLine = false) {
@@ -11862,6 +11939,75 @@ function compressBets(bets) {
     lines.push(segParts.join(' / '));
   }
   return lines;
+}
+
+/* ===================================================================
+ * 軸をを含む後処理（2026-09-01）
+ * =================================================================== */
+
+/* 軸３を3着に追加（ルールD）
+ *   条件1  軸ラインが3車以上（roles.axis3rd がある）
+ *   条件2  その買い目の「2着」が 軸頭 または 軸番
+ *   条件3  軸3が1着・2着に既に入っていない
+ *   条件4  同じ買い目がまだ無い
+ *
+ * 根拠：軸3がちょうど3着に入った25件のうち、
+ *   2着が軸頭または軸番だったのが 23件（92%）。
+ *   全段に無条件追加すると「軸番-対頭」の段だけで56点増えて的中ゼロだった。
+ *
+ * ★追加は3着の位置のみ。1着の車番は増えないので表示の段数は変わらない。
+ * ★テンプレ上、6点・8点では既に3着に軸3が入っており、0点追加になる。 */
+function addAxis3rdToThird(bets, roles) {
+  if (!Array.isArray(bets) || !roles) return { bets: bets || [], added: 0 };
+  const axis3rd = roles.axis3rd;
+  if (!axis3rd) return { bets: bets, added: 0 };
+
+  const c3 = String(axis3rd);
+  const secondOK = new Set([String(roles.axis), String(roles.axisBante)].filter(Boolean));
+  if (!secondOK.size) return { bets: bets, added: 0 };
+
+  const out = new Set(bets);
+  const before = out.size;
+
+  const pairs = new Set();
+  for (const b of bets) {
+    const p = String(b).split('-');
+    if (p.length !== 3) continue;
+    pairs.add(p[0] + '-' + p[1]);
+  }
+  for (const key of pairs) {
+    const a = key.split('-')[0], b2 = key.split('-')[1];
+    if (!secondOK.has(b2)) continue;
+    if (a === c3 || b2 === c3) continue;
+    out.add(a + '-' + b2 + '-' + c3);
+  }
+  return { bets: Array.from(out), added: out.size - before };
+}
+
+/* 1項1行の flat 圧縮形。compressBets の " / " 連結を解いて返す。
+ * ★オッズ表示・バリデーション・結果照合はすべてこちらを使う。
+ *   expandCompressedBet / countBetsFromCompressed / expandCompressed は
+ *   '-' での3分割を前提にしており、" / " を含む行を渡すと
+ *   その行をごっそり取りこぼす（2車券扱いに落ちる）。 */
+function compressBetsFlat(bets) {
+  const out = [];
+  (compressBets(bets) || []).forEach(function (line) {
+    String(line).split(' / ').forEach(function (t) { if (t) out.push(t); });
+  });
+  return out;
+}
+
+/* 画面表示用。flat を1着ごとにまとめ、" / " で連結する。
+ * ★これは【表示専用】。パーサに渡してはいけない。 */
+function groupCompressedForDisplay(flat) {
+  const order = [], map = {};
+  (flat || []).forEach(function (line) {
+    const a = String(line).split('-')[0];
+    if (!map[a]) { map[a] = []; order.push(a); }
+    map[a].push(line);
+  });
+  order.sort(function (x, y) { return Number(x) - Number(y); });
+  return order.map(function (a) { return map[a].join(' / '); });
 }
 
 // --- 6点パターン ---
@@ -12069,7 +12215,20 @@ const B_PATTERN_CONFIG = {
 const B_PATTERN_POINTS = [6, 8, 10, 12];
 
 // A-3パターンで使用可能な点数（9点は不可）
-const A3_AVAILABLE_POINTS = [6, 8, 10, 12, 15];
+/* ★★2026-09-01：A-3 の 15点パターンを廃止（ボンバイエ指示）。
+ *
+ * 理由：A-3 のテンプレートは3着に軸3を含んでいないため、
+ *   ルールD（軸3を3着に追加）で点数が大きく増える。
+ *     旧 6点→ 7点 / 旧 8点→10点 / 旧10点→14点 / 旧12点→16点
+ *   旧15点を残すと実際19点になり、上が重くなりすぎる。
+ *
+ * ★荒れ指数→点数のテーブル（pointsFromArePct）は一切変えない。
+ *   15をこのリストから外すだけで、既存の「使えない点数は一段下げる」
+ *   仕組み（adjustPointsForPattern）が 15 → 12 に落とす。
+ *   つまり15点帯の荒れ指数は旧12点（実際16点）が上限になる。
+ * ★A-1 / A-2 / B / C の15点は残す。廃止は A-3 のみ。
+ * ★MID_V4.AXIS3 を false に戻すときは、ここも [6,8,10,12,15] に戻すこと。 */
+const A3_AVAILABLE_POINTS = [6, 8, 10, 12];
 
 // A-3パターン発動条件の閾値
 const A3_PATTERN_CONFIG = {
@@ -13426,6 +13585,13 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
     if (rb + lb) _extraBonus[c] = rb + lb;
     if (rb) _flexBonus[c] = rb;
   });
+
+  /* ★★2026-09-01：V4軸スコア用のライン情報。2車以上ラインだけを前から数えた index/人数。
+     _axisMeta を selectAxis に渡すかどうかだけで V4 の切り替えを行う。
+     フラグOFFなら null を渡す＝従来動作に完全に戻る。
+     ★_lineMeta は対抗ライン選定（selectTaishoLineV4）でも使うので、フラグと別に作る。 */
+  const _lineMeta = (typeof buildLineMeta === 'function') ? buildLineMeta(lineup) : null;
+  const _axisMeta = midV4('AXIS', isMidnight) ? _lineMeta : null;
   
   // ========== 単騎含む三分戦の場合：Cパターン専用処理 ==========
   if (isCBunsen) {
@@ -13449,7 +13615,7 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
     }
     
     // 軸選出（2車ライン先頭3人から）
-    let axisResult = selectAxis(leaders, isMidnight, opts.ex || null, timeSlot, _line3Bonus, _extraBonus);
+    let axisResult = selectAxis(leaders, isMidnight, opts.ex || null, timeSlot, _line3Bonus, _extraBonus, _axisMeta);
     // ★軸確定（2026-08-04）：直近平均2.0以内のライン先頭がちょうど1人なら無条件で軸
     const _lockedAxisC = (typeof pickLockedAxis === 'function') ? pickLockedAxis(leaders, _recentAvg) : null;
     if (_lockedAxisC) {
@@ -13463,8 +13629,16 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
     
     // 対抗選出（残り2車ライン先頭2人から、スコアベース）
     const otherLeaders = leaders.filter(p => String(p.car) !== axisCar);
-    let taishoResult = selectTaisho(axisResult.axis, otherLeaders, isMidnight, opts.ex || null, timeSlot, _line3Bonus, _extraBonus,
-                                    lineStr, !!opts.swapTaishoLine);
+    /* ★★2026-09-01：C形態も v4 を通す。
+       C形態は2車以上ラインが2本しか無いため、軸を除けば残りは1本。
+       結果は従来と一致することが多いが、G戦や将来の並び変化で
+       3本以上になったときの取りこぼしを防ぐ。 */
+    let taishoResult = midV4('TAISHO', isMidnight)
+      ? selectTaishoLineV4(lineup, otherLeaders, axisCar) : null;
+    if (!taishoResult) {
+      taishoResult = selectTaisho(axisResult.axis, otherLeaders, isMidnight, opts.ex || null, timeSlot, _line3Bonus, _extraBonus,
+                                  lineStr, !!opts.swapTaishoLine);
+    }
     let taishoCar = String(taishoResult.taisho.car);
     
     // ★先頭率特例（2026-07-29）：軸↔対抗の入替。Cパターンにも適用する（指示⑥）
@@ -13557,16 +13731,32 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
     }
     const compressed0 = patternResult.compressed;
     // ★荒れ30.1%以上のとき、1着と2着を入れ替える（C-1/C-2のみ）2026-08-02
-    const compressed = shouldSwap12(patternResult.pattern, opts.arePct)
+    let compressed = shouldSwap12(patternResult.pattern, opts.arePct)
       ? compressed0.map(swap12Trio) : compressed0;
     // ★圧縮形を正として買い目を導出する（2026-08-01）
-    const betsOut = expandCompressed(compressed);
+    let betsOut = expandCompressed(compressed);
+    let compressedDisplay = compressed;
+    let _axis3AddedC = 0;
+
+    /* ★★2026-09-01：A経路と同形。
+       C形態は軸ラインが必ず2車なので roles.axis3rd が無く、実際には素通りする。
+       （39ケースの検証で、1点も増えないことを確認済み）
+       それでも入れるのは、将来 C の並び定義が変わったときの取りこぼし防止。 */
+    if (midV4('AXIS3', isMidnight)) {
+      const _a3 = addAxis3rdToThird(betsOut, roles);
+      if (_a3.added > 0) {
+        betsOut = _a3.bets;
+        compressed = compressBetsFlat(betsOut);
+        compressedDisplay = groupCompressedForDisplay(compressed);
+        _axis3AddedC = _a3.added;
+      }
+    }
     const betCountOut = betsOut.length;
     
-    // バリデーション
-    const countFromCompressed = countBetsFromCompressed(compressed);
-    if (patternResult.count !== countFromCompressed) {
-      console.warn(`[BRAIN/C-pattern] 買い目数と圧縮形カウントが不一致: bets=${patternResult.count}, compressed=${countFromCompressed} (バリデーション関数の既知の制約による誤差の可能性)`);
+    // バリデーション（★expandCompressed ベースに変更。2026-09-01）
+    const countFromCompressed = expandCompressed(compressed).length;
+    if (betsOut.length !== countFromCompressed) {
+      console.warn(`[BRAIN/C-pattern] 買い目数と圧縮形カウントが不一致: bets=${betsOut.length}, compressed=${countFromCompressed}`);
     }
     
     return {
@@ -13579,7 +13769,9 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
       patternCheck: { pattern: cCheck.pattern, reason: cCheck.reason },
       pattern: patternResult.pattern,
       bets: betsOut,
-      compressed,
+      compressed,                          // ★flat（パーサ用）
+      compressedDisplay,                   // ★表示用
+      axis3rdAdded: _axis3AddedC,
       betCount: betCountOut,
       availablePoints: C_AVAILABLE_POINTS,
       tokureiSwap: tokurei.swap, tokurei,
@@ -13597,7 +13789,7 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
   }
   
   // Step 2: 軸を選出
-  let axisResult = selectAxis(leaders, isMidnight, opts.ex || null, timeSlot, _line3Bonus, _extraBonus);
+  let axisResult = selectAxis(leaders, isMidnight, opts.ex || null, timeSlot, _line3Bonus, _extraBonus, _axisMeta);
   // ★軸確定（2026-08-04）：直近平均2.0以内のライン先頭がちょうど1人なら無条件で軸
   const _lockedAxis = (typeof pickLockedAxis === 'function') ? pickLockedAxis(leaders, _recentAvg) : null;
   if (_lockedAxis) {
@@ -13613,15 +13805,23 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
   const otherLeaders = leaders.filter(p => String(p.car) !== axisCar);
   // ★2026-08-12：A-2の無条件選出（3車ライン先頭）にも別ライン振替を適用する。
   //   「従来判定で選ばれなかったライン」を採るという指示のため、選出経路は問わない。
-  let taishoResult = selectTaishoForA2(lineStr, axisCar, otherLeaders) || selectTaisho(axisResult.axis, otherLeaders, isMidnight, opts.ex || null, timeSlot, _line3Bonus, _extraBonus,
-                                    lineStr, !!opts.swapTaishoLine);
-  if (opts.swapTaishoLine && taishoResult && taishoResult.reason
-      && String(taishoResult.reason).indexOf('A-2:') === 0) {
-    const _cands = otherLeaders.map(function(pl){ return { player: pl }; });
-    const _other = pickOtherTaishoLine(lineStr, axisCar, taishoResult.taisho.car, _cands);
-    if (_other) {
-      taishoResult = { taisho: _other.player,
-                       reason: taishoResult.reason + ` → 別ライン振替（${taishoResult.taisho.car}→${_other.player.car}）` };
+  /* ★★2026-09-01：対抗は「軸を除いた2車以上ラインのうち並びが前」に固定。
+     フラグOFF、または v4 が候補を見つけられなかった場合は従来経路へ。
+     ★selectTaishoForA2 / selectTaisho / pickOtherTaishoLine は削除しない。
+       ロールバック経路として必要。 */
+  let taishoResult = midV4('TAISHO', isMidnight)
+    ? selectTaishoLineV4(lineup, otherLeaders, axisCar) : null;
+  if (!taishoResult) {
+    taishoResult = selectTaishoForA2(lineStr, axisCar, otherLeaders) || selectTaisho(axisResult.axis, otherLeaders, isMidnight, opts.ex || null, timeSlot, _line3Bonus, _extraBonus,
+                                      lineStr, !!opts.swapTaishoLine);
+    if (opts.swapTaishoLine && taishoResult && taishoResult.reason
+        && String(taishoResult.reason).indexOf('A-2:') === 0) {
+      const _cands = otherLeaders.map(function(pl){ return { player: pl }; });
+      const _other = pickOtherTaishoLine(lineStr, axisCar, taishoResult.taisho.car, _cands);
+      if (_other) {
+        taishoResult = { taisho: _other.player,
+                         reason: taishoResult.reason + ` → 別ライン振替（${taishoResult.taisho.car}→${_other.player.car}）` };
+      }
     }
   }
   let taishoCar = String(taishoResult.taisho.car);
@@ -13669,7 +13869,7 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
       details: a3Check.details,
       isA3: true
     };
-    availablePoints = A3_AVAILABLE_POINTS;  // [6, 8, 10, 12, 15] ※9点不可
+    availablePoints = A3_AVAILABLE_POINTS;  // [6, 8, 10, 12] ※9点不可、※15点は2026-09-01に廃止
   } else {
     // A-3不成立 → Bパターン判定へ
     patternCheck = checkPatternB(axisResult.axis, axisBantePlayer, taishoResult.taisho);
@@ -13784,12 +13984,35 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
       compressed = compressed.map(swap12Trio);
     }
     // ★圧縮形を正として買い目を導出する（2026-08-01）
-    const bets3 = expandCompressed(compressed);
+    let bets3 = expandCompressed(compressed);
+    let compressedDisplay = compressed;   // 軸3を足さないときは現行の表記のまま
+    let _axis3Added = 0;
+
+    /* ★★2026-09-01：軸3を3着に追加（変更3）→ 圧縮形を再導出（変更4）。
+       ★必ず swap12 の後に置く。前に置くと入替で追加分が消える。
+       ★added===0 のときは再導出しない。手書き圧縮と compressBets の表記が
+         完全一致する保証が無く、軸3を足していないレースの見た目を変えないため。 */
+    if (midV4('AXIS3', isMidnight)) {
+      const _a3 = addAxis3rdToThird(bets3, roles);
+      if (_a3.added > 0) {
+        bets3 = _a3.bets;
+        compressed = compressBetsFlat(bets3);                        // パーサ用（1項1行）
+        compressedDisplay = groupCompressedForDisplay(compressed);   // 表示用（1着ごと）
+        _axis3Added = _a3.added;
+      }
+    }
     const betCount3 = bets3.length;
 
-  const countFromCompressed = countBetsFromCompressed(compressed);
-  if (patternResult.count !== countFromCompressed) {
-    console.error(`[BRAIN ERROR] 買い目数不一致: bets=${patternResult.count}, compressed=${countFromCompressed}`);
+  /* ★★2026-09-01：バリデーションを expandCompressed ベースに変更。
+     countBetsFromCompressed は2着と3着の重複を数え切れず、
+     変更前のコードでも一部パターンで誤検知していた
+     （実測：8点の買い目に対して 10 を返す）。
+     expandCompressed は39ケース全部で買い目数と一致した。
+     比較対象も patternResult.count から bets3.length へ。軸3を足すと
+     テンプレの点数とは必ずずれるため。 */
+  const countFromCompressed = expandCompressed(compressed).length;
+  if (bets3.length !== countFromCompressed) {
+    console.error(`[BRAIN ERROR] 買い目数不一致: bets=${bets3.length}, compressed=${countFromCompressed}`);
     console.error('パターン:', patternCheck.pattern, patternResult.pattern);
     console.error('圧縮形:', compressed);
     console.error('買い目:', patternResult.bets);
@@ -13805,7 +14028,9 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
     patternCheck,
     pattern: patternResult.pattern,
     bets: bets3,
-    compressed,
+    compressed,                            // ★flat（パーサ用）
+    compressedDisplay,                     // ★表示用（1着ごとにまとめた形）
+    axis3rdAdded: _axis3Added,
     betCount: betCount3,
     availablePoints,
     tokureiSwap: tokurei.swap, tokurei,
@@ -15980,7 +16205,7 @@ async function showResultElements(race, result) {
       console.error('setupResultCodeCard:', e);
       const codeEl = document.getElementById('resultCodeBlock');
       if (codeEl && result.compressed) {
-        codeEl.textContent = `${race.venue} ${race.raceNum}R ${result.betCount}点\n\n${result.compressed.join('\n')}`;
+        codeEl.textContent = `${race.venue} ${race.raceNum}R ${result.betCount}点\n\n${compressedForDisplay(result).join('\n')}`;
       }
     }
     document.getElementById('resultCodeCard').classList.add('show');
@@ -15995,7 +16220,7 @@ function setupResultBetCard(race, result) {
   document.getElementById('resultBetRace').textContent = `${race.venue} ${race.raceNum}R`;
   document.getElementById('resultBetPoints').textContent = `${result.betCount}点`;
   document.getElementById('resultBetDeadline').textContent = `締切 ${race.deadline || '--:--'}`;
-  document.getElementById('resultBetBets').textContent = result.compressed.join('\n');
+  document.getElementById('resultBetBets').textContent = compressedForDisplay(result).join('\n');
   
   // バッジ設定（おまかせ / ユーザー指定 / 自分で予想）
   const badge = document.getElementById('resultBetBadge');
@@ -16140,11 +16365,21 @@ function setupResultCodeCard(race, result) {
   }
   
   let codeText = `${race.venue} ${race.raceNum}R ${result.betCount}点\n\n`;
-  codeText += result.compressed.join('\n');
+  codeText += compressedForDisplay(result).join('\n');
   code.textContent = codeText;
 }
 
 // 圧縮買い目を展開
+/* ★★2026-09-01：表示用の圧縮形を取る。
+ *   compressedDisplay があればそれ、無ければ従来の compressed。
+ * ★これをオッズ計算や結果照合に使ってはいけない。
+ *   compressedDisplay は " / " で連結されており、expandCompressedBet は
+ *   '-' での3分割を前提にしているため、その行を丸ごと取りこぼす。 */
+function compressedForDisplay(r) {
+  if (!r) return [];
+  return (r.compressedDisplay && r.compressedDisplay.length) ? r.compressedDisplay : (r.compressed || []);
+}
+
 function expandCompressedBet(compressed) {
   // セパレータ判定（=は複式、≡はワイド、-は単式）
   const isWide = compressed.includes('≡');
@@ -16411,7 +16646,7 @@ function showBetResultPopup(race, result) {
   codeText += `軸: ${result.axis.car}番 ${result.axis.name || ''}\n`;
   codeText += `対抗: ${result.taisho.car}番 ${result.taisho.name || ''}\n`;
   codeText += `─────────────\n`;
-  codeText += result.compressed.join('\n');
+  codeText += compressedForDisplay(result).join('\n');
   
   code.textContent = codeText;
   
@@ -22007,7 +22242,11 @@ function attachTextsToBets(stage4, texts) {
           ], lineHold:null, classAdj:null },
           constraints:{}, bets: out.bets.map(function(c){ return { combo:c, p:null }; }),
           // compressed は文字列配列（例 "12-12-347"）
-          compressed: (out.compressed||[]).map(function(t){
+          /* ★★2026-09-01：ログの compressed は管理画面のSNS書き出し・一覧表示に
+             しか使われない（的中判定と点数は rec.bets を見ている）。
+             flat を入れるとSNSの行数が増えて見た目が変わるので、表示形を入れる。
+             ★データとしての正は bets 。分析側は bets を見ること。 */
+          compressed: ((out.compressedDisplay && out.compressedDisplay.length ? out.compressedDisplay : out.compressed)||[]).map(function(t){
             return { text: (typeof t === 'string' ? t : (t && t.text) || ''), n: 0 };
           }).filter(function(x){ return x.text; }),
           cover:null, scenarioLines:[], highlights:[],
@@ -23159,6 +23398,85 @@ const AXIS_V3 = {
 
   MIN_DEN: 3
 };
+
+/* ===================================================================
+ * ミッドナイト軸スコア v4（2026-09-01）
+ *
+ * 実測136件（2026-08-07〜08-31）のレース内ペア比較および条件付きロジットで較正。
+ * 旧 AXIS_V3（B回数・自力・かまし・つっぱり中心）から全面差し替え。
+ * 係数は「ライン位置1段ぶんを 1.00」とした相対値。おおむね 15〜20 点に収まる。
+ *
+ * ★V3 と桁が違う（V3 は最大80点超）。同一レース内で新旧を混ぜて比較しないこと。
+ * ★ミッドナイト専用。app.html / result.html には移植しない。
+ * ★V3 にあった 3連対率(W_RENTAI3) と ミッドナイト1着率(W_MID_P1) は含まない。
+ *   合計50点ぶんの重みを、検証できないまま捨てる選択をしている。
+ *   ログに柔軟枠・役割が残っていないため効果を測れなかったのが理由であり、
+ *   「効いていない」ことが確認されたわけではない。ログ項目追加は別タスク。
+ *
+ * 1段ぶん（1.00点）を覆すのに必要な差：
+ *   競走得点 6.7点差 ／ 先頭時1着率 19.6ポイント差 ／ ライン人数は3車で1.26段ぶん有利
+ *   → 中団の3車ライン(4.78) が 前方の2車ライン(4.52) を上回る。
+ * =================================================================== */
+const AXIS_V4_MID = {
+  W_LINE_POS:      1.00,   // (2 - ライン位置) 前方=2 / 中団=1 / 後方=0
+  W_LINE_SIZE:     1.26,   // ライン人数（2 または 3）
+  W_PT:            0.149,  // 競走得点（素点）
+  W_HEAD_P1:       0.051,  // ライン先頭での1着率（%生値 0〜100）
+  HEAD_P1_DEFAULT: 45.0    // EXが取れない場合の代入値（実測の全体平均）
+};
+
+/* lineIndex は「2車以上ラインだけを前から数えた index」。単騎は数えない。
+   lineSize はそのラインの人数。
+
+   ★先頭時1着率は exRate() を使う。EXレコードは p1 を持たず n1 だけの場合があり、
+     rec.head.p1 を直読みすると黙って DEFAULT に落ちて全員同じ値になる。
+     exRate は AXIS_V3.MIN_DEN(=3) の母数判定も内部で行う。
+   ★breakdown の形は V3 と揃える（car を必ず含める）。呼び出し側が
+     axisBreakdown を素通しで返しているため、形を変えると受け手が壊れる。 */
+function calcAxisScoreV4Mid(player, ex, lineIndex, lineSize) {
+  const W = AXIS_V4_MID;
+  const rec = ex ? ex[Number(player.car)] : null;
+
+  const posTerm  = (2 - Math.min(Number(lineIndex) || 0, 2)) * W.W_LINE_POS;
+  const sizeTerm = (Number(lineSize) || 2) * W.W_LINE_SIZE;
+  const ptTerm   = (Number(player.pt) || 0) * W.W_PT;
+
+  const hp = (typeof exRate === 'function') ? exRate(rec, 'head', 1) : null;
+  const headP1 = (hp != null) ? hp * 100 : W.HEAD_P1_DEFAULT;
+  const headTerm = headP1 * W.W_HEAD_P1;
+
+  const total = posTerm + sizeTerm + ptTerm + headTerm;
+  return {
+    score: Math.round(total * 100) / 100,
+    breakdown: {
+      car: String(player.car),
+      lineIndex: lineIndex, lineSize: lineSize,
+      pt: Number(player.pt) || 0, headP1: Math.round(headP1 * 10) / 10,
+      parts: {
+        pos:  Math.round(posTerm  * 100) / 100,
+        size: Math.round(sizeTerm * 100) / 100,
+        pt:   Math.round(ptTerm   * 100) / 100,
+        head: Math.round(headTerm * 100) / 100
+      },
+      ver: 'v4mid'
+    }
+  };
+}
+
+/* 2車以上ラインだけを前から数えた index と人数のマップ。
+   ★単騎を数に含めるとライン位置がずれる。単騎は meta に入れない（軸候補ではない）。
+   例）並び 1-2-4 / 3 / 5-6 / 7
+       → [1,2,4] が lineIndex 0、[5,6] が lineIndex 1。3 と 7 は入らない。 */
+function buildLineMeta(lineup) {
+  const meta = {};
+  let idx = 0;
+  for (const g of (lineup || [])) {
+    if (!g || g.length < 2) continue;
+    for (const car of g) meta[String(car)] = { lineIndex: idx, lineSize: g.length };
+    idx++;
+  }
+  return meta;
+}
 
 /* ===== 先頭率特例（2026-07-29 追加） =====
  * 発動条件（すべて満たす場合のみ）
@@ -25247,8 +25565,10 @@ body.tk-lock{ overflow:hidden; }
     ov.classList.add('show');
 
     var pts = data.highlights || [];
-    var rows = (out.compressed || []).map(function(t){ return (typeof t === 'string') ? t : (t.text || ''); })
-                                     .filter(function(t){ return t; });
+    /* ★★2026-09-01：表示なので compressedDisplay を優先する */
+    var _cd = (out.compressedDisplay && out.compressedDisplay.length) ? out.compressedDisplay : out.compressed;
+    var rows = (_cd || []).map(function(t){ return (typeof t === 'string') ? t : (t.text || ''); })
+                          .filter(function(t){ return t; });
     if(!rows.length && out.bets) rows = out.bets.slice();
 
     // 注目ポイント → 買い目 の順に出す

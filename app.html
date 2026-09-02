@@ -7341,6 +7341,12 @@ body.omk-shake{animation:omkShake .42s linear;}
       <div class="menu-item no-icon" id="menuAreRaceBtn">
         荒れ予報レース一覧
       </div>
+      <!-- 2026-09-02 ボンバイエ指示：荒れ予報の下に追加。
+           遷移先は同じ brainkeirin.jp 内なので外部リンク記号は付けない
+           （menuGptBtn と同じ扱い）。 -->
+      <div class="menu-item no-icon" id="menuKaimeTlBtn">
+        競輪買い目だけTL
+      </div>
       <!-- 2026-08-25 ボンバイエ指示：掲示板項目を削除 -->
       <div class="menu-item no-icon" id="menuGptBtn">
         レース情報テキスト生成
@@ -21033,6 +21039,15 @@ document.getElementById('menuAreRaceBtn').addEventListener('click', function() {
 // ★掲示板：2026-08-25 ボンバイエ指示によりメニュー項目ごと削除。
 //   旧遷移先: https://www.kikuya-rental.com/bbs/?owner_name=brain
 //   結果照会（menuResultBtn）はメニューから削除済み。
+
+/* 競輪買い目だけTL（2026-09-02 追加）
+   ★DOM の #menuKaimeTlBtn とこのリスナーは必ず2つセットで扱うこと。
+     片方だけ消すと getElementById(null).addEventListener で TypeError になり、
+     それ以降のリスナー登録が全部止まる（掛示板削除時の教訓）。 */
+document.getElementById('menuKaimeTlBtn').addEventListener('click', function() {
+  document.getElementById('menuOverlay').classList.remove('show');
+  location.href = 'https://brainkeirin.jp/kaime';
+});
 
 document.getElementById('menuGptBtn').addEventListener('click', function() {
   document.getElementById('menuOverlay').classList.remove('show');
