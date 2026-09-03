@@ -13765,6 +13765,11 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
       axis: { car: axisCar, name: axisResult.axis.name, score: axisResult.axisScore },
       taisho: { car: taishoCar, name: taishoResult.taisho.name, score: taishoResult.taishoScore, reason: taishoResult.reason },
       roles: { ...roles, tanki: String(tankiCar) },
+      /* ★★2026-09-03：記録用。軸スコアの内訳と直近平均ロックの発動有無。
+         ロック発動レースは新スコアの効果を測れないので分けて集計するため。
+         ★買い目には一切影響しない。 */
+      axisBreakdown: axisResult.axisBreakdown || null,
+      axisLocked: !!axisResult.axisLocked,
       flex: { A: flexResult.flexA, B: flexResult.flexB, candidates: flexResult.candidates, reason: flexResult.reason },
       patternCheck: { pattern: cCheck.pattern, reason: cCheck.reason },
       pattern: patternResult.pattern,
@@ -14025,6 +14030,11 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
     taisho: { car: taishoCar, name: taishoResult.taisho.name, score: taishoResult.taishoScore, reason: taishoResult.reason },
     roles,
     flex: { A: flexResult.flexA, B: flexResult.flexB, C: flexResult.flexC },
+    /* ★★2026-09-03：記録用。軸スコアの内訳と、直近平均ロックの発動有無。
+       ロック発動レースは新スコアの効果を測れないので分けて集計するため。
+       ★買い目には一切影響しない。 */
+    axisBreakdown: axisResult.axisBreakdown || null,
+    axisLocked: !!axisResult.axisLocked,
     patternCheck,
     pattern: patternResult.pattern,
     bets: bets3,
@@ -22250,7 +22260,38 @@ function attachTextsToBets(stage4, texts) {
             return { text: (typeof t === 'string' ? t : (t && t.text) || ''), n: 0 };
           }).filter(function(x){ return x.text; }),
           cover:null, scenarioLines:[], highlights:[],
-          T1:{},T2:{},T3:{},blended:{},combos:[],roles:{}
+          T1:{},T2:{},T3:{},blended:{},combos:[],
+          /* ★★2026-09-03：これまで roles:{} と空を入れており、
+             分析側は役割を買い目から逆算するしかなかった。
+             軸ロジック v4（4-13）で対抗の選び方と軸3の追加が入ったため、
+             従来の定義での逆算は機能しない。実値を記録する。
+             ★買い目には一切影響しない。 */
+          roles: (out && out.roles) ? {
+            axis:        out.roles.axis        != null ? String(out.roles.axis)        : null,
+            axisBante:   out.roles.axisBante   != null ? String(out.roles.axisBante)   : null,
+            axis3rd:     out.roles.axis3rd     != null ? String(out.roles.axis3rd)     : null,
+            taisho:      out.roles.taisho      != null ? String(out.roles.taisho)      : null,
+            taishoBante: out.roles.taishoBante != null ? String(out.roles.taishoBante) : null,
+            tanki:       out.roles.tanki       != null ? String(out.roles.tanki)       : null,
+            hasAxis3rd:  !!out.roles.hasAxis3rd
+          } : {},
+          /* ★柔軟枠の実値。これが無いと
+             「3連対率とミッドナイト1着率の計50点を捨てた判断」の正否を検証できない。 */
+          flex: (out && out.flex) ? {
+            A: out.flex.A != null ? String(out.flex.A) : null,
+            B: out.flex.B != null ? String(out.flex.B) : null,
+            C: out.flex.C != null ? String(out.flex.C) : null
+          } : null,
+          /* ★軸スコア v4 の内訳と、直近平均ロックが発動したか。
+             ロック発動レースは新スコアの効果を測れないので分けて集計すること。 */
+          axisInfo: {
+            score: (out && out.axis && out.axis.score != null) ? out.axis.score : null,
+            breakdown: (out && out.axisBreakdown) || null,
+            locked: !!(out && out.axisLocked),
+            axis3rdAdded: (out && out.axis3rdAdded != null) ? out.axis3rdAdded : 0,
+            taishoVer: (out && out.taisho && out.taisho.reason
+                        && String(out.taisho.reason).indexOf('対抗v4') === 0) ? 'v4' : 'v3'
+          }
         }, {
           venue: (typeof CURRENT_VENUE!=='undefined'&&CURRENT_VENUE)?CURRENT_VENUE.venue:'',
           venueId: (typeof CURRENT_VENUE!=='undefined'&&CURRENT_VENUE)?CURRENT_VENUE.venueId:'',
@@ -22267,7 +22308,11 @@ function attachTextsToBets(stage4, texts) {
           ex: ex, bankKey: bankKey,
           players: race.players.map(function(p){
             return { car:Number(p.n), name:p.name||'', pt:p.pt, style:p.style||'', klass:p.cls||p.klass||'',
-                     nige:p.nige, makuri:(p.maki!=null?p.maki:p.makuri), sashi:p.sashi, mark:p.mark, B:p.B };
+                     nige:p.nige, makuri:(p.maki!=null?p.maki:p.makuri), sashi:p.sashi, mark:p.mark, B:p.B,
+                     /* ★★2026-09-03 追加：3連対率。
+                        軸スコア v4 で W_RENTAI3 を捨てた判断の正否を検証するために必須。 */
+                     rentai3: (p.r3 != null ? Number(p.r3) : (p.rentai3 != null ? Number(p.rentai3) : null)),
+                     win: (p.win != null ? Number(p.win) : null) };
           })
         });
       }

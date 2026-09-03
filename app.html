@@ -11414,14 +11414,80 @@ function sortPair(a, b) {
 }
 
 // 買い目を圧縮形に変換
-function compressBets(bets) {
+/* ===================================================================
+ * デイナイター A-1 買い目構成 v2（2026-09-03）
+ *
+ * DAY_LOG 341件のうち A-1 66件の実測による微修正。
+ *   変更1  「軸番-対頭」の段を全廃（168点使って的中ゼロ）
+ *   変更2  「軸頭-軸番-対番」を追加
+ *   変更3  「軸頭-軸番-三頭」を追加（★根拠は当たり1件。弱い）
+ *   変更4  A-1 の圧縮形を compressBets(bets) の導出に切り替え
+ *   変更5  段の並びを「点数の多い順」の降順に
+ *
+ * ★ENABLED を false にすると 2026-09-02 時点の動作に完全に戻る。
+ * ★A-1（hasAxis3rd === true）専用。A-2 / A-3 / C系 / B系 には一切及ばない。
+ * ★ミッドナイト（midrace.html）には移植しない。
+ * ★app.html と result.html の両方に同じものを入れること。
+ *   result.html は結果照合のために買い目を再生成するため、
+ *   片方だけ変えると的中判定と回収率の集計がずれる。
+ *
+ * ★★重要な構造変更：A-1 だけ「買い目 → 圧縮形」の向きになる。
+ *   他パターンは従来どおり「手書き圧縮形 → 展開 → 買い目」。
+ *   A-2 のテンプレートを変えても買い目は変わらないが、
+ *   A-1 のテンプレートを変えると買い目が変わる。混在するので注意。
+ * =================================================================== */
+const A1_V2 = {
+  ENABLED: true,
+  ADD_LINE3HEAD: true,   // 変更3。根拠が弱いのでこれだけ外せる
+  SORT_BY_COUNT: true    // 変更5。段を点数の多い順に
+};
+
+/* 第3ライン＝軸でも対抗でもない「2車以上」ラインの先頭。無ければ null。
+   ★参照比較（g === axisLine）ではなく車番の所属で判定する。
+     呼び出し側は roles.axis / roles.taisho（車番の文字列）しか持っていないため。
+   ★単騎（1車ライン）は対象外。 */
+function getLine3Head(lineup, axisCar, taishoCar) {
+  for (const g of (lineup || [])) {
+    if (!g || g.length < 2) continue;
+    const cars = g.map(String);
+    if (cars.includes(String(axisCar))) continue;
+    if (cars.includes(String(taishoCar))) continue;
+    return String(g[0]);
+  }
+  return null;
+}
+
+/* A-1 の買い目を整える。重複・null混入・同一車番を落とす。
+   ★line3Head が null のとき、テンプレートリテラルは文字列 "null" になる。
+     生成側でも条件付き追加にしているが、ここでも二重に守る。 */
+function a1CleanBets(bets) {
+  return Array.from(new Set((bets || []).filter(function (b) {
+    const p = String(b).split('-');
+    if (p.length !== 3) return false;
+    if (new Set(p).size !== 3) return false;
+    return !p.includes('null') && !p.includes('undefined') && !p.includes('');
+  })));
+}
+
+function compressBets(bets, opts) {
   // 1着でグループ化→各1着内で最大矩形(B×C)を貪欲被覆（ボックス圧縮対応・2-15-15等）。
   // 戻り値は1着ごとに1段（同段内の買い目は ' / ' 連結）。
+  //
+  // ★★2026-09-03：第2引数 { sortByCount: true } で段の並びを
+  //   「その段が含む点数の多い順（降順）」にできる。同点は車番の昇順。
+  //   ★既定は従来どおり車番の昇順。引数を渡さなければ振る舞いは変わらない。
+  //     compressBets には他にも2か所呼び出しがあるため、全体を降順にしない。
+  //   ★同じ1着の買い目は従来どおり必ず同じ段にまとまる（byFirst でグループ化）。
   const triples = Array.from(new Set(bets)).map(s => s.split('-'));
   const byFirst = {};
   for (const [a, b, c] of triples) { (byFirst[a] = byFirst[a] || []).push([b, c]); }
   const num = x => Number(x);
-  const firsts = Object.keys(byFirst).sort((x, y) => num(x) - num(y));
+  const firsts = (opts && opts.sortByCount)
+    ? Object.keys(byFirst).sort((x, y) => {
+        const d = byFirst[y].length - byFirst[x].length;   // 点数の降順
+        return d !== 0 ? d : num(x) - num(y);              // 同点は車番昇順
+      })
+    : Object.keys(byFirst).sort((x, y) => num(x) - num(y));
   const lines = [];
   for (const a of firsts) {
     const pairs = byFirst[a];
@@ -11517,15 +11583,34 @@ function generate8Points_v2(cars, flexA, flexB) {
 
 // --- 9点パターン ---
 function generate9Points_v1(cars, flexB) {
-  const { axis, axisBante, axis3rd, taisho, taishoBante } = cars;
+  const { axis, axisBante, axis3rd, taisho, taishoBante, line3Head } = cars;
+  /* ★2026-09-03 A-1 v2
+       削除：軸番-対頭-軸頭 / 軸番-対頭-対番   （168点使って的中ゼロ）
+       追加：軸頭-軸番-対番 / 軸頭-軸番-三頭
+     ENABLED=false のときは 2026-09-02 時点の並びをそのまま返す。 */
+  if (typeof A1_V2 === 'undefined' || !A1_V2.ENABLED) {
+    const bets = [
+      `${axis}-${axisBante}-${taisho}`, `${axis}-${axisBante}-${axis3rd}`,
+      `${axisBante}-${axis}-${taisho}`, `${axisBante}-${axis}-${axis3rd}`,
+      `${axisBante}-${axis}-${taishoBante}`,
+      `${axisBante}-${taisho}-${axis}`, `${axisBante}-${taisho}-${taishoBante}`,
+      `${taisho}-${axisBante}-${axis}`, `${taisho}-${axisBante}-${taishoBante}`
+    ];
+    return { pattern: 'A-1', bets, count: bets.length };
+  }
   const bets = [
+    // 軸頭発（対頭 / 軸3 / 対番）
     `${axis}-${axisBante}-${taisho}`, `${axis}-${axisBante}-${axis3rd}`,
+    `${axis}-${axisBante}-${taishoBante}`,
+    // 軸番発（対頭 / 軸3 / 対番）
     `${axisBante}-${axis}-${taisho}`, `${axisBante}-${axis}-${axis3rd}`,
     `${axisBante}-${axis}-${taishoBante}`,
-    `${axisBante}-${taisho}-${axis}`, `${axisBante}-${taisho}-${taishoBante}`,
+    // 対頭発（軸頭 / 対番）
     `${taisho}-${axisBante}-${axis}`, `${taisho}-${axisBante}-${taishoBante}`
   ];
-  return { pattern: 'A-1', bets, count: bets.length };
+  if (A1_V2.ADD_LINE3HEAD && line3Head) bets.push(`${axis}-${axisBante}-${line3Head}`);
+  const uniq = (typeof a1CleanBets === 'function') ? a1CleanBets(bets) : bets;
+  return { pattern: 'A-1', bets: uniq, count: uniq.length };
 }
 
 function generate9Points_v2(cars, flexA, flexB) {
@@ -11545,15 +11630,28 @@ function generate9Points_v2(cars, flexA, flexB) {
 
 // --- 10点パターン ---
 function generate10Points_v1(cars, flexA) {
-  const { axis, axisBante, axis3rd, taisho, taishoBante } = cars;
+  const { axis, axisBante, axis3rd, taisho, taishoBante, line3Head } = cars;
+  if (typeof A1_V2 === 'undefined' || !A1_V2.ENABLED) {
+    const bets = [
+      `${axis}-${axisBante}-${taisho}`, `${axis}-${axisBante}-${axis3rd}`, `${axis}-${axisBante}-${flexA}`,
+      `${axisBante}-${axis}-${taisho}`, `${axisBante}-${axis}-${axis3rd}`, `${axisBante}-${axis}-${flexA}`,
+      `${axisBante}-${axis}-${taishoBante}`,
+      `${axisBante}-${taisho}-${axis}`, `${axisBante}-${taisho}-${taishoBante}`,
+      `${taisho}-${axisBante}-${axis}`
+    ];
+    return { pattern: 'A-1', bets, count: bets.length };
+  }
+  /* ★2026-09-03 A-1 v2：軸番-対頭の2点を削除し、軸頭発に 対番・三頭 を追加 */
   const bets = [
     `${axis}-${axisBante}-${taisho}`, `${axis}-${axisBante}-${axis3rd}`, `${axis}-${axisBante}-${flexA}`,
+    `${axis}-${axisBante}-${taishoBante}`,
     `${axisBante}-${axis}-${taisho}`, `${axisBante}-${axis}-${axis3rd}`, `${axisBante}-${axis}-${flexA}`,
     `${axisBante}-${axis}-${taishoBante}`,
-    `${axisBante}-${taisho}-${axis}`, `${axisBante}-${taisho}-${taishoBante}`,
     `${taisho}-${axisBante}-${axis}`
   ];
-  return { pattern: 'A-1', bets, count: bets.length };
+  if (A1_V2.ADD_LINE3HEAD && line3Head) bets.push(`${axis}-${axisBante}-${line3Head}`);
+  const uniq = (typeof a1CleanBets === 'function') ? a1CleanBets(bets) : bets;
+  return { pattern: 'A-1', bets: uniq, count: uniq.length };
 }
 
 function generate10Points_v2(cars, flexA, flexB) {
@@ -11573,16 +11671,29 @@ function generate10Points_v2(cars, flexA, flexB) {
 
 // --- 12点パターン ---
 function generate12Points_v1(cars, flexA, flexB) {
-  const { axis, axisBante, axis3rd, taisho, taishoBante } = cars;
+  const { axis, axisBante, axis3rd, taisho, taishoBante, line3Head } = cars;
+  if (typeof A1_V2 === 'undefined' || !A1_V2.ENABLED) {
+    const bets = [
+      `${axis}-${axisBante}-${taisho}`, `${axis}-${axisBante}-${axis3rd}`, `${axis}-${axisBante}-${flexA}`,
+      `${axisBante}-${axis}-${taisho}`, `${axisBante}-${axis}-${axis3rd}`, `${axisBante}-${axis}-${flexA}`,
+      `${axisBante}-${axis}-${taishoBante}`,
+      `${axisBante}-${taisho}-${axis}`, `${axisBante}-${taisho}-${taishoBante}`,
+      `${axisBante}-${axis}-${flexB}`, `${axisBante}-${taisho}-${flexB}`,
+      `${taisho}-${axisBante}-${axis}`
+    ];
+    return { pattern: 'A-1', bets, count: bets.length };
+  }
+  /* ★2026-09-03 A-1 v2：軸番-対頭の3点を削除し、軸頭発に 対番・三頭 を追加。定義上11点 */
   const bets = [
     `${axis}-${axisBante}-${taisho}`, `${axis}-${axisBante}-${axis3rd}`, `${axis}-${axisBante}-${flexA}`,
+    `${axis}-${axisBante}-${taishoBante}`,
     `${axisBante}-${axis}-${taisho}`, `${axisBante}-${axis}-${axis3rd}`, `${axisBante}-${axis}-${flexA}`,
-    `${axisBante}-${axis}-${taishoBante}`,
-    `${axisBante}-${taisho}-${axis}`, `${axisBante}-${taisho}-${taishoBante}`,
-    `${axisBante}-${axis}-${flexB}`, `${axisBante}-${taisho}-${flexB}`,
+    `${axisBante}-${axis}-${taishoBante}`, `${axisBante}-${axis}-${flexB}`,
     `${taisho}-${axisBante}-${axis}`
   ];
-  return { pattern: 'A-1', bets, count: bets.length };
+  if (A1_V2.ADD_LINE3HEAD && line3Head) bets.push(`${axis}-${axisBante}-${line3Head}`);
+  const uniq = (typeof a1CleanBets === 'function') ? a1CleanBets(bets) : bets;
+  return { pattern: 'A-1', bets: uniq, count: uniq.length };
 }
 
 function generate12Points_v2(cars, flexA, flexB) {
@@ -11603,18 +11714,33 @@ function generate12Points_v2(cars, flexA, flexB) {
 
 // --- 15点パターン ---
 function generate15Points_v1(cars, flexA, flexB) {
-  const { axis, axisBante, axis3rd, taisho, taishoBante } = cars;
+  const { axis, axisBante, axis3rd, taisho, taishoBante, line3Head } = cars;
+  if (typeof A1_V2 === 'undefined' || !A1_V2.ENABLED) {
+    const bets = [
+      `${axis}-${axisBante}-${taisho}`, `${axis}-${axisBante}-${axis3rd}`, `${axis}-${axisBante}-${flexA}`,
+      `${axisBante}-${axis}-${taisho}`, `${axisBante}-${axis}-${axis3rd}`, `${axisBante}-${axis}-${flexA}`,
+      `${axisBante}-${axis}-${taishoBante}`,
+      `${axisBante}-${taisho}-${axis}`, `${axisBante}-${taisho}-${taishoBante}`,
+      `${axisBante}-${axis}-${flexB}`, `${axisBante}-${taisho}-${flexB}`,
+      `${taisho}-${axisBante}-${axis}`,
+      `${taisho}-${taishoBante}-${axisBante}`, `${taisho}-${axisBante}-${taishoBante}`,
+      `${taisho}-${taishoBante}-${axis}`
+    ];
+    return { pattern: 'A-1', bets, count: bets.length };
+  }
+  /* ★2026-09-03 A-1 v2：軸番-対頭の3点を削除し、軸頭発に 対番・三頭 を追加。定義上14点
+     対頭発（4点）は現行のまま。 */
   const bets = [
     `${axis}-${axisBante}-${taisho}`, `${axis}-${axisBante}-${axis3rd}`, `${axis}-${axisBante}-${flexA}`,
+    `${axis}-${axisBante}-${taishoBante}`,
     `${axisBante}-${axis}-${taisho}`, `${axisBante}-${axis}-${axis3rd}`, `${axisBante}-${axis}-${flexA}`,
-    `${axisBante}-${axis}-${taishoBante}`,
-    `${axisBante}-${taisho}-${axis}`, `${axisBante}-${taisho}-${taishoBante}`,
-    `${axisBante}-${axis}-${flexB}`, `${axisBante}-${taisho}-${flexB}`,
-    `${taisho}-${axisBante}-${axis}`,
-    `${taisho}-${taishoBante}-${axisBante}`, `${taisho}-${axisBante}-${taishoBante}`,
-    `${taisho}-${taishoBante}-${axis}`
+    `${axisBante}-${axis}-${taishoBante}`, `${axisBante}-${axis}-${flexB}`,
+    `${taisho}-${axisBante}-${axis}`, `${taisho}-${axisBante}-${taishoBante}`,
+    `${taisho}-${taishoBante}-${axisBante}`, `${taisho}-${taishoBante}-${axis}`
   ];
-  return { pattern: 'A-1', bets, count: bets.length };
+  if (A1_V2.ADD_LINE3HEAD && line3Head) bets.push(`${axis}-${axisBante}-${line3Head}`);
+  const uniq = (typeof a1CleanBets === 'function') ? a1CleanBets(bets) : bets;
+  return { pattern: 'A-1', bets: uniq, count: uniq.length };
 }
 
 function generate15Points_v2(cars, flexA, flexB, flexC, isGrade) {
@@ -13338,22 +13464,49 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
         ? selectFlexPlayersV3(players, roles, lineup, roles.hasAxis3rd, opts.ex, isMidnight, opts.bankKey || null, timeSlot, _flexBonus)
         : selectFlexPlayers(players, roles, lineStr, roles.hasAxis3rd);
     // ★flexC はG戦のみ値を持つ（2026-08-02）。7車立てでは null → 型側で flexA に落ちる。
+    /* ★2026-09-03 A-1 v2：第3ライン先頭を roles に載せる。
+       A-1 の「軸頭-軸番-三頭」でのみ使う。無ければ null でその1点は生成されない。 */
+    if (typeof A1_V2 !== 'undefined' && A1_V2.ENABLED && roles.hasAxis3rd
+        && typeof getLine3Head === 'function') {
+      roles.line3Head = getLine3Head(lineup, roles.axis, roles.taisho);
+    }
     patternResult = generatePatternA(points, roles, flexResult.flexA, flexResult.flexB, roles.hasAxis3rd, flexResult.flexC, isGrade);
-    compressed = compressBetsWithRoles(points, roles, roles.hasAxis3rd, flexResult.flexA, flexResult.flexB, flexResult.flexC, isGrade);
+    /* ★★2026-09-03 A-1 v2：A-1 だけ圧縮形を買い目から導出する。
+       ここを手書きのままにすると、テンプレートを書き換えても買い目が変わらない。
+       このファイルは compressed を展開したものを bets として返すため（下の bets3）。
+       ★A-2 / A-3 / C系 は従来どおり手書き版。混在するので注意。 */
+    compressed = (typeof A1_V2 !== 'undefined' && A1_V2.ENABLED && roles.hasAxis3rd
+                  && typeof compressBets === 'function')
+      ? compressBets(patternResult.bets, { sortByCount: !!A1_V2.SORT_BY_COUNT })
+      : compressBetsWithRoles(points, roles, roles.hasAxis3rd, flexResult.flexA, flexResult.flexB, flexResult.flexC, isGrade);
   }
   
   // Step 8: バリデーション（買い目数と圧縮形から計算される点数が一致するか）
     // ★荒れ30.1%以上のとき、1着と2着を入れ替える（A-2/A-3のみ）2026-08-02
-    if (shouldSwap12(patternResult.pattern, opts.arePct)) {
+    const _swapped12 = shouldSwap12(patternResult.pattern, opts.arePct);
+    if (_swapped12) {
       compressed = compressed.map(swap12Trio);
     }
     // ★圧縮形を正として買い目を導出する（2026-08-01）
     const bets3 = expandCompressed(compressed);
     const betCount3 = bets3.length;
 
-  const countFromCompressed = countBetsFromCompressed(compressed);
-  if (patternResult.count !== countFromCompressed) {
-    console.error(`[BRAIN ERROR] 買い目数不一致: bets=${patternResult.count}, compressed=${countFromCompressed}`);
+  /* ★★2026-09-03：バリデーションを作り直した。
+     旧：patternResult.count と countBetsFromCompressed(compressed) を比較。
+       countBetsFromCompressed は2着と3着の重複を数え切れず、
+       A-3 と C-1 では正常動作でも常に誤検知していた（実測：bets=10 に対して 16）。
+     新：テンプレートが意図した買い目と、圧縮形を展開した買い目を直接比べる。
+       これが本来チェックしたかったこと。誤差は出ない。
+     ★swap12 が効いたときは compressed だけ入れ替わり、
+       patternResult.bets は元のままなので比較しない。 */
+  const _tplBets = Array.from(new Set((patternResult.bets || []).filter(function (b) {
+    const q = String(b).split('-');
+    return q.length === 3 && new Set(q).size === 3
+        && !q.includes('null') && !q.includes('undefined') && !q.includes('');
+  })));
+  const countFromCompressed = bets3.length;
+  if (!_swapped12 && _tplBets.length !== bets3.length) {
+    console.error(`[BRAIN ERROR] 買い目数不一致: bets=${_tplBets.length}, compressed=${bets3.length}`);
     console.error('パターン:', patternCheck.pattern, patternResult.pattern);
     console.error('圧縮形:', compressed);
     console.error('買い目:', patternResult.bets);
@@ -13373,11 +13526,14 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
     betCount: betCount3,
     availablePoints,
     tokureiSwap: tokurei.swap, tokurei,
-    validation: { countFromCompressed, match: betCount3 === countFromCompressed }
+    validation: { countFromCompressed, templateCount: _tplBets.length,
+                  match: _swapped12 ? true : (_tplBets.length === bets3.length) }
   };
 }
 
 // 圧縮形から買い目数を計算するヘルパー
+// ★2026-09-03：バリデーションからは呼ばなくなった（重複を数え切れないため）。
+//   他から参照されている可能性があるので定義は残す。
 function countBetsFromCompressed(compressed) {
   let total = 0;
   for (const line of compressed) {
@@ -13675,8 +13831,17 @@ function generateBetsCustom(lineup, rawPlayers, points, timeSlot) {
     
   } else {
     // ★flexC はG戦のみ値を持つ（2026-08-02）。7車立てでは null → 型側で flexA に落ちる。
+    /* ★2026-09-03 A-1 v2：ユーザー指定モードにも同じ処理を通す。
+       ここを忘れると指定モードだけ line3Head が undefined になる。 */
+    if (typeof A1_V2 !== 'undefined' && A1_V2.ENABLED && roles.hasAxis3rd
+        && typeof getLine3Head === 'function') {
+      roles.line3Head = getLine3Head(lineup, roles.axis, roles.taisho);
+    }
     patternResult = generatePatternA(points, roles, flexResult.flexA, flexResult.flexB, roles.hasAxis3rd, flexResult.flexC, isGrade);
-    compressed = compressBetsWithRoles(points, roles, roles.hasAxis3rd, flexResult.flexA, flexResult.flexB, flexResult.flexC, isGrade);
+    compressed = (typeof A1_V2 !== 'undefined' && A1_V2.ENABLED && roles.hasAxis3rd
+                  && typeof compressBets === 'function')
+      ? compressBets(patternResult.bets, { sortByCount: !!A1_V2.SORT_BY_COUNT })
+      : compressBetsWithRoles(points, roles, roles.hasAxis3rd, flexResult.flexA, flexResult.flexB, flexResult.flexC, isGrade);
   }
   
   return {
@@ -23728,7 +23893,26 @@ async function runMid3BunsenGeneration(race, ctx){
     betCount: out.betCount || buyStrs.length,
     bets: buyStrs,
     compressed: compressed,
-    expanded: expanded
+    expanded: expanded,
+    /* ★★2026-09-03：役割と柔軟枠を記録用に持ち回す。買い目には一切影響しない。
+       これまで DAY_LOG に roles が無く、分析側は買い目からの逆算に頼っていた。
+       A-1 のテンプレートを変えた（4-14）ため、従来の定義での逆算は機能しなくなる。
+       ここを記録しないと次回以降の A-1 分析ができない。 */
+    roles: (out && out.roles) ? {
+      axis:        out.roles.axis        != null ? String(out.roles.axis)        : null,
+      axisBante:   out.roles.axisBante   != null ? String(out.roles.axisBante)   : null,
+      axis3rd:     out.roles.axis3rd     != null ? String(out.roles.axis3rd)     : null,
+      taisho:      out.roles.taisho      != null ? String(out.roles.taisho)      : null,
+      taishoBante: out.roles.taishoBante != null ? String(out.roles.taishoBante) : null,
+      line3Head:   out.roles.line3Head   != null ? String(out.roles.line3Head)   : null,
+      tanki:       out.roles.tanki       != null ? String(out.roles.tanki)       : null,
+      hasAxis3rd:  !!out.roles.hasAxis3rd
+    } : null,
+    flex: (out && out.flex) ? {
+      A: out.flex.A != null ? String(out.flex.A) : null,
+      B: out.flex.B != null ? String(out.flex.B) : null,
+      C: out.flex.C != null ? String(out.flex.C) : null
+    } : null
   };
 
   /* ★2026-08-07：予想を記録する（デイナイター）。
@@ -23888,6 +24072,10 @@ if (typeof window !== 'undefined') {
       recentUsed: !!res.recentUsed,
       bets: (res.bets || []).slice(),
       compressed: (res.compressed || []).slice(),
+      /* ★2026-09-03 追加。買い目からの役割逆算をやめられるようにする。
+         A-1 のテンプレート変更（4-14）以降、従来の逆算は機能しない。 */
+      roles: res.roles || null,
+      flex: res.flex || null,
       result: null
     };
     if(idx >= 0) arr[idx] = rec; else arr.push(rec);
