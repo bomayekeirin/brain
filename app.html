@@ -15262,6 +15262,9 @@ function renderCustomLineSelector() {
       
       renderCustomLineSelector();
       updateCustomStepLabel();
+      /* ★2026-09-03：軸/対抗が決まった時点で点数の妥当性を再判定する。
+         A-3 かどうかは組み合わせで変わるため、先に選んだ点数が使えなくなることがある。 */
+      if (typeof window.__brainRevalidatePoints === 'function') window.__brainRevalidatePoints();
       updateCustomSelectionResult();
       updateCustomGenerateButton();
     });
@@ -16737,8 +16740,100 @@ document.getElementById('rtHomeBtn').addEventListener('click', () => {
     wobbleTimers = [];
   }
   
+  /* ===================================================================
+   * ★★2026-09-03：軸指定モードの点数リストを、ユーザーが選んだ軸/対抗で決める
+   *
+   * 症状：オレンジランプが点いていて、軸・対抗・点数まで選んで生成ボタンを押しても
+   *       「A-3パターンでは9点は使用不可」で生成されない。
+   *
+   * 原因：updateAvailablePoints() は【自動選定の軸/対抗】でパターンを判定していた。
+   *       A-3 かどうかは軸/対抗の組み合わせで変わるため、
+   *       自動が A（9点可）でも、ユーザーが選んだ組み合わせが A-3 だと 9点は使えない。
+   *       しかも点数ピッカーを開いたときにしか再計算されず、
+   *       軸/対抗を選び直しても点数リストは更新されなかった。
+   *
+   * 対策：軸指定タブで両方選択済みなら、その組み合わせでパターンを判定して点数リストを返す。
+   *
+   * ★判定は checkPatternA3 / checkPatternB をそのまま使う。判定器を二重に持たない。
+   *   generateBetsCustom の Step 4〜6 と同じ順序・同じ引数で呼ぶこと。
+   *   ここがズレると「点数は選べたのに生成で弾かれる」が再発する。
+   * =================================================================== */
+  function customPatternForSelection() {
+    try {
+      if (CUSTOM_AXIS_LINE === null || CUSTOM_TAISHO_LINE === null) return null;
+      const race = CURRENT_VENUE_RACES[CURRENT_RACE_INDEX];
+      if (!race || !race.lineup || !race.players) return null;
+
+      const axisLine = CUSTOM_LINES[CUSTOM_AXIS_LINE];
+      const taishoLine = CUSTOM_LINES[CUSTOM_TAISHO_LINE];
+      if (!axisLine || !taishoLine) return null;
+
+      const isCB = isCBunsenFormation(race.lineup);
+      /* 単騎は選択UI側で選べないようにしてあるが、念のため */
+      if (isCB && (axisLine.size === 1 || taishoLine.size === 1)) {
+        return { pattern: '生成不可', availablePoints: [], reason: '単騎は軸または対抗に指定できません' };
+      }
+
+      const lineStr = lineupToString(race.lineup);
+      const players = race.players.map(p => ({
+        car: String(p.n), name: p.name,
+        nige: p.nige || 0, makuri: p.maki || 0, sashi: p.sashi || 0,
+        mark: p.mark || 0, B: p.B || 0,
+        rentai3: p.r3 || 0, win: p.win || 0, pt: p.pt || 0, ai: p.ai || ''
+      }));
+
+      /* C形態は単騎の特性だけで C-1/C-2 が決まる。軸/対抗には依存しない。 */
+      if (isCB) {
+        const tankiCar = findTankiCar(race.lineup);
+        const tankiPlayer = players.find(p => p.car === String(tankiCar));
+        if (!tankiPlayer) return null;
+        const cCheck = checkPatternC(tankiPlayer);
+        return { pattern: cCheck.pattern, displayPattern: cCheck.pattern,
+                 reason: cCheck.reason, isC: true, availablePoints: C_AVAILABLE_POINTS };
+      }
+
+      const axisCar = axisLine.head, taishoCar = taishoLine.head;
+      const axisPlayer = players.find(p => p.car === String(axisCar));
+      const taishoPlayer = players.find(p => p.car === String(taishoCar));
+      if (!axisPlayer || !taishoPlayer) return null;
+
+      const roles = assignRolesSimple(lineStr, String(axisCar), String(taishoCar));
+      const axisBantePlayer = players.find(p => p.car === roles.axisBante) || {};
+      const taishoBantePlayer = players.find(p => p.car === roles.taishoBante) || {};
+
+      const leaderCars = extractLeaders(lineStr);
+      const leaders = players.filter(p => leaderCars.includes(String(p.car)));
+      const a3Check = checkPatternA3(leaders, axisBantePlayer, taishoBantePlayer, axisPlayer);
+
+      if (a3Check.isA3) {
+        return { pattern: 'A-3', displayPattern: 'A-3', reason: a3Check.reason,
+                 availablePoints: A3_AVAILABLE_POINTS };
+      }
+      const bCheck = checkPatternB(axisPlayer, axisBantePlayer, taishoPlayer);
+      return { pattern: bCheck.pattern, displayPattern: bCheck.pattern, reason: bCheck.reason,
+               availablePoints: bCheck.pattern === 'INVALID' ? []
+                 : (bCheck.pattern.startsWith('B') ? B_PATTERN_POINTS : BRAIN_CONFIG.POINT_PATTERNS) };
+    } catch (e) {
+      console.error('customPatternForSelection error:', e);
+      return null;
+    }
+  }
+
   // パターン判定を行い、使用可能な点数を更新
   function updateAvailablePoints() {
+    /* ★2026-09-03：軸指定タブで両方選択済みなら、その組み合わせを優先して判定する。
+       未選択・おまかせタブのときは従来どおり自動選定で判定する。 */
+    try {
+      if (typeof isGenSubActive === 'function' && isGenSubActive('custom')) {
+        const cp = customPatternForSelection();
+        if (cp) {
+          CURRENT_PATTERN_CHECK = cp;
+          CURRENT_AVAILABLE_POINTS = cp.availablePoints || [];
+          return;
+        }
+      }
+    } catch (e) {}
+
     try {
       const currentRace = CURRENT_VENUE_RACES[CURRENT_RACE_INDEX];
       if (!currentRace || !currentRace.lineup || !currentRace.players) {
@@ -16860,6 +16955,27 @@ document.getElementById('rtHomeBtn').addEventListener('click', () => {
     }
   }
   
+  /* ★2026-09-03：軸/対抗を選び直したときに、外（renderCustomLineSelector）から
+     点数の妥当性を再判定できるように公開する。
+     ★IIFE の中なので、これを消すと選択変更時の再判定が無言で効かなくなる。 */
+  window.__brainRevalidatePoints = function () {
+    try {
+      updateAvailablePoints();
+      const cur = pointBox && pointBox.dataset ? parseInt(pointBox.dataset.value) : NaN;
+      if (isNaN(cur)) return;
+      if (Array.isArray(CURRENT_AVAILABLE_POINTS) && !CURRENT_AVAILABLE_POINTS.includes(cur)) {
+        /* 選び直した組み合わせでは今の点数が使えない → 点数をクリアする。
+           ここでクリアしないと「点数は表示されているのに生成で弾かれる」が残る。 */
+        pointBox.dataset.value = '';
+        pointBox.classList.remove('has-value');
+        if (pointValue) pointValue.textContent = '';
+        const pat = (CURRENT_PATTERN_CHECK && (CURRENT_PATTERN_CHECK.displayPattern || CURRENT_PATTERN_CHECK.pattern)) || '';
+        showToast(pat ? (pat + 'では' + cur + '点が使えないため点数を選び直してください')
+                      : 'この組み合わせでは' + cur + '点が使えません', true);
+      }
+    } catch (e) { console.error('__brainRevalidatePoints error:', e); }
+  };
+
   // ボックスクリック → オーバーレイ表示
   pointBox.addEventListener('click', () => {
     // パターン判定を更新
