@@ -12565,6 +12565,45 @@ function compressBetsWithRolesForA3(points, cars) {
 
 const C_AVAILABLE_POINTS = [6, 8, 9, 10, 12, 15];
 
+/* ===================================================================
+ * デイナイター C-1 買い目構成 v2（2026-09-03）
+ *
+ * DAY_LOG の C-1 94件（デイ68 / ナイター26）の実測による全面置換。
+ *   1着  軸頭 / 対頭
+ *   2着  軸番 / 軸頭              （9点）
+ *        軸番 / 軸頭 / 対頭        （12点）
+ *   3着  軸頭 / 軸番 / 三頭 / 対番 / 対頭   （全帯共通）
+ *
+ * ★ENABLED を false にすると 2026-09-03 時点の動作に完全に戻る。
+ * ★C-1 専用。C-2 / A-1 / A-2 / A-3 / B系 には一切及ばない。
+ *   generatePatternC1 と generatePatternA は相互に呼び合っておらず、
+ *   テンプレートも別々に直書きされている（構造上の波及なしを確認済み）。
+ * ★ミッドナイト（midrace.html）には移植しない。
+ * ★app.html と result.html の両方に入れること。
+ *   result.html は結果照合のために買い目を再生成するため、
+ *   片方だけ変えると的中判定と回収率の集計がずれる。
+ *
+ * ★★倍率2.19を期待値として扱わないこと（分析側 第9章）。
+ *   ・当たる回数は現行と統計的に引き分け（McNemar p=1.0000）
+ *   ・配当上位1件を除くと 2.19 → 1.43
+ *   ・荒れ境界の効果は実証されていない（40〜75 のどこでも当たり19件で一定）
+ *     境界80で1.52に急落する。65は「限界効果100%超の範囲を機械的に取った」値。
+ * =================================================================== */
+const C1_V2 = { ENABLED: true, ARE_THRESHOLD: 65.0 };
+
+/* C-1 の点数。荒れ65未満=9点 / 65以上=12点。
+   ★arePct が取れないときは12点（分析側の指定。C-1 は荒れ65以上が57%のため）。 */
+function c1PointsV2(arePct) {
+  const v = Number(arePct);
+  if (arePct == null || isNaN(v)) return 12;
+  return v >= C1_V2.ARE_THRESHOLD ? 12 : 9;
+}
+
+/* C-1 v2 で選べる点数。点数カードもこれに合わせる。
+   ★これを C_AVAILABLE_POINTS のままにすると
+     「10点を選んだのに9点が出る」が起きる。 */
+const C1_V2_POINTS = [9, 12];
+
 // --- C-1 / C-2 判定 ---
 // C-2 = AI印あり（◎〇△×）AND（自力≥3 OR 差し≥4）
 // 上記以外 → C-1
@@ -12726,7 +12765,53 @@ function selectFlexForC2(players, roles, lineStr) {
 }
 
 // --- C-1 買い目生成（A-2と同一構造） ---
+/* ★2026-09-03：C-1 v2 の本体。ENABLED=false なら旧実装へ委譲する。 */
 function generatePatternC1(points, cars) {
+  if (typeof C1_V2 === 'undefined' || !C1_V2.ENABLED) {
+    return generatePatternC1_v1(points, cars);
+  }
+  const { axis, axisBante, taisho, taishoBante, line3Head } = cars;
+
+  const first  = [axis, taisho];
+  const second = (Number(points) >= 12) ? [axisBante, axis, taisho] : [axisBante, axis];
+  const third  = [axis, axisBante, line3Head, taishoBante, taisho];
+
+  const bets = [], seen = new Set();
+  for (const a of first) {
+    if (!a) continue;
+    for (const b of second) {
+      if (!b || b === a) continue;
+      for (const c of third) {
+        if (!c || c === a || c === b) continue;
+        const k = `${a}-${b}-${c}`;
+        if (seen.has(k)) continue;
+        seen.add(k); bets.push(k);
+      }
+    }
+  }
+
+  /* ★圧縮形は1段のフォーメーション表記。compressBets は通さない。
+     C-1 v2 は純粋なフォーメーションなので 1着-2着-3着 の1行に畳める。
+       例）13-37-13567
+     ★compressBets を通すと1着ごとに2段に割れる。買い目は同じだが
+       「1着2車・2着2〜3車・3着5車」という設計が読み取れなくなる。
+     ★" / " が構造的に出ないので、オッズ表示（expandCompressedBet）が壊れる余地がない。
+       36,288ケースで展開結果が買い目と完全一致することを確認済み。
+     ★三頭が無い場合は3着が1つ減るだけ（9点→6点 / 12点→8点）。
+       ただし C形態は 1/2/2/2 固定、G戦Cルートも2車以上ライン3本が条件なので、
+       軸・対抗を除いた2車以上ラインは必ず1本残る。実際には発生しない。 */
+  const uniqSort = arr => Array.from(new Set(arr.filter(Boolean)))
+                            .sort((x, y) => Number(x) - Number(y)).join('');
+  const compressed = bets.length
+    ? [`${uniqSort(first)}-${uniqSort(second)}-${uniqSort(third)}`]
+    : [];
+
+  return { pattern: 'C-1', bets, compressed, count: bets.length };
+}
+
+/* ===== 旧 C-1（2026-09-03 まで）。ロールバック用に残す。
+   ★A-2 と完全に同一のテンプレートだった（全点数帯で買い目が一致することを確認済み）。 */
+function generatePatternC1_v1(points, cars) {
   const { axis, axisBante, taisho, taishoBante, flexA } = cars;
   
   // 車番をソートして結合するヘルパー（既存A-2と同じ）
@@ -13187,12 +13272,19 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
     
     // ★probeOnly：パターン判定だけを返す（ランプ・生成ボタンの可否判定用・2026-07-29）
     if (opts.probeOnly) {
-      return { probe:true, pattern: cCheck.pattern, availablePoints: C_AVAILABLE_POINTS,
+      return { probe:true, pattern: cCheck.pattern,
+        availablePoints: (cCheck.pattern === 'C-1' && typeof C1_V2 !== 'undefined' && C1_V2.ENABLED)
+          ? C1_V2_POINTS : C_AVAILABLE_POINTS,
                tokureiSwap: tokurei.swap, tokurei };
     }
     
     // 点数チェック
-    if (!C_AVAILABLE_POINTS.includes(points)) {
+    /* ★2026-09-03：C-1 v2 は点数を 9/12 に固定するため、このチェックを通さない。
+       通すと「10点を選んだのに C-1 だから弾かれる」が起きる。
+       C-2 は従来どおり C_AVAILABLE_POINTS で判定する。 */
+    const _isC1v2 = (cCheck.pattern === 'C-1')
+      && (typeof C1_V2 !== 'undefined') && C1_V2.ENABLED;
+    if (!_isC1v2 && !C_AVAILABLE_POINTS.includes(points)) {
       return {
         error: `${cCheck.pattern}パターンでは${points}点は使用不可`,
         errorDetail: `使用可能: ${C_AVAILABLE_POINTS.join(', ')}点`,
@@ -13230,33 +13322,63 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
       };
       patternResult = generatePatternC2(points, cars);
     } else {
-      // C-1: A-2と同じ買い目、単騎は柔軟枠候補
+      // C-1: 2026-09-03 より独自フォーメーション（v2）。旧版は A-2 と同一だった。
       // ★2026-08-04：7車立ても含めて selectFlexPlayersV3 に統一（Cパターン独自を廃止）
       flexResult = _flexV3();
+      /* ★2026-09-03：C-1 v2 で使う第3ライン先頭。A経路と同じ getLine3Head を使う。
+         ★C経路はA経路より前にあるため、A-1 v2 の代入は通っていない。ここで入れる。
+         ★単騎（1車ライン）は getLine3Head 側で除外される。 */
+      if (typeof C1_V2 !== 'undefined' && C1_V2.ENABLED && typeof getLine3Head === 'function') {
+        roles.line3Head = getLine3Head(lineup, roles.axis, roles.taisho);
+      }
       cars = {
         axis: roles.axis,
         axisBante: roles.axisBante,
         taisho: roles.taisho,
         taishoBante: roles.taishoBante,
+        line3Head: roles.line3Head || null,   // ★C-1 v2 用（C-2 は使わない）
         tanki: String(tankiCar),
         flexA: flexResult.flexA,
         flexB: flexResult.flexB,
         flexC: flexResult.flexC
       };
-      patternResult = generatePatternC1(points, cars);
+      /* ★C-1 v2 の点数は 9 / 12 の2段階。
+           自動生成（荒れ指数がある経路）→ c1PointsV2(arePct)
+           ユーザーが点数を選ぶ経路      → 選択を尊重（12以上なら12点構成）
+         ★点数カード側も C1_V2_POINTS = [9,12] に絞ってあるので、
+           「選んだ点数と出る点数が違う」は起きない。 */
+      const _c1pts = (typeof C1_V2 !== 'undefined' && C1_V2.ENABLED)
+        ? ((opts.arePct != null && typeof c1PointsV2 === 'function')
+            ? c1PointsV2(opts.arePct) : (Number(points) >= 12 ? 12 : 9))
+        : points;
+      patternResult = generatePatternC1(_c1pts, cars);
     }
     const compressed0 = patternResult.compressed;
-    // ★荒れ30.1%以上のとき、1着と2着を入れ替える（C-1/C-2のみ）2026-08-02
-    const compressed = shouldSwap12(patternResult.pattern, opts.arePct)
+    /* ★荒れ30.1%以上のとき、1着と2着を入れ替える（C-1/C-2のみ）2026-08-02
+       ★★2026-09-03：C-1 v2 は1段フォーメーションのため swap12Trio の対象外にする。
+         v2 は既に1着を「軸頭・対頭」の2車に絞っており、入れ替えると設計が崩れる。
+         SWAP12_ENABLED を true に戻したときも C-1 には効かない。C-2 には従来どおり効く。 */
+    const _skipSwapC1 = (patternResult.pattern === 'C-1')
+      && (typeof C1_V2 !== 'undefined') && C1_V2.ENABLED;
+    const compressed = (!_skipSwapC1 && shouldSwap12(patternResult.pattern, opts.arePct))
       ? compressed0.map(swap12Trio) : compressed0;
     // ★圧縮形を正として買い目を導出する（2026-08-01）
     const betsOut = expandCompressed(compressed);
     const betCountOut = betsOut.length;
     
-    // バリデーション
-    const countFromCompressed = countBetsFromCompressed(compressed);
-    if (patternResult.count !== countFromCompressed) {
-      console.warn(`[BRAIN/C-pattern] 買い目数と圧縮形カウントが不一致: bets=${patternResult.count}, compressed=${countFromCompressed} (バリデーション関数の既知の制約による誤差の可能性)`);
+    /* ★★2026-09-03：バリデーションを A経路と同じ形に作り直した。
+       旧：countBetsFromCompressed は2着と3着の重複を数え切れず、
+           C-1 では正常動作でも常に誤検知して console.warn を出していた。
+           C-1 v2 の1段フォーメーションでは誤差がさらに大きくなる（9点→15と返す）。
+       新：テンプレートが意図した買い目と、圧縮形を展開した買い目を直接比べる。 */
+    const _tplBetsC = Array.from(new Set((patternResult.bets || []).filter(function (b) {
+      const q = String(b).split('-');
+      return q.length === 3 && new Set(q).size === 3
+          && !q.includes('null') && !q.includes('undefined') && !q.includes('');
+    })));
+    const countFromCompressed = betsOut.length;
+    if (_tplBetsC.length !== betsOut.length) {
+      console.warn(`[BRAIN/C-pattern] 買い目数と圧縮形が不一致: bets=${_tplBetsC.length}, compressed=${betsOut.length}`);
     }
     
     return {
@@ -13271,9 +13393,11 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
       bets: betsOut,
       compressed,
       betCount: betCountOut,
-      availablePoints: C_AVAILABLE_POINTS,
+      availablePoints: (cCheck.pattern === 'C-1' && typeof C1_V2 !== 'undefined' && C1_V2.ENABLED)
+        ? C1_V2_POINTS : C_AVAILABLE_POINTS,
       tokureiSwap: tokurei.swap, tokurei,
-      validation: { countFromCompressed, match: betCountOut === countFromCompressed }
+      validation: { countFromCompressed, templateCount: _tplBetsC.length,
+                    match: _tplBetsC.length === betsOut.length }
     };
   }
   
@@ -13633,7 +13757,12 @@ function generateBetsCustom(lineup, rawPlayers, points, timeSlot, opts = {}) {
     const cCheck = checkPatternC(tankiPlayer);
     
     // 点数チェック
-    if (!C_AVAILABLE_POINTS.includes(points)) {
+    /* ★2026-09-03：C-1 v2 は点数を 9/12 に固定するため、このチェックを通さない。
+       通すと「10点を選んだのに C-1 だから弾かれる」が起きる。
+       C-2 は従来どおり C_AVAILABLE_POINTS で判定する。 */
+    const _isC1v2 = (cCheck.pattern === 'C-1')
+      && (typeof C1_V2 !== 'undefined') && C1_V2.ENABLED;
+    if (!_isC1v2 && !C_AVAILABLE_POINTS.includes(points)) {
       return {
         error: `${cCheck.pattern}パターンでは${points}点は使用不可`,
         errorDetail: `使用可能: ${C_AVAILABLE_POINTS.join(', ')}点`,
@@ -13659,16 +13788,25 @@ function generateBetsCustom(lineup, rawPlayers, points, timeSlot, opts = {}) {
       patternResult = generatePatternC2(points, cars);
     } else {
       flexResult = selectFlexForC1(players, axisCar, taishoCar, tankiCar, lineStr);
+      /* ★2026-09-03：軸指定モードの C-1 も v2 に揃える。
+         自動生成と違う買い目が出ると、ユーザーから見て一貫しない。 */
+      if (typeof C1_V2 !== 'undefined' && C1_V2.ENABLED && typeof getLine3Head === 'function') {
+        roles.line3Head = getLine3Head(lineup, roles.axis, roles.taisho);
+      }
       cars = {
         axis: roles.axis,
         axisBante: roles.axisBante,
         taisho: roles.taisho,
         taishoBante: roles.taishoBante,
+        line3Head: roles.line3Head || null,
         tanki: String(tankiCar),
         flexA: flexResult.flexA,
         flexB: flexResult.flexB
       };
-      patternResult = generatePatternC1(points, cars);
+      /* 軸指定モードは荒れ指数を持たないので、ユーザーの選んだ点数で 9/12 を決める。 */
+      const _c1ptsCustom = (typeof C1_V2 !== 'undefined' && C1_V2.ENABLED)
+        ? (Number(points) >= 12 ? 12 : 9) : points;
+      patternResult = generatePatternC1(_c1ptsCustom, cars);
     }
     const compressed = patternResult.compressed;
     const countFromCompressed = countBetsFromCompressed(compressed);
@@ -16801,7 +16939,9 @@ document.getElementById('rtHomeBtn').addEventListener('click', () => {
         if (!tankiPlayer) return null;
         const cCheck = checkPatternC(tankiPlayer);
         return { pattern: cCheck.pattern, displayPattern: cCheck.pattern,
-                 reason: cCheck.reason, isC: true, availablePoints: C_AVAILABLE_POINTS };
+                 reason: cCheck.reason, isC: true,
+                 availablePoints: (cCheck.pattern === 'C-1' && typeof C1_V2 !== 'undefined' && C1_V2.ENABLED)
+                   ? C1_V2_POINTS : C_AVAILABLE_POINTS };
       }
 
       const axisCar = axisLine.head, taishoCar = taishoLine.head;
@@ -16898,7 +17038,10 @@ document.getElementById('rtHomeBtn').addEventListener('click', () => {
           reason: cCheck.reason,
           isC: true
         };
-        CURRENT_AVAILABLE_POINTS = C_AVAILABLE_POINTS;
+        /* ★2026-09-03：C-1 v2 は 9/12 のみ。C-2 は従来どおり。 */
+        CURRENT_AVAILABLE_POINTS =
+          (cCheck.pattern === 'C-1' && typeof C1_V2 !== 'undefined' && C1_V2.ENABLED)
+            ? C1_V2_POINTS : C_AVAILABLE_POINTS;
         return;
       }
       
@@ -24026,6 +24169,13 @@ async function runMid3BunsenGeneration(race, ctx){
        これまで DAY_LOG に roles が無く、分析側は買い目からの逆算に頼っていた。
        A-1 のテンプレートを変えた（4-14）ため、従来の定義での逆算は機能しなくなる。
        ここを記録しないと次回以降の A-1 分析ができない。 */
+    /* ★2026-09-03：C-1 v2 がどちらの点数帯で生成したかを残す。
+       境界65が妥当だったかを後から数字で確認するため。買い目には影響しない。 */
+    patternInfo: {
+      pattern: (out && out.pattern) || null,
+      c1Points: (out && out.pattern === 'C-1') ? (out.betCount || null) : null,
+      arePct: (out && out.input && out.input.arePct != null) ? out.input.arePct : null
+    },
     roles: (out && out.roles) ? {
       axis:        out.roles.axis        != null ? String(out.roles.axis)        : null,
       axisBante:   out.roles.axisBante   != null ? String(out.roles.axisBante)   : null,
@@ -24204,6 +24354,7 @@ if (typeof window !== 'undefined') {
          A-1 のテンプレート変更（4-14）以降、従来の逆算は機能しない。 */
       roles: res.roles || null,
       flex: res.flex || null,
+      patternInfo: res.patternInfo || null,   /* ★2026-09-03 */
       result: null
     };
     if(idx >= 0) arr[idx] = rec; else arr.push(rec);
