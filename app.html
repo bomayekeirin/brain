@@ -13558,7 +13558,19 @@ function countBetsFromCompressed(compressed) {
 }
 
 // ===== ユーザー指定モード用 買い目生成 =====
-function generateBetsCustom(lineup, rawPlayers, points, timeSlot) {
+function generateBetsCustom(lineup, rawPlayers, points, timeSlot, opts = {}) {
+  /* ★★2026-09-03 重大バグ修正：isGrade が未定義だった。
+     この関数は generatePatternA(..., isGrade) と compressBetsWithRoles(..., isGrade) を
+     呼んでいるが、isGrade をどこにも宣言していなかった。
+     生成側は関数スコープなので ReferenceError になり、
+     クリックハンドラごと落ちて【トーストも出ずボタンが無反応】になっていた。
+
+     A-3 判定が成立する組み合わせは generatePatternA3 を通るため無事だったが、
+     A-1 / A-2 になる組み合わせ（対抗に3車ラインを選んだときに起きやすい）で必ず落ちていた。
+
+     ★generateBets 側と同じく opts.isGrade から取る。呼び出し側が渡していなければ false。 */
+  const isGrade = !!opts.isGrade;
+
   // 3分戦 or 単騎含む三分戦チェック
   const is3Bunsen = is3BunsenFormation(lineup);
   const isCBunsen = isCBunsenFormation(lineup);
