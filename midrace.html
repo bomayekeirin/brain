@@ -22733,6 +22733,14 @@ document.addEventListener('click', function(e){
           nige: p.nige || 0, makuri: p.makuri || p.maki || 0,
           sashi: p.sashi || 0, mark: p.mark || 0,
           B: p.B != null ? p.B : null,
+          /* ★★2026-09-06 修正：3連対率と勝率を記録する。
+             2026-09-02 に呼び出し側（ctx.players を作る map）へ追加したが、
+             この record() が ctx.players を作り直しており、追加分が黙って捨てられていた。
+             呼び出し側だけ直しても記録されない。ここが記録の実体。
+             軸スコア v4 で W_RENTAI3 を捨てた判断の正否を検証するために必須。 */
+          rentai3: (p.rentai3 != null ? Number(p.rentai3)
+                    : (p.r3 != null ? Number(p.r3) : null)),
+          win: (p.win != null ? Number(p.win) : null),
           ex: exSnapshot(exRec, ctx.bankKey || null)
         };
       }),
@@ -22765,6 +22773,16 @@ document.addEventListener('click', function(e){
       cover: round4(out.cover),
       scenarioLines: (out.scenarioLines || []).map(function (x) { return x.text; }),
       highlights: (out.highlights || []).map(function (h) { return { car: h.car, notes: h.notes }; }),
+      /* ★★2026-09-06 修正：役割・柔軟枠・軸スコア情報を記録する。
+         2026-09-02 に呼び出し側の out に載せたが、この record() は
+         rec を固定の項目で組み立てており、載せただけでは記録されなかった。
+         【呼び出し側に足すだけでは効かない。ここに書かないと落ちる。】
+         ★buy 目には一切影響しない。
+         ★axisInfo.locked は pickLockedAxis（直近平均2.0以内で軸固定）の発動有無。
+           発動レースは軸スコア v4 の効果を測れないため、分析側で分けて集計する。 */
+      roles: (out.roles && Object.keys(out.roles).length) ? out.roles : null,
+      flex: out.flex || null,
+      axisInfo: out.axisInfo || null,
       result: null      // 照合後に埋める
     };
 

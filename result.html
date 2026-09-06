@@ -2527,7 +2527,7 @@ const A3_PATTERN_CONFIG = {
 const C_AVAILABLE_POINTS = [6, 8, 9, 10, 12, 15];
 
 /* ===================================================================
- * デイナイター C-1 買い目構成 v2（2026-09-03）
+ * デイナイター C-1 買い目構成 v2（2026-09-06）
  *
  * DAY_LOG の C-1 94件（デイ68 / ナイター26）の実測による全面置換。
  *   1着  軸頭 / 対頭
@@ -4541,7 +4541,7 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
     }
     
     // 点数チェック
-    /* ★2026-09-03：C-1 v2 は点数を 9/12 に固定するためこのチェックを通さない。 */
+    /* ★2026-09-06：C-1 v2 は点数を 9/12 に固定するためこのチェックを通さない。 */
     const _isC1v2 = (cCheck.pattern === 'C-1')
       && (typeof C1_V2 !== 'undefined') && C1_V2.ENABLED;
     if (!_isC1v2 && !C_AVAILABLE_POINTS.includes(points)) {
@@ -4585,7 +4585,7 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
       // C-1: 2026-09-03 より独自フォーメーション（v2）。旧版は A-2 と同一だった。
       // ★2026-08-04：7車立ても含めて selectFlexPlayersV3 に統一（Cパターン独自を廃止）
       flexResult = _flexV3();
-      /* ★2026-09-03：C-1 v2 で使う第3ライン先頭。app.html と完全に同じ処理。 */
+      /* ★2026-09-06：C-1 v2 で使う第3ライン先頭。app.html と完全に同じ処理。 */
       if (typeof C1_V2 !== 'undefined' && C1_V2.ENABLED && typeof getLine3Head === 'function') {
         roles.line3Head = getLine3Head(lineup, roles.axis, roles.taisho);
       }
@@ -4608,7 +4608,7 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
     }
     const compressed0 = patternResult.compressed;
     /* ★荒れ30.1%以上のとき、1着と2着を入れ替える（C-1/C-2のみ）2026-08-02
-       ★★2026-09-03：C-1 v2 は1段フォーメーションのため swap12Trio の対象外。 */
+       ★★2026-09-06：C-1 v2 は1段フォーメーションのため swap12Trio の対象外。 */
     const _skipSwapC1 = (patternResult.pattern === 'C-1')
       && (typeof C1_V2 !== 'undefined') && C1_V2.ENABLED;
     const compressed = (!_skipSwapC1 && shouldSwap12(patternResult.pattern, opts.arePct))
@@ -4617,7 +4617,7 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
     const betsOut = expandCompressed(compressed);
     const betCountOut = betsOut.length;
     
-    /* ★★2026-09-03：バリデーションを app.html と同じ形へ。
+    /* ★★2026-09-06：バリデーションを app.html と同じ形へ。
        countBetsFromCompressed は重複を数え切れず常に誤検知していた。 */
     const _tplBetsC = Array.from(new Set((patternResult.bets || []).filter(function (b) {
       const q = String(b).split('-');

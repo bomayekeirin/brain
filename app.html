@@ -12566,7 +12566,7 @@ function compressBetsWithRolesForA3(points, cars) {
 const C_AVAILABLE_POINTS = [6, 8, 9, 10, 12, 15];
 
 /* ===================================================================
- * デイナイター C-1 買い目構成 v2（2026-09-03）
+ * デイナイター C-1 買い目構成 v2（2026-09-06）
  *
  * DAY_LOG の C-1 94件（デイ68 / ナイター26）の実測による全面置換。
  *   1着  軸頭 / 対頭
@@ -12765,7 +12765,7 @@ function selectFlexForC2(players, roles, lineStr) {
 }
 
 // --- C-1 買い目生成（A-2と同一構造） ---
-/* ★2026-09-03：C-1 v2 の本体。ENABLED=false なら旧実装へ委譲する。 */
+/* ★2026-09-06：C-1 v2 の本体。ENABLED=false なら旧実装へ委譲する。 */
 function generatePatternC1(points, cars) {
   if (typeof C1_V2 === 'undefined' || !C1_V2.ENABLED) {
     return generatePatternC1_v1(points, cars);
@@ -13279,7 +13279,7 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
     }
     
     // 点数チェック
-    /* ★2026-09-03：C-1 v2 は点数を 9/12 に固定するため、このチェックを通さない。
+    /* ★2026-09-06：C-1 v2 は点数を 9/12 に固定するため、このチェックを通さない。
        通すと「10点を選んだのに C-1 だから弾かれる」が起きる。
        C-2 は従来どおり C_AVAILABLE_POINTS で判定する。 */
     const _isC1v2 = (cCheck.pattern === 'C-1')
@@ -13325,7 +13325,7 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
       // C-1: 2026-09-03 より独自フォーメーション（v2）。旧版は A-2 と同一だった。
       // ★2026-08-04：7車立ても含めて selectFlexPlayersV3 に統一（Cパターン独自を廃止）
       flexResult = _flexV3();
-      /* ★2026-09-03：C-1 v2 で使う第3ライン先頭。A経路と同じ getLine3Head を使う。
+      /* ★2026-09-06：C-1 v2 で使う第3ライン先頭。A経路と同じ getLine3Head を使う。
          ★C経路はA経路より前にあるため、A-1 v2 の代入は通っていない。ここで入れる。
          ★単騎（1車ライン）は getLine3Head 側で除外される。 */
       if (typeof C1_V2 !== 'undefined' && C1_V2.ENABLED && typeof getLine3Head === 'function') {
@@ -13355,7 +13355,7 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
     }
     const compressed0 = patternResult.compressed;
     /* ★荒れ30.1%以上のとき、1着と2着を入れ替える（C-1/C-2のみ）2026-08-02
-       ★★2026-09-03：C-1 v2 は1段フォーメーションのため swap12Trio の対象外にする。
+       ★★2026-09-06：C-1 v2 は1段フォーメーションのため swap12Trio の対象外にする。
          v2 は既に1着を「軸頭・対頭」の2車に絞っており、入れ替えると設計が崩れる。
          SWAP12_ENABLED を true に戻したときも C-1 には効かない。C-2 には従来どおり効く。 */
     const _skipSwapC1 = (patternResult.pattern === 'C-1')
@@ -13366,7 +13366,7 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
     const betsOut = expandCompressed(compressed);
     const betCountOut = betsOut.length;
     
-    /* ★★2026-09-03：バリデーションを A経路と同じ形に作り直した。
+    /* ★★2026-09-06：バリデーションを A経路と同じ形に作り直した。
        旧：countBetsFromCompressed は2着と3着の重複を数え切れず、
            C-1 では正常動作でも常に誤検知して console.warn を出していた。
            C-1 v2 の1段フォーメーションでは誤差がさらに大きくなる（9点→15と返す）。
@@ -13683,7 +13683,7 @@ function countBetsFromCompressed(compressed) {
 
 // ===== ユーザー指定モード用 買い目生成 =====
 function generateBetsCustom(lineup, rawPlayers, points, timeSlot, opts = {}) {
-  /* ★★2026-09-03 重大バグ修正：isGrade が未定義だった。
+  /* ★★2026-09-06 重大バグ修正：isGrade が未定義だった。
      この関数は generatePatternA(..., isGrade) と compressBetsWithRoles(..., isGrade) を
      呼んでいるが、isGrade をどこにも宣言していなかった。
      生成側は関数スコープなので ReferenceError になり、
@@ -13757,7 +13757,7 @@ function generateBetsCustom(lineup, rawPlayers, points, timeSlot, opts = {}) {
     const cCheck = checkPatternC(tankiPlayer);
     
     // 点数チェック
-    /* ★2026-09-03：C-1 v2 は点数を 9/12 に固定するため、このチェックを通さない。
+    /* ★2026-09-06：C-1 v2 は点数を 9/12 に固定するため、このチェックを通さない。
        通すと「10点を選んだのに C-1 だから弾かれる」が起きる。
        C-2 は従来どおり C_AVAILABLE_POINTS で判定する。 */
     const _isC1v2 = (cCheck.pattern === 'C-1')
@@ -13788,7 +13788,7 @@ function generateBetsCustom(lineup, rawPlayers, points, timeSlot, opts = {}) {
       patternResult = generatePatternC2(points, cars);
     } else {
       flexResult = selectFlexForC1(players, axisCar, taishoCar, tankiCar, lineStr);
-      /* ★2026-09-03：軸指定モードの C-1 も v2 に揃える。
+      /* ★2026-09-06：軸指定モードの C-1 も v2 に揃える。
          自動生成と違う買い目が出ると、ユーザーから見て一貫しない。 */
       if (typeof C1_V2 !== 'undefined' && C1_V2.ENABLED && typeof getLine3Head === 'function') {
         roles.line3Head = getLine3Head(lineup, roles.axis, roles.taisho);
@@ -15412,7 +15412,7 @@ function renderCustomLineSelector() {
       
       renderCustomLineSelector();
       updateCustomStepLabel();
-      /* ★2026-09-03：軸/対抗が決まった時点で点数の妥当性を再判定する。
+      /* ★2026-09-06：軸/対抗が決まった時点で点数の妥当性を再判定する。
          A-3 かどうかは組み合わせで変わるため、先に選んだ点数が使えなくなることがある。 */
       if (typeof window.__brainRevalidatePoints === 'function') window.__brainRevalidatePoints();
       updateCustomSelectionResult();
@@ -16891,7 +16891,7 @@ document.getElementById('rtHomeBtn').addEventListener('click', () => {
   }
   
   /* ===================================================================
-   * ★★2026-09-03：軸指定モードの点数リストを、ユーザーが選んだ軸/対抗で決める
+   * ★★2026-09-06：軸指定モードの点数リストを、ユーザーが選んだ軸/対抗で決める
    *
    * 症状：オレンジランプが点いていて、軸・対抗・点数まで選んで生成ボタンを押しても
    *       「A-3パターンでは9点は使用不可」で生成されない。
@@ -16973,7 +16973,7 @@ document.getElementById('rtHomeBtn').addEventListener('click', () => {
 
   // パターン判定を行い、使用可能な点数を更新
   function updateAvailablePoints() {
-    /* ★2026-09-03：軸指定タブで両方選択済みなら、その組み合わせを優先して判定する。
+    /* ★2026-09-06：軸指定タブで両方選択済みなら、その組み合わせを優先して判定する。
        未選択・おまかせタブのときは従来どおり自動選定で判定する。 */
     try {
       if (typeof isGenSubActive === 'function' && isGenSubActive('custom')) {
@@ -17038,7 +17038,7 @@ document.getElementById('rtHomeBtn').addEventListener('click', () => {
           reason: cCheck.reason,
           isC: true
         };
-        /* ★2026-09-03：C-1 v2 は 9/12 のみ。C-2 は従来どおり。 */
+        /* ★2026-09-06：C-1 v2 は 9/12 のみ。C-2 は従来どおり。 */
         CURRENT_AVAILABLE_POINTS =
           (cCheck.pattern === 'C-1' && typeof C1_V2 !== 'undefined' && C1_V2.ENABLED)
             ? C1_V2_POINTS : C_AVAILABLE_POINTS;
@@ -17110,7 +17110,7 @@ document.getElementById('rtHomeBtn').addEventListener('click', () => {
     }
   }
   
-  /* ★2026-09-03：軸/対抗を選び直したときに、外（renderCustomLineSelector）から
+  /* ★2026-09-06：軸/対抗を選び直したときに、外（renderCustomLineSelector）から
      点数の妥当性を再判定できるように公開する。
      ★IIFE の中なので、これを消すと選択変更時の再判定が無言で効かなくなる。 */
   window.__brainRevalidatePoints = function () {
@@ -24169,7 +24169,7 @@ async function runMid3BunsenGeneration(race, ctx){
        これまで DAY_LOG に roles が無く、分析側は買い目からの逆算に頼っていた。
        A-1 のテンプレートを変えた（4-14）ため、従来の定義での逆算は機能しなくなる。
        ここを記録しないと次回以降の A-1 分析ができない。 */
-    /* ★2026-09-03：C-1 v2 がどちらの点数帯で生成したかを残す。
+    /* ★2026-09-06：C-1 v2 がどちらの点数帯で生成したかを残す。
        境界65が妥当だったかを後から数字で確認するため。買い目には影響しない。 */
     patternInfo: {
       pattern: (out && out.pattern) || null,
@@ -24354,7 +24354,7 @@ if (typeof window !== 'undefined') {
          A-1 のテンプレート変更（4-14）以降、従来の逆算は機能しない。 */
       roles: res.roles || null,
       flex: res.flex || null,
-      patternInfo: res.patternInfo || null,   /* ★2026-09-03 */
+      patternInfo: res.patternInfo || null,   /* ★2026-09-06 */
       result: null
     };
     if(idx >= 0) arr[idx] = rec; else arr.push(rec);
