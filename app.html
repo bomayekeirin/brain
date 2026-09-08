@@ -12589,6 +12589,140 @@ const C_AVAILABLE_POINTS = [6, 8, 9, 10, 12, 15];
  *   ・荒れ境界の効果は実証されていない（40〜75 のどこでも当たり19件で一定）
  *     境界80で1.52に急落する。65は「限界効果100%超の範囲を機械的に取った」値。
  * =================================================================== */
+/* ===================================================================
+ * デイナイター D-1 パターン（2026-09-06 新設）
+ *
+ * 発動条件：AI本命（◎）が「前方ライン」にいること。
+ *   前方ライン ＝ 2車以上のラインだけを並び順に数えたときの最前。単騎は数えない。
+ *
+ * 買い目（8点固定）
+ *   1着・2着  ◎ / 対番（対抗ラインの番手）
+ *   3着        ◎の番手 / 対頭（対抗ラインの先頭）
+ *   ＋ 2着と3着の折り返し
+ *
+ * ★A-1 / A-2 / A-3 / C-1 / C-2 / B系 のテンプレートには触らない。
+ *   D-1 は既存の全パターンより【先に】判定し、組めなければ従来判定へフォールバックする。
+ * ★ミッドナイト（midrace.html）には適用しない。
+ * ★app.html と result.html の両方に入れること。
+ *
+ * ★★圧縮表記は2行の通常表記。分析側の指示書は "AB-AB=CD" の1行を提案していたが、
+ *   【 "=" は既存の3連複表記と衝突するため使えない】。
+ *     expandCompressedBet は includes('=') を「複式（3連複）」の判定に使っており、
+ *     "18-18=26" は parts=["18-18","26"] の2分割になって2車券扱いに落ちる。
+ *     実測で ["1-2","1-6","2-8","6-8","--2","--6"] という壊れた展開になった。
+ *     カレッタの3連複（carettaCompress3f）も "=" 区切りを使っている。
+ *   → 2行にすればすべて素の A-B-C になり、既存パーサを1行も触らずに通る。
+ *     1行目 AB-AB-CD（3着が CD）／ 2行目 AB-CD-AB（2着が CD）で折り返しが読める。
+ *
+ * ★★倍率1.70を期待値として扱わないこと（分析側 第13章）。
+ *   ・的中数は現行と完全に同じ（McNemar p=1.0000）。新規15件 / 喪失15件
+ *   ・改善は「配当の引き」と「点数15%減」による
+ *   ・381件で設計し同じ381件で評価。独立した検証データはない
+ *   ・全体の41.7%（159件）の買い目が変わる。A-1 v2 / C-1 v2 の発動件数も奪う
+ * =================================================================== */
+const D1_V1 = { ENABLED: true };
+const D1_POINTS = [8];
+
+/* ◎が前方ライン（2車以上ラインのうち最前）にいるか */
+function isHonmeiInFrontLine(lineup, players) {
+  try {
+    const hon = (players || []).find(p => p && p.ai === '本命');
+    if (!hon) return false;
+    const big = (lineup || []).filter(g => g && g.length >= 2);
+    if (!big.length) return false;
+    const car = String(hon.car != null ? hon.car : hon.n);
+    return big[0].map(String).includes(car);
+  } catch (e) { return false; }
+}
+
+/* ◎の車番を返す。無ければ null。 */
+function getHonmeiCar(players) {
+  const hon = (players || []).find(p => p && p.ai === '本命');
+  if (!hon) return null;
+  return String(hon.car != null ? hon.car : hon.n);
+}
+
+/* ◎の番手。
+     ◎が前方ラインの先頭   → 直後の車（index 1）
+     ◎が番手以降           → そのラインの先頭（index 0）
+   ★◎が前方ラインの先頭でないケースが実測で37.4%ある。必ず両方に対応する。 */
+function getHonmeiPartner(lineup, honmeiCar) {
+  const big = (lineup || []).filter(g => g && g.length >= 2);
+  if (!big.length) return null;
+  const g = big[0].map(String);
+  const i = g.indexOf(String(honmeiCar));
+  if (i < 0) return null;
+  return (i === 0) ? (g[1] || null) : g[0];
+}
+
+/* D-1 の買い目。組めない場合は null を返す（呼び出し側で従来判定へフォールバック）。
+   ★組めないのは「3着候補が両方とも1着2着の車と重複する」ケース。実測で12.6%。 */
+function generatePatternD1(cars) {
+  const { honmei, honmeiPartner, taisho, taishoBante } = cars || {};
+  if (!honmei || !taishoBante) return null;
+
+  const A = [String(honmei), String(taishoBante)];
+  if (A[0] === A[1]) return null;
+  const C = [honmeiPartner, taisho]
+              .filter(c => c && !A.includes(String(c)))
+              .map(String);
+  if (!C.length) return null;
+
+  const seen = new Set(), bets = [];
+  for (const i of A) {
+    for (const j of A) {
+      if (i === j) continue;
+      for (const c of C) {
+        if (c === i || c === j) continue;
+        for (const k of [`${i}-${j}-${c}`, `${i}-${c}-${j}`]) {
+          if (!seen.has(k)) { seen.add(k); bets.push(k); }
+        }
+      }
+    }
+  }
+  if (!bets.length) return null;
+  return { pattern: 'D-1', bets, compressed: compressD1(cars), count: bets.length };
+}
+
+/* D-1 の圧縮形（2行）。
+     1行目 AB-AB-CD  … 3着が CD
+     2行目 AB-CD-AB  … 2着が CD（折り返し）
+   ★どちらも素の A-B-C。既存の expandCompressed / expandCompressedBet で通る。
+   ★" / " も "=" も使わない。 */
+function compressD1(cars) {
+  const { honmei, honmeiPartner, taisho, taishoBante } = cars || {};
+  const srt = a => a.slice().sort((x, y) => Number(x) - Number(y)).join('');
+  const A = [String(honmei), String(taishoBante)];
+  const C = [honmeiPartner, taisho].filter(c => c && !A.includes(String(c))).map(String);
+  if (!C.length) return [];
+  const a = srt(A), c = srt(C);
+  return [`${a}-${a}-${c}`, `${a}-${c}-${a}`];
+}
+
+/* D-1 を試す。発動しない／組めない場合は null。
+   ★roles（対頭・対番）は呼び出し側で確定済みのものを渡すこと。 */
+function tryPatternD1(lineup, players, roles) {
+  if (typeof D1_V1 === 'undefined' || !D1_V1.ENABLED) return null;
+  if (!isHonmeiInFrontLine(lineup, players)) return null;
+  const honmei = getHonmeiCar(players);
+  if (!honmei) return null;
+  const honmeiPartner = getHonmeiPartner(lineup, honmei);
+  const cars = {
+    honmei: honmei,
+    honmeiPartner: honmeiPartner,
+    taisho: roles && roles.taisho != null ? String(roles.taisho) : null,
+    taishoBante: roles && roles.taishoBante != null ? String(roles.taishoBante) : null
+  };
+  const r = generatePatternD1(cars);
+  if (!r) return null;
+  const big = (lineup || []).filter(g => g && g.length >= 2);
+  let idx = -1;
+  big.forEach((g, i) => { if (g.map(String).includes(String(honmei))) idx = i; });
+  r.d1Cars = cars;
+  r.honmeiLineIndex = idx;
+  return r;
+}
+
 const C1_V2 = { ENABLED: true, ARE_THRESHOLD: 65.0 };
 
 /* C-1 の点数。荒れ65未満=9点 / 65以上=12点。
@@ -13269,9 +13403,17 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
     
     // C-1/C-2判定（単騎の特性で）
     const cCheck = checkPatternC(tankiPlayer);
+
+    /* ★★2026-09-06：D-1 を最優先で判定する（分析側 5-1）。
+       組めなければ null が返り、そのまま従来判定へ落ちる。 */
+    const _d1 = (typeof tryPatternD1 === 'function') ? tryPatternD1(lineup, players, roles) : null;
+    const _d1Fallback = !_d1 && (typeof isHonmeiInFrontLine === 'function')
+                        && isHonmeiInFrontLine(lineup, players);
     
     // ★probeOnly：パターン判定だけを返す（ランプ・生成ボタンの可否判定用・2026-07-29）
     if (opts.probeOnly) {
+      if (_d1) return { probe:true, pattern:'D-1', availablePoints: D1_POINTS,
+                        tokureiSwap: tokurei.swap, tokurei };
       return { probe:true, pattern: cCheck.pattern,
         availablePoints: (cCheck.pattern === 'C-1' && typeof C1_V2 !== 'undefined' && C1_V2.ENABLED)
           ? C1_V2_POINTS : C_AVAILABLE_POINTS,
@@ -13284,7 +13426,8 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
        C-2 は従来どおり C_AVAILABLE_POINTS で判定する。 */
     const _isC1v2 = (cCheck.pattern === 'C-1')
       && (typeof C1_V2 !== 'undefined') && C1_V2.ENABLED;
-    if (!_isC1v2 && !C_AVAILABLE_POINTS.includes(points)) {
+    /* ★2026-09-06：D-1 は8点固定なので点数チェックを通さない（分析側 第6章）。 */
+    if (!_d1 && !_isC1v2 && !C_AVAILABLE_POINTS.includes(points)) {
       return {
         error: `${cCheck.pattern}パターンでは${points}点は使用不可`,
         errorDetail: `使用可能: ${C_AVAILABLE_POINTS.join(', ')}点`,
@@ -13297,6 +13440,13 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
     }
     
     let flexResult, patternResult, cars;
+    /* ★2026-09-06：D-1 のメタ情報（ログ用）。買い目の採否は下の override で行う。 */
+    let _d1Meta = _d1
+      ? { honmei:_d1.d1Cars.honmei, honmeiPartner:_d1.d1Cars.honmeiPartner,
+          honmeiLineIndex:_d1.honmeiLineIndex, fallbackFrom:null }
+      : (_d1Fallback ? { honmei:getHonmeiCar(players),
+          honmeiPartner:getHonmeiPartner(lineup, getHonmeiCar(players)),
+          honmeiLineIndex:0, fallbackFrom:null } : null);
     
     // ★G戦の柔軟枠は selectFlexPlayersV3 に統一する（2026-08-02・案A）。
     //   selectFlexForC1/C2 は「残りライン＝サイズ2」を決め打ちしており
@@ -13353,6 +13503,16 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
         : points;
       patternResult = generatePatternC1(_c1pts, cars);
     }
+    /* ★★2026-09-06：D-1 が組めていれば、ここで C-1/C-2 の結果を差し替える。
+       ★if/else でブロックを囲まないのは、C分岐の生成部が長く、
+         ブロック置換で共有処理を巻き込む事故を避けるため。
+         C-1/C-2 の生成は空回りするが副作用は無い（買い目を作るだけ）。 */
+    if (_d1) {
+      patternResult = _d1;
+      cars = _d1.d1Cars;
+    } else if (_d1Meta) {
+      _d1Meta.fallbackFrom = (patternResult && patternResult.pattern) || null;
+    }
     const compressed0 = patternResult.compressed;
     /* ★荒れ30.1%以上のとき、1着と2着を入れ替える（C-1/C-2のみ）2026-08-02
        ★★2026-09-06：C-1 v2 は1段フォーメーションのため swap12Trio の対象外にする。
@@ -13393,8 +13553,10 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
       bets: betsOut,
       compressed,
       betCount: betCountOut,
-      availablePoints: (cCheck.pattern === 'C-1' && typeof C1_V2 !== 'undefined' && C1_V2.ENABLED)
-        ? C1_V2_POINTS : C_AVAILABLE_POINTS,
+      availablePoints: _d1 ? D1_POINTS
+        : ((cCheck.pattern === 'C-1' && typeof C1_V2 !== 'undefined' && C1_V2.ENABLED)
+            ? C1_V2_POINTS : C_AVAILABLE_POINTS),
+      d1Info: _d1Meta,
       tokureiSwap: tokurei.swap, tokurei,
       validation: { countFromCompressed, templateCount: _tplBetsC.length,
                     match: _tplBetsC.length === betsOut.length }
@@ -13471,6 +13633,18 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
   
   // Step 5a: A-3パターン判定（優先）※軸データも渡す（捲りタイプ特例判定用）
   const a3Check = checkPatternA3(leaders, axisBantePlayer, taishoBantePlayer, axisResult.axis);
+
+  /* ★★2026-09-06：D-1 を最優先で判定する（分析側 5-1）。
+     組めなければ null が返り、そのまま A-3 → B → A の従来判定へ落ちる。 */
+  const _d1 = (typeof tryPatternD1 === 'function') ? tryPatternD1(lineup, players, roles) : null;
+  const _d1Fallback = !_d1 && (typeof isHonmeiInFrontLine === 'function')
+                      && isHonmeiInFrontLine(lineup, players);
+  let _d1Meta = _d1
+    ? { honmei:_d1.d1Cars.honmei, honmeiPartner:_d1.d1Cars.honmeiPartner,
+        honmeiLineIndex:_d1.honmeiLineIndex, fallbackFrom:null }
+    : (_d1Fallback ? { honmei:getHonmeiCar(players),
+        honmeiPartner:getHonmeiPartner(lineup, getHonmeiCar(players)),
+        honmeiLineIndex:0, fallbackFrom:null } : null);
   
   let patternCheck;
   let availablePoints;
@@ -13500,12 +13674,16 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
   // ★probeOnly：パターン判定だけを返す（ランプ・生成ボタンの可否判定用・2026-07-29）
   //   INVALID判定を本体と完全に一致させるため、判定器を二重に持たない。
   if (opts.probeOnly) {
+    if (_d1) return { probe:true, pattern:'D-1',
+                      patternCheck:{ pattern:'D-1', reason:'AI本命が前方ラインにいる' },
+                      availablePoints: D1_POINTS, tokureiSwap: tokurei.swap, tokurei };
     return { probe:true, pattern: patternCheck.pattern, patternCheck, availablePoints,
              tokureiSwap: tokurei.swap, tokurei };
   }
   
   // Step 6: 生成不可判定
-  if (patternCheck.pattern === 'INVALID') {
+  /* ★2026-09-06：D-1 が組めていれば INVALID でも生成する（D-1 は既存判定に依存しない）。 */
+  if (!_d1 && patternCheck.pattern === 'INVALID') {
     return {
       error: '生成不可',
       errorDetail: patternCheck.reason,
@@ -13517,7 +13695,8 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
   }
   
   // Step 7: 点数チェック（パターンに応じた点数かどうか）
-  if (!availablePoints.includes(points)) {
+  /* ★2026-09-06：D-1 は8点固定なので通さない（分析側 第6章）。 */
+  if (!_d1 && !availablePoints.includes(points)) {
     return {
       error: `${patternCheck.pattern}パターンでは${points}点は使用不可`,
       errorDetail: `使用可能: ${availablePoints.join(', ')}点`,
@@ -13605,6 +13784,16 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
       : compressBetsWithRoles(points, roles, roles.hasAxis3rd, flexResult.flexA, flexResult.flexB, flexResult.flexC, isGrade);
   }
   
+  /* ★★2026-09-06：D-1 が組めていれば A-3 / B / A の結果を差し替える。
+     ★swap12 より前に置く。D-1 は1着を◎と対番に絞っており、入れ替えると設計が崩れる。
+       shouldSwap12 は 'D-1' を対象パターンに含まないため実際には発火しない。 */
+  if (_d1) {
+    patternResult = _d1;
+    compressed = _d1.compressed;
+  } else if (_d1Meta) {
+    _d1Meta.fallbackFrom = (patternResult && patternResult.pattern) || null;
+  }
+
   // Step 8: バリデーション（買い目数と圧縮形から計算される点数が一致するか）
     // ★荒れ30.1%以上のとき、1着と2着を入れ替える（A-2/A-3のみ）2026-08-02
     const _swapped12 = shouldSwap12(patternResult.pattern, opts.arePct);
@@ -13648,7 +13837,8 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
     bets: bets3,
     compressed,
     betCount: betCount3,
-    availablePoints,
+    availablePoints: _d1 ? D1_POINTS : availablePoints,
+    d1Info: _d1Meta,
     tokureiSwap: tokurei.swap, tokurei,
     validation: { countFromCompressed, templateCount: _tplBets.length,
                   match: _swapped12 ? true : (_tplBets.length === bets3.length) }
@@ -13755,6 +13945,12 @@ function generateBetsCustom(lineup, rawPlayers, points, timeSlot, opts = {}) {
     
     // C-1/C-2判定（単騎の特性で）
     const cCheck = checkPatternC(tankiPlayer);
+
+    /* ★★2026-09-06：D-1 を最優先で判定する（分析側 5-1）。
+       組めなければ null が返り、そのまま従来判定へ落ちる。 */
+    const _d1 = (typeof tryPatternD1 === 'function') ? tryPatternD1(lineup, players, roles) : null;
+    const _d1Fallback = !_d1 && (typeof isHonmeiInFrontLine === 'function')
+                        && isHonmeiInFrontLine(lineup, players);
     
     // 点数チェック
     /* ★2026-09-06：C-1 v2 は点数を 9/12 に固定するため、このチェックを通さない。
@@ -13762,7 +13958,8 @@ function generateBetsCustom(lineup, rawPlayers, points, timeSlot, opts = {}) {
        C-2 は従来どおり C_AVAILABLE_POINTS で判定する。 */
     const _isC1v2 = (cCheck.pattern === 'C-1')
       && (typeof C1_V2 !== 'undefined') && C1_V2.ENABLED;
-    if (!_isC1v2 && !C_AVAILABLE_POINTS.includes(points)) {
+    /* ★2026-09-06：D-1 は8点固定なので点数チェックを通さない（分析側 第6章）。 */
+    if (!_d1 && !_isC1v2 && !C_AVAILABLE_POINTS.includes(points)) {
       return {
         error: `${cCheck.pattern}パターンでは${points}点は使用不可`,
         errorDetail: `使用可能: ${C_AVAILABLE_POINTS.join(', ')}点`,
@@ -13774,6 +13971,13 @@ function generateBetsCustom(lineup, rawPlayers, points, timeSlot, opts = {}) {
     }
     
     let flexResult, patternResult, cars;
+    /* ★2026-09-06：D-1 のメタ情報（ログ用）。買い目の採否は下の override で行う。 */
+    let _d1Meta = _d1
+      ? { honmei:_d1.d1Cars.honmei, honmeiPartner:_d1.d1Cars.honmeiPartner,
+          honmeiLineIndex:_d1.honmeiLineIndex, fallbackFrom:null }
+      : (_d1Fallback ? { honmei:getHonmeiCar(players),
+          honmeiPartner:getHonmeiPartner(lineup, getHonmeiCar(players)),
+          honmeiLineIndex:0, fallbackFrom:null } : null);
     
     if (cCheck.pattern === 'C-2') {
       flexResult = selectFlexForC2(players, roles, lineStr);
@@ -13808,6 +14012,14 @@ function generateBetsCustom(lineup, rawPlayers, points, timeSlot, opts = {}) {
         ? (Number(points) >= 12 ? 12 : 9) : points;
       patternResult = generatePatternC1(_c1ptsCustom, cars);
     }
+    /* ★★2026-09-06：軸指定モードでも D-1 が組めていれば差し替える。
+       対抗ラインはユーザーが指定したものを使う（分析側 7-1 案a）。 */
+    if (_d1) {
+      patternResult = _d1;
+      cars = _d1.d1Cars;
+    } else if (_d1Meta) {
+      _d1Meta.fallbackFrom = (patternResult && patternResult.pattern) || null;
+    }
     const compressed = patternResult.compressed;
     const countFromCompressed = countBetsFromCompressed(compressed);
     
@@ -13819,13 +14031,24 @@ function generateBetsCustom(lineup, rawPlayers, points, timeSlot, opts = {}) {
       taisho: { car: taishoCar, name: taishoPlayer.name },
       roles: { ...roles, tanki: String(tankiCar) },
       flex: { A: flexResult.flexA, B: flexResult.flexB, candidates: flexResult.candidates, reason: flexResult.reason },
-      patternCheck: { pattern: cCheck.pattern, reason: cCheck.reason },
+      patternCheck: { pattern: patternResult.pattern === 'D-1' ? 'D-1' : cCheck.pattern,
+                      reason: patternResult.pattern === 'D-1' ? 'AI本命が前方ラインにいる' : cCheck.reason },
       pattern: patternResult.pattern,
       bets: patternResult.bets,
       compressed,
       betCount: patternResult.count,
-      availablePoints: C_AVAILABLE_POINTS,
-      validation: { countFromCompressed, match: patternResult.count === countFromCompressed }
+      availablePoints: _d1 ? D1_POINTS
+        : ((cCheck.pattern === 'C-1' && typeof C1_V2 !== 'undefined' && C1_V2.ENABLED)
+            ? C1_V2_POINTS : C_AVAILABLE_POINTS),
+      d1Info: _d1Meta,
+      /* ★2026-09-06：D-1 は countBetsFromCompressed が使えないので、
+         テンプレの買い目と圧縮形の展開を直接比べる。 */
+      validation: _d1
+        ? (function(){ const e = expandCompressed(compressed);
+            return { countFromCompressed: e.length,
+                     match: e.length === patternResult.bets.length
+                            && patternResult.bets.every(function(b){ return e.includes(b); }) }; })()
+        : { countFromCompressed, match: patternResult.count === countFromCompressed }
     };
   }
   
@@ -13851,6 +14074,18 @@ function generateBetsCustom(lineup, rawPlayers, points, timeSlot, opts = {}) {
   const leaderCars = extractLeaders(lineStr);
   const leaders = players.filter(p => leaderCars.includes(String(p.car)));
   const a3Check = checkPatternA3(leaders, axisBantePlayer, taishoBantePlayer, axisPlayer);
+
+  /* ★★2026-09-06：D-1 を最優先で判定する（分析側 5-1）。
+     組めなければ null が返り、そのまま A-3 → B → A の従来判定へ落ちる。 */
+  const _d1 = (typeof tryPatternD1 === 'function') ? tryPatternD1(lineup, players, roles) : null;
+  const _d1Fallback = !_d1 && (typeof isHonmeiInFrontLine === 'function')
+                      && isHonmeiInFrontLine(lineup, players);
+  let _d1Meta = _d1
+    ? { honmei:_d1.d1Cars.honmei, honmeiPartner:_d1.d1Cars.honmeiPartner,
+        honmeiLineIndex:_d1.honmeiLineIndex, fallbackFrom:null }
+    : (_d1Fallback ? { honmei:getHonmeiCar(players),
+        honmeiPartner:getHonmeiPartner(lineup, getHonmeiCar(players)),
+        honmeiLineIndex:0, fallbackFrom:null } : null);
   
   let patternCheck;
   let availablePoints;
@@ -13875,7 +14110,8 @@ function generateBetsCustom(lineup, rawPlayers, points, timeSlot, opts = {}) {
   }
   
   // Step 5: 生成不可判定
-  if (patternCheck.pattern === 'INVALID') {
+  /* ★2026-09-06：D-1 が組めていれば INVALID でも生成する。 */
+  if (!_d1 && patternCheck.pattern === 'INVALID') {
     return {
       error: '生成不可',
       errorDetail: patternCheck.reason,
@@ -13887,7 +14123,8 @@ function generateBetsCustom(lineup, rawPlayers, points, timeSlot, opts = {}) {
   }
   
   // Step 6: 点数チェック
-  if (!availablePoints.includes(points)) {
+  /* ★2026-09-06：D-1 は8点固定なので通さない。 */
+  if (!_d1 && !availablePoints.includes(points)) {
     return {
       error: `${patternCheck.pattern}パターンでは${points}点は使用不可`,
       errorDetail: `使用可能: ${availablePoints.join(', ')}点`,
@@ -13994,6 +14231,15 @@ function generateBetsCustom(lineup, rawPlayers, points, timeSlot, opts = {}) {
       : compressBetsWithRoles(points, roles, roles.hasAxis3rd, flexResult.flexA, flexResult.flexB, flexResult.flexC, isGrade);
   }
   
+  /* ★★2026-09-06：軸指定モードの A系も D-1 で差し替える。
+     対抗ラインはユーザーが指定したものを使う（分析側 7-1 案a）。 */
+  if (_d1) {
+    patternResult = _d1;
+    compressed = _d1.compressed;
+  } else if (_d1Meta) {
+    _d1Meta.fallbackFrom = (patternResult && patternResult.pattern) || null;
+  }
+
   return {
     success: true,
     mode: 'custom',
@@ -14007,7 +14253,8 @@ function generateBetsCustom(lineup, rawPlayers, points, timeSlot, opts = {}) {
     bets: patternResult.bets,
     compressed,
     betCount: patternResult.count,
-    availablePoints,
+    availablePoints: _d1 ? D1_POINTS : availablePoints,
+    d1Info: _d1Meta,
     brainSelection: { axis: brainAxisCar, taisho: brainTaishoCar }
   };
 }
@@ -16917,6 +17164,21 @@ document.getElementById('rtHomeBtn').addEventListener('click', () => {
       const axisLine = CUSTOM_LINES[CUSTOM_AXIS_LINE];
       const taishoLine = CUSTOM_LINES[CUSTOM_TAISHO_LINE];
       if (!axisLine || !taishoLine) return null;
+
+      /* ★★2026-09-06：D-1 は軸/対抗の指定に関係なく、◎の位置で決まる。
+         対抗ラインだけユーザー指定を使う（分析側 7-1 案a）。
+         点数カードは [8] のみに絞る。 */
+      if (typeof D1_V1 !== 'undefined' && D1_V1.ENABLED
+          && typeof isHonmeiInFrontLine === 'function'
+          && isHonmeiInFrontLine(race.lineup, race.players)) {
+        const _roles = assignRolesSimple(lineupToString(race.lineup),
+                                         String(axisLine.head), String(taishoLine.head));
+        const _d1p = tryPatternD1(race.lineup, race.players, _roles);
+        if (_d1p) {
+          return { pattern:'D-1', displayPattern:'D-1',
+                   reason:'AI本命が前方ラインにいる', availablePoints: D1_POINTS };
+        }
+      }
 
       const isCB = isCBunsenFormation(race.lineup);
       /* 単騎は選択UI側で選べないようにしてあるが、念のため */
@@ -24174,7 +24436,14 @@ async function runMid3BunsenGeneration(race, ctx){
     patternInfo: {
       pattern: (out && out.pattern) || null,
       c1Points: (out && out.pattern === 'C-1') ? (out.betCount || null) : null,
-      arePct: (out && out.input && out.input.arePct != null) ? out.input.arePct : null
+      arePct: (out && out.input && out.input.arePct != null) ? out.input.arePct : null,
+      /* ★2026-09-06：D-1 の効果検証用（分析側 第10章）。
+         fallbackFrom は「◎が前方にいたが D-1 が組めず従来パターンに落ちた」ときの
+         実際に使われたパターン名。実効カバー率の測定に必要。 */
+      honmei:          (out && out.d1Info) ? out.d1Info.honmei : null,
+      honmeiPartner:   (out && out.d1Info) ? out.d1Info.honmeiPartner : null,
+      honmeiLineIndex: (out && out.d1Info) ? out.d1Info.honmeiLineIndex : null,
+      fallbackFrom:    (out && out.d1Info) ? out.d1Info.fallbackFrom : null
     },
     roles: (out && out.roles) ? {
       axis:        out.roles.axis        != null ? String(out.roles.axis)        : null,
