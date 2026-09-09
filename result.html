@@ -2622,11 +2622,23 @@ function generatePatternD1(cars) {
   const { honmei, honmeiPartner, taisho, taishoBante } = cars || {};
   if (!honmei || !taishoBante) return null;
 
+  /* ★★2026-09-09：成立しない条件を明示する（分析側の指摘）。
+     軸ラインを「◎のいる前方ライン」に固定したので対抗ラインは必ず別ラインになり、
+     下の2つは理屈の上では起きない。それでも残すのは、
+     対抗選定が将来変わったときに黙って壊れないようにするため。
+       ◎ === 対番  … 1着セットが1車になり買い目が0点になる（旧実装で19件）
+       ◎ === 対頭  … 3着候補が空になる（旧実装で23件） */
+  if (String(honmei) === String(taishoBante)) return null;
+  if (taisho != null && String(honmei) === String(taisho)) return null;
+
   const A = [String(honmei), String(taishoBante)];
   if (A[0] === A[1]) return null;
-  const C = [honmeiPartner, taisho]
-              .filter(c => c && !A.includes(String(c)))
-              .map(String);
+  /* ★重複除去。◎の番手 === 対頭 になり得る（◎が3車ラインの3番手で、
+     そのラインが対抗ラインでもある場合）。除去しないと圧縮形が "22" のように壊れる。 */
+  const C = Array.from(new Set(
+              [honmeiPartner, taisho]
+                .filter(c => c && !A.includes(String(c)))
+                .map(String)));
   if (!C.length) return null;
 
   const seen = new Set(), bets = [];
@@ -2652,12 +2664,32 @@ function generatePatternD1(cars) {
    ★" / " も "=" も使わない。 */
 function compressD1(cars) {
   const { honmei, honmeiPartner, taisho, taishoBante } = cars || {};
-  const srt = a => a.slice().sort((x, y) => Number(x) - Number(y)).join('');
+  /* ★2026-09-09：必ず重複除去してから連結する。
+     しないと ◎の番手 === 対頭 のときに "18-18-22" のような壊れた圧縮形になる。 */
+  const srt = a => Array.from(new Set(a)).sort((x, y) => Number(x) - Number(y)).join('');
   const A = [String(honmei), String(taishoBante)];
-  const C = [honmeiPartner, taisho].filter(c => c && !A.includes(String(c))).map(String);
+  const C = Array.from(new Set(
+              [honmeiPartner, taisho].filter(c => c && !A.includes(String(c))).map(String)));
   if (!C.length) return [];
   const a = srt(A), c = srt(C);
   return [`${a}-${a}-${c}`, `${a}-${c}-${a}`];
+}
+
+/* ★★2026-09-09：D-1 の軸ラインは「◎がいる前方ライン」に固定する（ボンバイエ判断）。
+   通常の軸選定に任せると、対抗ラインが◎のライン自身になることがあり、
+     ◎=対頭 → 3着候補が空（23件）
+     ◎=対番 → 1着セットが1車（19件）
+     ◎の番手=対頭 → 圧縮形が重複
+   という衝突が起きていた。軸を◎のラインに固定すれば、対抗は必ず別ラインになり
+   これらが構造的に消える。
+   ★対抗の選び方そのものは既存の選定方法（selectTaishoForA2 → selectTaisho）を使う。
+     D-1 専用の対抗ロジックは作らない。 */
+function d1AxisCar(lineup, players) {
+  const big = (lineup || []).filter(g => g && g.length >= 2);
+  if (!big.length) return null;
+  const hon = getHonmeiCar(players);
+  if (!hon) return null;
+  return big[0].map(String).includes(String(hon)) ? String(big[0][0]) : null;
 }
 
 /* D-1 を試す。発動しない／組めない場合は null。
@@ -4669,7 +4701,18 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
     const cCheck = checkPatternC(tankiPlayer);
 
     /* ★★2026-09-06：D-1 を最優先で判定する。app.html と完全に同じ処理。 */
-    const _d1 = (typeof tryPatternD1 === 'function') ? tryPatternD1(lineup, players, roles) : null;
+    /* ★2026-09-09：D-1 の軸は「◎のいる前方ライン」。対抗は既存の選定方法で選び直す。 */
+    const _d1Ax = (typeof d1AxisCar === 'function') ? d1AxisCar(lineup, players) : null;
+    let _d1Roles = null;
+    if (_d1Ax) {
+      const _d1Others = leaders.filter(p => String(p.car) !== _d1Ax);
+      const _d1Ap = leaders.find(p => String(p.car) === _d1Ax);
+      const _d1T = selectTaishoForA2(lineStr, _d1Ax, _d1Others)
+                || (_d1Ap ? selectTaisho(_d1Ap, _d1Others, isMidnight, opts.ex || null, timeSlot,
+                                         _line3Bonus, _extraBonus, lineStr, !!opts.swapTaishoLine) : null);
+      if (_d1T && _d1T.taisho) _d1Roles = assignRolesSimple(lineStr, _d1Ax, String(_d1T.taisho.car));
+    }
+    const _d1 = (typeof tryPatternD1 === 'function') ? tryPatternD1(lineup, players, _d1Roles) : null;
     const _d1Fallback = !_d1 && (typeof isHonmeiInFrontLine === 'function')
                         && isHonmeiInFrontLine(lineup, players);
     let _d1Meta = _d1
@@ -4873,7 +4916,17 @@ function generateBets(lineup, rawPlayers, points, timeSlot, opts = {}) {
   const a3Check = checkPatternA3(leaders, axisBantePlayer, taishoBantePlayer, axisResult.axis);
 
   /* ★★2026-09-06：D-1 を最優先で判定する。app.html と完全に同じ処理。 */
-  const _d1 = (typeof tryPatternD1 === 'function') ? tryPatternD1(lineup, players, roles) : null;
+  /* ★2026-09-09：D-1 の軸は「◎のいる前方ライン」。対抗は既存の選定方法で選び直す。 */
+  const _d1Ax = (typeof d1AxisCar === 'function') ? d1AxisCar(lineup, players) : null;
+  let _d1Roles = null;
+  if (_d1Ax) {
+    const _d1Others = leaders.filter(p => String(p.car) !== _d1Ax);
+    const _d1Ap = leaders.find(p => String(p.car) === _d1Ax);
+    const _d1T = selectTaishoForA2(lineStr, _d1Ax, _d1Others)
+              || (_d1Ap ? selectTaisho(_d1Ap, _d1Others, isMidnight) : null);
+    if (_d1T && _d1T.taisho) _d1Roles = assignRolesSimple(lineStr, _d1Ax, String(_d1T.taisho.car));
+  }
+  const _d1 = (typeof tryPatternD1 === 'function') ? tryPatternD1(lineup, players, _d1Roles) : null;
   const _d1Fallback = !_d1 && (typeof isHonmeiInFrontLine === 'function')
                       && isHonmeiInFrontLine(lineup, players);
   let _d1Meta = _d1
