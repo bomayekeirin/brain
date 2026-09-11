@@ -19913,6 +19913,35 @@ function carettaComboHasUnmarkedHigh(combo, markMap){
     return !hasAiMark; // AI印が無ければ除外
   });
 }
+/* ===== 2026-09-11 ボンバイエ指示：AI印×の3車ライン先頭 → その車番1着の2車単を非表示 =====
+ * 荒れ予報買い目（カレッタ式）の2車単のみ。ワイド・3連複・3連単・通常生成には触れない。
+ *
+ *   条件  AI印×（＝連下）が付いた選手が「3車ライン」の先頭にいる
+ *   処理  その車番が1着の2車単（例：×が4番車なら 4-○）をすべて出さない
+ *
+ * ・AI印×の判定は markMap（calcAllMarks）の type==='ai' かつ mark==='×'。
+ *   カレッタ印の ✖（U+2716）は対象外。
+ * ・3車ライン＝ちょうど3車のライン（g.length === 3）。4車以上のラインは対象外。
+ * ・G戦／非G戦とも適用する。
+ * ・generateCarettaA の【最終形】に対してかける（5-6 の無条件追加より後）。
+ *   ×先頭が5番車なら 5-6 も消える。
+ * ・荒れ買い目画面・オッズ更新ボタン・テキスト一覧・荒れ予報結果は
+ *   すべて generateCarettaA を通るため、この1箇所で全経路が揃う。
+ * ・ENABLED:false で旧版と完全一致。 */
+const ARE2T_X3HEAD = { ENABLED: true };
+
+function carettaX3HeadCars(markMap, lineup){
+  if (!markMap || !lineup || !lineup.length) return [];
+  const out = [];
+  for (const g of lineup){
+    if (!g || g.length !== 3) continue;                 // 3車ラインのみ
+    const head = String(g[0]);
+    const info = markMap[head];
+    if (info && info.type === 'ai' && info.mark === '×') out.push(head);
+  }
+  return out;
+}
+
 function generateCarettaA(odds2t, lineup, markMap, isG){
   if(!odds2t) return null;
   const passed=[];
@@ -20059,6 +20088,14 @@ function generateCarettaA(odds2t, lineup, markMap, isG){
     if(!carettaExclude6(markMap, lineup, null)){
       const _o56=(odds2t && ('5-6' in odds2t))?carettaOddsVal(odds2t['5-6']):null;
       passed.push({combo:'5-6', odds:_o56});   // オッズが無い場合も null のまま採用
+    }
+  }
+
+  // ★2026-09-11 ボンバイエ指示：AI印×の3車ライン先頭 → その車番1着を全削除（最終形に適用）
+  if (typeof ARE2T_X3HEAD !== 'undefined' && ARE2T_X3HEAD.ENABLED){
+    const _x3h = carettaX3HeadCars(markMap, lineup);
+    if (_x3h.length){
+      for(let i=passed.length-1;i>=0;i--){ if(_x3h.includes(passed[i].combo.split('-')[0])) passed.splice(i,1); }
     }
   }
 
