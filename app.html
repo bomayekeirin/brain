@@ -19916,12 +19916,14 @@ function carettaComboHasUnmarkedHigh(combo, markMap){
 /* ===== 2026-09-11 ボンバイエ指示：AI印×の3車ライン先頭 → その車番1着の2車単を非表示 =====
  * 荒れ予報買い目（カレッタ式）の2車単のみ。ワイド・3連複・3連単・通常生成には触れない。
  *
- *   条件  AI印×（＝連下）が付いた選手が「3車ライン」の先頭にいる
+ *   条件  AI印×（＝連下）が付いた選手が「3車ライン」または「4車ライン」の先頭にいる
  *   処理  その車番が1着の2車単（例：×が4番車なら 4-○）をすべて出さない
  *
  * ・AI印×の判定は markMap（calcAllMarks）の type==='ai' かつ mark==='×'。
  *   カレッタ印の ✖（U+2716）は対象外。
- * ・3車ライン＝ちょうど3車のライン（g.length === 3）。4車以上のラインは対象外。
+ * ・対象ライン＝3車または4車のライン（g.length が 3 か 4）。
+ *   ★2026-09-11 追加指示：G戦（9車立て）の4車ライン先頭の×も除外する。
+ *   5車以上・2車以下のラインは対象外。
  * ・G戦／非G戦とも適用する。
  * ・generateCarettaA の【最終形】に対してかける（5-6 の無条件追加より後）。
  *   ×先頭が5番車なら 5-6 も消える。
@@ -19934,7 +19936,7 @@ function carettaX3HeadCars(markMap, lineup){
   if (!markMap || !lineup || !lineup.length) return [];
   const out = [];
   for (const g of lineup){
-    if (!g || g.length !== 3) continue;                 // 3車ラインのみ
+    if (!g || (g.length !== 3 && g.length !== 4)) continue;   // 3車・4車ラインのみ（2026-09-11 4車追加）
     const head = String(g[0]);
     const info = markMap[head];
     if (info && info.type === 'ai' && info.mark === '×') out.push(head);
