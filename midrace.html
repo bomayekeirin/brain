@@ -13476,6 +13476,46 @@ function pickGradeTankiForC(lineup, players){
 }
 
 
+/* ===== 2026-09-11 ボンバイエ指示：ミッドナイト本生成の買い目の2着と3着を入れ替える =====
+ * 現行ロジックで作った買い目（最終形）の 2着と3着をすべて入れ替える。
+ *   例  1-25-3467 → 1-3467-25
+ *       12-12-347 → 12-347-12
+ * 1着群・2着群・3着群のうち車番が重複しない組、という定義は入れ替えても変わらないため、
+ * 点数は必ず保存される（組が1対1で対応する）。
+ *
+ * ・適用するのは runAxisV3Generation（生成ボタン・一括生成）の出力のみ。
+ *   荒れ買い目（カレッタ 3連単B/C）と Lab の検証ツールは generateBets を直接呼ぶため対象外。
+ * ・軸3の3着追加（MID_V4.AXIS3）より後＝最終形にかける。
+ * ・bets（展開形）／compressed（パーサ用 flat）／compressedDisplay（表示用 " / " 連結）を同時に入れ替える。
+ * ・記録には axisInfo.swap23 = true を残す（入替前後の母集団を分けるため）。
+ * ・ENABLED:false で旧版と完全一致。 */
+const MID_SWAP23 = { ENABLED: true };
+
+function swap23Trio(str){
+  const g = String(str).split('-');
+  return (g.length === 3) ? (g[0] + '-' + g[2] + '-' + g[1]) : str;
+}
+
+/* 生成結果の買い目を2着↔3着で入れ替えた新しいオブジェクトを返す。
+ * エラー・probe・買い目なしはそのまま返す。 */
+function applySwap23(out){
+  if (!out || out.error || out.probe || !Array.isArray(out.bets)) return out;
+  const bets = out.bets.map(swap23Trio);
+  const compressed = (out.compressed || []).map(swap23Trio);
+  const compressedDisplay = (out.compressedDisplay || []).map(function(t){
+    return (typeof t === 'string') ? t.split(' / ').map(swap23Trio).join(' / ') : t;
+  });
+  const countFromCompressed = expandCompressed(compressed).length;
+  return Object.assign({}, out, {
+    bets: bets,
+    compressed: compressed,
+    compressedDisplay: compressedDisplay,
+    betCount: bets.length,
+    swap23: true,
+    validation: { countFromCompressed: countFromCompressed, match: bets.length === countFromCompressed }
+  });
+}
+
 function swap12Trio(str){
   const g = String(str).split('-');
   return (g.length === 3) ? (g[1] + '-' + g[0] + '-' + g[2]) : str;
@@ -22216,6 +22256,8 @@ function attachTextsToBets(stage4, texts) {
         if(alt > wantPoints) upgraded = true; else downgraded = true;
       }
     }
+    // ★2026-09-11：2着↔3着の入れ替え（最終形に適用・表示／記録／結果照合すべてこの out を使う）
+    if (typeof MID_SWAP23 !== 'undefined' && MID_SWAP23.ENABLED) out = applySwap23(out);
 
     var highlights = [];
     try{ highlights = pickHighlightsV3(out, race, ex, true); }catch(e){}
@@ -22290,7 +22332,9 @@ function attachTextsToBets(stage4, texts) {
             locked: !!(out && out.axisLocked),
             axis3rdAdded: (out && out.axis3rdAdded != null) ? out.axis3rdAdded : 0,
             taishoVer: (out && out.taisho && out.taisho.reason
-                        && String(out.taisho.reason).indexOf('対抗v4') === 0) ? 'v4' : 'v3'
+                        && String(out.taisho.reason).indexOf('対抗v4') === 0) ? 'v4' : 'v3',
+            /* ★2026-09-11：2着↔3着の入れ替えを適用したか（MID_SWAP23）。母集団の分離用 */
+            swap23: !!(out && out.swap23)
           }
         }, {
           venue: (typeof CURRENT_VENUE!=='undefined'&&CURRENT_VENUE)?CURRENT_VENUE.venue:'',
