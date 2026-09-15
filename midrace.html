@@ -13489,7 +13489,7 @@ function pickGradeTankiForC(lineup, players){
  * ・bets（展開形）／compressed（パーサ用 flat）／compressedDisplay（表示用 " / " 連結）を同時に入れ替える。
  * ・記録には axisInfo.swap23 = true を残す（入替前後の母集団を分けるため）。
  * ・ENABLED:false で旧版と完全一致。 */
-const MID_SWAP23 = { ENABLED: false };   // ★2026-09-11 オフ（入替なし＝09-11配布前と同一）
+const MID_SWAP23 = { ENABLED: true };   // ★2026-09-11 オン（2着↔3着を入替）
 
 function swap23Trio(str){
   const g = String(str).split('-');
