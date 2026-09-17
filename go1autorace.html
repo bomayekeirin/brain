@@ -1658,17 +1658,21 @@
      ★ここはユーティリティ帯。描画関数のブロック置換に巻き込まれない位置に置くこと。 */
   var CLOSE_NEAR_MIN = 25;
 
-  function closeInfo(start){
+  /* wrap=true のときだけ日跨ぎ補正をかける。
+     ★ミッドナイト開催（発走が0時台）専用の補正。デイ開催にも効かせると、
+       深夜に「朝の締切」を翌日と誤判定して終了済みのレースが復活する（12節 #25）。 */
+  function closeInfo(start, wrap){
     if(!start) return null;
     var p = String(start).split(':');
     if(p.length !== 2) return null;
     var sm = Number(p[0]) * 60 + Number(p[1]);
     if(isNaN(sm)) return null;
     var cm = sm - 5;
-    if(cm < 0) cm += 1440;
+    var crossed = false;
+    if(cm < 0){ cm += 1440; crossed = true; }
     var now = new Date();
     var rest = cm - (now.getHours() * 60 + now.getMinutes());
-    if(rest < -720) rest += 1440;
+    if((wrap || crossed) && rest < -720) rest += 1440;
     return {
       minutes: cm,
       text: ('0' + Math.floor(cm / 60)).slice(-2) + ':' + ('0' + (cm % 60)).slice(-2),
@@ -1822,27 +1826,111 @@
       var af = (a.status === 'done'), bf = (b.status === 'done');
       if(af && !bf) return 1;
       if(bf && !af) return -1;
-      var ad = deadlineOf(a.start), bd = deadlineOf(b.start);
+      var ad = closeInfo(a.start, a.wrap), bd = closeInfo(b.start, b.wrap);
       var ar = ad ? ad.rest : 99999;
       var br = bd ? bd.rest : 99999;
-      /* 締切を過ぎたものは、まだ先のものより後ろへ */
-      if(ar < 0 && br >= 0) return 1;
-      if(br < 0 && ar >= 0) return -1;
+      /* ★締切までの残り時間の昇順。締切を過ぎたもの（負値）が先頭に来るのが正しい。
+         「締切超過は末尾へ」としていた頃は、発走直前〜レース中のいちばん見たい開催が
+         下に沈み、まだ何時間も先の開催が上に来ていた（12節 #25）。
+         全レース終了（status:'done'）だけは上の分岐で末尾へ送っている。 */
       return ar - br;
     });
   }
 
   /* 締切（発走-5分）到達までの残りミリ秒。秒精度で求める。
      ★deadlineOf の rest は分単位なので、発火タイミングの計算には使わない。 */
-  function msUntilClose(start){
-    var ci = closeInfo(start);
+  function msUntilClose(start, wrap){
+    var ci = closeInfo(start, wrap);
     if(!ci) return null;
     var now = new Date();
     var t = new Date(now.getTime());
     t.setHours(Math.floor(ci.minutes / 60), ci.minutes % 60, 0, 0);
     var ms = t.getTime() - now.getTime();
-    if(ms < -12 * 3600 * 1000) ms += 24 * 3600 * 1000;   /* 日跨ぎ */
+    if(wrap && ms < -12 * 3600 * 1000) ms += 24 * 3600 * 1000;   /* ミッドナイトのみ日跨ぎ */
     return ms;
+  }
+
+  /* meetingId(開催初日YYYYMMDD + 場コード) と 日目 から、その日の日付を出す。
+     ★端末の日付に依存しないので、日跨ぎのミッドナイトでもずれない。 */
+  function ymdOfMeeting(mid, dayNum){
+    var s0 = String(mid || '');
+    if(s0.length < 8) return '';
+    var y = Number(s0.slice(0,4)), mo = Number(s0.slice(4,6)), d = Number(s0.slice(6,8));
+    if(!y || !mo || !d) return '';
+    var dt = new Date(y, mo - 1, d);
+    dt.setDate(dt.getDate() + (Number(dayNum) || 1) - 1);
+    return dt.getFullYear() +
+           ('0' + (dt.getMonth() + 1)).slice(-2) +
+           ('0' + dt.getDate()).slice(-2);
+  }
+
+  /* その開催の「次に締切を迎えるレース」を、1日出走表の時刻表から自前で決める。
+     ★winticket のトップは【発走】で繰り上がるため、締切〜発走の5分間は
+       締切済みのレースを返し続ける。取得元任せにせず、ここで繰り上げる。 */
+  function applySchedule(m){
+    var ymd = ymdOfMeeting(m.meetingId, m.dayNum);
+    if(!ymd) return false;
+    var day = DAY_CACHE[m.slug + '/' + ymd];
+    if(!day) return false;
+
+    var nos = [];
+    for(var k in day){ if(day.hasOwnProperty(k)) nos.push(Number(k)); }
+    if(!nos.length) return false;
+    nos.sort(function(a, b){ return a - b; });
+
+    /* 0時台に発走するレースを含む開催（ミッドナイト）だけ日跨ぎ補正を有効にする */
+    var wrap = false;
+    for(var w=0; w<nos.length; w++){
+      var iw = day[nos[w]];
+      if(iw && iw.start && Number(String(iw.start).split(':')[0]) < 5){ wrap = true; break; }
+    }
+
+    var picked = null;
+    for(var i=0;i<nos.length;i++){
+      var info = day[nos[i]];
+      if(!info || !info.start) continue;
+      var ci = closeInfo(info.start, wrap);
+      if(ci && !ci.ended){ picked = { no:nos[i], start:info.start }; break; }
+    }
+    m.wrap = wrap;
+
+    m.races = nos[nos.length - 1];
+    if(picked){
+      m.nextRace = picked.no;
+      m.start = picked.start;
+      m.status = 'open';
+    }else{
+      m.status = 'done';
+      m.nextRace = nos[nos.length - 1];   /* 終了時は最終レース番号を出す（1Rに戻さない） */
+      m.start = null;
+    }
+    return true;
+  }
+
+  function applyAllSchedules(){
+    var changed = false;
+    for(var i=0;i<MEETINGS.length;i++){
+      if(applySchedule(MEETINGS[i])) changed = true;
+    }
+    return changed;
+  }
+
+  /* 各開催の時刻表を1回ずつ取りに行く（DAY_CACHE / DAY_PENDING で重複防止） */
+  function ensureSchedules(){
+    for(var i=0;i<MEETINGS.length;i++){
+      (function(m){
+        var ymd = ymdOfMeeting(m.meetingId, m.dayNum);
+        if(!ymd) return;
+        if(DAY_CACHE[m.slug + '/' + ymd] || DAY_PENDING[m.slug + '/' + ymd]) return;
+        loadOneDay(m.slug, ymd, function(err){
+          if(err) return;                     /* 失敗しても winticket 由来の値で動く */
+          applyAllSchedules();
+          MEETINGS = sortMeetings(MEETINGS);
+          if(!location.hash || location.hash.indexOf('#/race/') !== 0) renderCards(true);
+          scheduleAdvance();
+        });
+      })(MEETINGS[i]);
+    }
   }
 
   function showSkeleton(){
@@ -1883,10 +1971,13 @@
         showMsg('NO RACE', '本日の開催はありません。', true);
         return;
       }
-      MEETINGS = sortMeetings(list);
+      MEETINGS = list;
+      applyAllSchedules();          /* 既に時刻表があれば即座に繰り上げる */
+      MEETINGS = sortMeetings(MEETINGS);
       renderCards(!!silent);
       startRefresh();
       scheduleAdvance();
+      ensureSchedules();            /* 無ければ取りに行く */
       /* 直リンクで出走表を開いていた場合、開催情報が揃った時点でヘッダを描き直す */
       if(typeof route === 'function' && location.hash.indexOf('#/race/') === 0) route();
     }).catch(function(e){
@@ -1912,7 +2003,7 @@
     for(var i=0;i<MEETINGS.length;i++){
       var m = MEETINGS[i];
       if(m.status !== 'open' || !m.start) continue;
-      var ms = msUntilClose(m.start);
+      var ms = msUntilClose(m.start, m.wrap);
       if(ms === null) continue;
       if(ms > 0 && (soonest === null || ms < soonest)) soonest = ms;
     }
@@ -1922,7 +2013,12 @@
     if(wait > 30 * 60 * 1000) wait = 30 * 60 * 1000;   /* 遠すぎる場合は30分で一度見直す */
     advTimer = setTimeout(function(){
       advTimer = null;
-      loadMeetings(true);
+      /* 時刻表があるものは即座に自前で繰り上げる（winticket の反映を待たない） */
+      var ok = applyAllSchedules();
+      MEETINGS = sortMeetings(MEETINGS);
+      if(!location.hash || location.hash.indexOf('#/race/') !== 0) renderCards(true);
+      if(ok) scheduleAdvance();
+      else loadMeetings(true);
     }, wait);
   }
 
@@ -1936,17 +2032,22 @@
       if(isTransitioning) return;
       if(location.hash && location.hash.indexOf('#/race/') === 0) return;  /* 出走表表示中は触らない */
 
+      /* 時刻表があるものは自前で繰り上げる。無いものだけ取り直す */
+      applyAllSchedules();
       var stale = false;
       for(var i=0;i<MEETINGS.length;i++){
         var m = MEETINGS[i];
         if(m.status !== 'open' || !m.start) continue;
-        var ci = closeInfo(m.start);
+        var ymd2 = ymdOfMeeting(m.meetingId, m.dayNum);
+        if(DAY_CACHE[m.slug + '/' + ymd2]) continue;   /* 時刻表があるなら取り直し不要 */
+        var ci = closeInfo(m.start, m.wrap);
         if(ci && ci.ended){ stale = true; break; }
       }
       if(stale){ loadMeetings(true); return; }
 
       MEETINGS = sortMeetings(MEETINGS);
       renderCards(true);
+      scheduleAdvance();
     }, 60000);
   }
 
@@ -1986,8 +2087,8 @@
     if(fin){
       right = '<span class="gc-fin">終了</span>';
     }else{
-      var d = deadlineOf(m.start);
-      if(d && d.rest <= 25 && d.rest > 0){
+      var d = closeInfo(m.start, m.wrap);
+      if(d && d.rest <= CLOSE_NEAR_MIN && d.rest > 0){
         right = '<span class="gc-count"><span class="gc-count-dot"></span>締切' + d.rest + '分前</span>';
       }else if(d && d.rest > 0){
         right = '<span class="gc-start"><span class="gc-start-label">締切</span>' + esc(d.text) + '</span>';
@@ -2003,7 +2104,8 @@
              '<div class="gc-main">' +
                '<div class="gc-left">' +
                  '<div class="gc-name-row">' +
-                   '<span class="gc-name">' + esc(v.jp) + '<span class="r">' + esc(raceNum) + 'R</span></span>' +
+                   '<span class="gc-name">' + esc(v.jp) +
+                     (fin ? '' : '<span class="r">' + esc(raceNum) + 'R</span>') + '</span>' +
                    '<span class="gc-grade grade-' + gradeKey(m.grade) + '">' + esc(m.grade) + '</span>' +
                    '<span class="gc-slot">' + SLOT_ICON[slotKey(m.session)] + '</span>' +
                  '</div>' +
