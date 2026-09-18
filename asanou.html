@@ -22439,5 +22439,360 @@ if (typeof window !== 'undefined') {
 }
 
 </script>
+
+<script>
+/* ===================================================================
+ * 朝脳：今節の上がりタイム取得層（2026-09-18 フェーズA）
+ *
+ * ・オッズパークの結果ページ（RaceKekka.do）から
+ *   上り／S・B／個人状況／着順／決まり手を読む。
+ * ・会場単位で「その節の過去日ぶん」をまとめて取り、選手辞書にする。
+ *   同じ節の選手は過去日のどこかに必ずいるため、レース単位で追う必要はない。
+ * ・節が終わるまで結果は変わらないので localStorage にキャッシュする。
+ *   3日目に増える取得は前日ぶんだけになる。
+ * ・★この層は既存の生成ロジックからは呼ばれない。値の確認用に window.AGARI を出すだけ。
+ * =================================================================== */
+const AGARI_V1 = {
+  ENABLED: true,
+  CACHE_PREFIX: 'asa_agari_v1',
+  RACE_MAX: 12,      // 1日あたりの最大レース数（R数が取れなかったときの上限）
+  DAY_MAX: 6,        // 遡る最大日数
+  SLEEP_MS: 120      // プロキシへの連続アクセス間隔
+};
+
+function asaAgariNorm(s){ return String(s == null ? '' : s).replace(/[\s\u3000]/g, ''); }
+/* ★突き合わせは氏名のみで行う。
+ *   オッズパークは「北海」、WinTicket は「北海道」のように府県表記が揃わないため、
+ *   府県をキーに入れると取り逃がす。府県は同姓同名が出たときの絞り込みだけに使う。 */
+function asaAgariKeyOf(name){ return asaAgariNorm(name); }
+function asaAgariPrefHit(a, b){
+  a = asaAgariNorm(a); b = asaAgariNorm(b);
+  if (!a || !b) return true;
+  return a.indexOf(b) === 0 || b.indexOf(a) === 0;
+}
+/* 節の記録から、その選手の出走ぶんを取り出す */
+function asaAgariEntriesOf(meeting, player){
+  const list = (meeting.players[asaAgariKeyOf(player.name)] || []);
+  if (!list.length) return list;
+  const cds = {};
+  list.forEach(function(e){ if (e.playerCd) cds[e.playerCd] = 1; });
+  if (Object.keys(cds).length <= 1) return list;                 // 同姓同名なし
+  if (!asaAgariNorm(player.pref)) return [];                     // 府県が無いと絞れない＝使わない
+  const narrowed = list.filter(function(e){ return asaAgariPrefHit(e.pref, player.pref); });
+  return narrowed.length ? narrowed : [];                        // 絞れなければ使わない（誤爆防止）
+}
+function asaAgariKb(d){
+  return d.getFullYear().toString()
+       + String(d.getMonth() + 1).padStart(2, '0')
+       + String(d.getDate()).padStart(2, '0');
+}
+function asaAgariTodayKb(){
+  const d = new Date();
+  if (typeof CURRENT_DATE_VIEW !== 'undefined' && CURRENT_DATE_VIEW === 'tomorrow') d.setDate(d.getDate() + 1);
+  return asaAgariKb(d);
+}
+function asaAgariSleep(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+
+async function asaAgariFetchDoc(url){
+  const resp = await fetch(PROXY_URL + '?url=' + encodeURIComponent(url));
+  if (!resp.ok) throw new Error('取得失敗 ' + resp.status);
+  const html = await resp.text();
+  return new DOMParser().parseFromString(html, 'text/html');
+}
+
+/* 結果テーブルを「ヘッダーの文字」で特定して列位置を返す。
+ * 列の並びが変わっても追従できるようにするため、位置決め打ちにはしない。 */
+function asaAgariFindTable(doc){
+  const tables = doc ? [].slice.call(doc.querySelectorAll('table')) : [];
+  for (const t of tables){
+    const rows = [].slice.call(t.rows);
+    for (let ri = 0; ri < Math.min(2, rows.length); ri++){
+      const idx = {};
+      [].slice.call(rows[ri].cells).forEach(function(c, i){
+        const tx = asaAgariNorm(c.textContent);
+        if (tx === '着' && idx.rank == null) idx.rank = i;
+        else if (tx.indexOf('車番') >= 0 && idx.car == null) idx.car = i;
+        else if (tx.indexOf('選手名') >= 0 && idx.name == null) idx.name = i;
+        else if (tx.indexOf('府県') >= 0 && idx.pref == null) idx.pref = i;
+        else if (tx.indexOf('級班') >= 0 && idx.cls == null) idx.cls = i;
+        else if (tx.indexOf('決まり手') >= 0 && idx.kimarite == null) idx.kimarite = i;
+        else if ((tx === '上り' || tx === '上がり') && idx.agari == null) idx.agari = i;
+        else if ((tx === 'S/B' || tx === 'SB') && idx.sb == null) idx.sb = i;
+        else if (tx.indexOf('個人状況') >= 0 && idx.note == null) idx.note = i;
+      });
+      if (idx.car != null && idx.agari != null && idx.name != null) return { table: t, idx: idx, headerRow: ri };
+    }
+  }
+  return null;
+}
+
+/* 1レース分の結果を読む。結果未確定・構造不一致は null を返す。 */
+function asaAgariParse(doc){
+  const found = asaAgariFindTable(doc);
+  if (!found) return null;
+  const idx = found.idx;
+  const width = Math.max.apply(null, Object.keys(idx).map(function(k){ return idx[k]; })) + 1;
+  const validK = ['逃げ', '捲り', '捲くり', '差し', 'マーク'];
+  const out = [];
+  let lastRank = null;
+  [].slice.call(found.table.rows).forEach(function(tr, ri){
+    if (ri <= found.headerRow) return;
+    const cells = [].slice.call(tr.cells);
+    // 同着の2人目以降は「着」セルが rowspan に吸われ、列が1つ手前にずれる
+    let off = 0;
+    if (cells.length === width) off = 0;
+    else if (cells.length === width - 1) off = -1;
+    else return;
+    const cellAt = function(k){
+      if (idx[k] == null) return null;
+      return cells[idx[k] + off] || null;
+    };
+    const textAt = function(k){ const c = cellAt(k); return c ? String(c.textContent || '').trim() : ''; };
+
+    const carTx = textAt('car').replace(/[^0-9]/g, '');
+    if (!carTx) return;
+    const car = Number(carTx);
+
+    const rankTx = (off === -1) ? '' : textAt('rank').replace(/[^0-9]/g, '');
+    const agariM = textAt('agari').match(/\d+(?:\.\d+)?/);
+    const agari = agariM ? Number(agariM[0]) : null;
+
+    let rank = null;
+    if (rankTx){ rank = Number(rankTx); lastRank = rank; }
+    else if (agari != null && lastRank != null) rank = lastRank;   // 同着：着番空欄＋上りあり
+
+    const nameCell = cellAt('name');
+    const a = nameCell ? nameCell.querySelector('a') : null;
+    const href = a ? (a.getAttribute('href') || '') : '';
+    const cdM = href.match(/playerCd=(\d+)/);
+    const name = asaAgariNorm(a ? a.textContent : (nameCell ? nameCell.textContent : ''));
+
+    const kt = textAt('kimarite');
+    let kimarite = '';
+    for (const k of validK){ if (kt.indexOf(k) >= 0){ kimarite = (k === '捲くり') ? '捲り' : k; break; } }
+
+    const sb = textAt('sb');
+    const note = textAt('note');
+
+    out.push({
+      car: car, rank: rank, name: name, playerCd: cdM ? cdM[1] : null,
+      pref: asaAgariNorm(textAt('pref')), cls: asaAgariNorm(textAt('cls')),
+      kimarite: kimarite, agari: agari,
+      S: /S/.test(sb), B: /B/.test(sb), note: note
+    });
+  });
+  return out;
+}
+
+/* その節の開催日（YYYYMMDD）を、当日の結果ページに並ぶ日目リンクから取る。
+ * 連続日と決め打ちしないための処理。取れなければ null を返す。 */
+async function asaAgariMeetingDays(joCode, todayKb){
+  try{
+    const doc = await asaAgariFetchDoc(
+      'https://www.oddspark.com/keirin/RaceKekka.do?joCode=' + joCode + '&kaisaiBi=' + todayKb + '&raceNo=1');
+    const days = [];
+    [].slice.call(doc.querySelectorAll('a')).forEach(function(a){
+      const m = (a.getAttribute('href') || '').match(/AllRaceList\.do\?joCode=(\d+)&kaisaiBi=(\d{8})/);
+      if (m && m[1] === String(joCode) && days.indexOf(m[2]) < 0) days.push(m[2]);
+    });
+    days.sort();
+    return days.length ? days : null;
+  }catch(e){ return null; }
+}
+
+/* その日のレース数。払戻一覧（1リクエスト）の各Rリンクから数える。 */
+async function asaAgariRaceCount(joCode, kb){
+  try{
+    const doc = await asaAgariFetchDoc(
+      'https://www.oddspark.com/keirin/ALLRaceResult.do?joCode=' + joCode + '&kaisaiBi=' + kb);
+    let max = 0;
+    [].slice.call(doc.querySelectorAll('a')).forEach(function(a){
+      const m = (a.getAttribute('href') || '').match(/RaceKekka\.do\?joCode=\d+&kaisaiBi=\d{8}&raceNo=(\d+)/);
+      if (m) max = Math.max(max, Number(m[1]));
+    });
+    return max || null;
+  }catch(e){ return null; }
+}
+
+function asaAgariCacheKey(joCode, kb){ return AGARI_V1.CACHE_PREFIX + '|' + joCode + '|' + kb; }
+function asaAgariCacheGet(joCode, kb){
+  try{ const raw = localStorage.getItem(asaAgariCacheKey(joCode, kb)); return raw ? JSON.parse(raw) : null; }
+  catch(e){ return null; }
+}
+function asaAgariCacheSet(joCode, kb, data){
+  try{ localStorage.setItem(asaAgariCacheKey(joCode, kb), JSON.stringify(data)); return true; }
+  catch(e){ return false; }
+}
+
+/* 1日ぶんの全レース結果。キャッシュがあれば取りに行かない。 */
+async function asaAgariFetchDay(joCode, kb, onProgress){
+  const hit = asaAgariCacheGet(joCode, kb);
+  if (hit && hit.races) return { kb: kb, races: hit.races, fromCache: true, requests: 0 };
+  let requests = 0;
+  const count = await asaAgariRaceCount(joCode, kb); requests++;
+  const max = count || AGARI_V1.RACE_MAX;
+  const races = {};
+  let miss = 0;
+  for (let r = 1; r <= max; r++){
+    // R数が取れなかった日は、空振りが3つ続いたら打ち切る（無駄打ちを減らす）
+    if (!count && miss >= 3) break;
+    if (onProgress) { try{ onProgress(kb, r, max); }catch(_e){} }
+    try{
+      const doc = await asaAgariFetchDoc(
+        'https://www.oddspark.com/keirin/RaceKekka.do?joCode=' + joCode + '&kaisaiBi=' + kb + '&raceNo=' + r);
+      requests++;
+      const rows = asaAgariParse(doc);
+      if (rows && rows.length){ races[r] = rows; miss = 0; } else { miss++; }
+    }catch(e){ miss++; /* その1レースだけ落とす */ }
+    await asaAgariSleep(AGARI_V1.SLEEP_MS);
+  }
+  const data = { kb: kb, races: races, savedAt: new Date().toISOString() };
+  asaAgariCacheSet(joCode, kb, data);
+  return { kb: kb, races: races, fromCache: false, requests: requests };
+}
+
+/* 会場の「今節の過去日ぶん」を集めて選手辞書にする。
+ * 戻り値の players は 氏名|府県 と playerCd の両方を引けるようにしてある。 */
+async function asaAgariBuildMeeting(venue, opts){
+  opts = opts || {};
+  const v = venue || (typeof CURRENT_VENUE !== 'undefined' ? CURRENT_VENUE : null);
+  if (!v) return { error: '会場が特定できません' };
+  const joCode = (typeof ODDSPARK_JO_CODES !== 'undefined') ? ODDSPARK_JO_CODES[v.venueId] : null;
+  if (!joCode) return { error: '会場コードなし: ' + v.venueId };
+
+  const todayKb = opts.todayKb || asaAgariTodayKb();
+  let days = await asaAgariMeetingDays(joCode, todayKb);
+  let daySource = 'リンク';
+  if (!days){
+    // リンクが取れないときは、日目から連続日と見なして遡る（暫定）
+    const dayNum = Number(v.dayNum || 1);
+    days = [];
+    for (let i = dayNum - 1; i >= 0; i--){
+      const d = new Date(Number(todayKb.slice(0, 4)), Number(todayKb.slice(4, 6)) - 1, Number(todayKb.slice(6, 8)));
+      d.setDate(d.getDate() - i);
+      days.push(asaAgariKb(d));
+    }
+    daySource = '連続日と仮定';
+  }
+  const past = days.filter(function(d){ return d < todayKb; }).slice(-AGARI_V1.DAY_MAX);
+
+  const players = {};
+  const byCd = {};
+  let requests = 0, cachedDays = 0, raceCount = 0;
+  for (const kb of past){
+    const day = await asaAgariFetchDay(joCode, kb, opts.onProgress);
+    requests += day.requests;
+    if (day.fromCache) cachedDays++;
+    Object.keys(day.races).forEach(function(r){
+      raceCount++;
+      day.races[r].forEach(function(row){
+        const e = {
+          kb: kb, raceNo: Number(r), car: row.car, rank: row.rank, agari: row.agari,
+          kimarite: row.kimarite, S: row.S, B: row.B, note: row.note,
+          name: row.name, pref: row.pref, cls: row.cls, playerCd: row.playerCd
+        };
+        const key = asaAgariKeyOf(row.name);
+        (players[key] = players[key] || []).push(e);
+        if (row.playerCd) (byCd[row.playerCd] = byCd[row.playerCd] || []).push(e);
+      });
+    });
+  }
+  Object.keys(players).forEach(function(k){
+    players[k].sort(function(a, b){ return (a.kb === b.kb) ? (a.raceNo - b.raceNo) : (a.kb < b.kb ? -1 : 1); });
+  });
+
+  const meeting = {
+    joCode: joCode, venue: v.venue, venueId: v.venueId, todayKb: todayKb,
+    days: days, pastDays: past, daySource: daySource,
+    players: players, byCd: byCd,
+    stats: { 過去日数: past.length, 取得レース数: raceCount, 選手数: Object.keys(players).length,
+             リクエスト数: requests, キャッシュ日数: cachedDays }
+  };
+  window.__ASA_AGARI_MEETING = meeting;
+  return meeting;
+}
+
+/* 出走メンバーの上がりを相対化する。
+ * metric: 'best'（節内ベスト・既定）/ 'last'（直近）/ 'mean'（平均）
+ * データが無い選手は value:null のまま返す（埋めない）。 */
+function asaAgariForRace(race, meeting, metric){
+  metric = metric || 'best';
+  const mt = meeting || window.__ASA_AGARI_MEETING;
+  if (!race || !race.players || !mt || !mt.players) return null;
+  const rows = race.players.map(function(p){
+    const list = asaAgariEntriesOf(mt, p).filter(function(e){ return e.agari != null; });
+    let value = null, best = null, last = null, mean = null;
+    if (list.length){
+      best = Math.min.apply(null, list.map(function(e){ return e.agari; }));
+      last = list[list.length - 1].agari;
+      mean = list.reduce(function(a, e){ return a + e.agari; }, 0) / list.length;
+      mean = Math.round(mean * 100) / 100;
+      value = (metric === 'last') ? last : (metric === 'mean' ? mean : best);
+    }
+    return {
+      car: Number(p.car != null ? p.car : p.n), name: p.name, pref: p.pref,
+      本数: list.length, 上りベスト: best, 上り直近: last, 上り平均: mean,
+      値: value, 順位: null, 最速: false, メンバー平均差: null, 最速差: null,
+      明細: list.map(function(e){ return e.kb.slice(4) + ' ' + e.raceNo + 'R ' + e.agari + (e.rank ? ' (' + e.rank + '着' + (e.kimarite ? '/' + e.kimarite : '') + ')' : ''); })
+    };
+  });
+  const vals = rows.filter(function(r){ return r.値 != null; }).map(function(r){ return r.値; });
+  if (vals.length){
+    const fastest = Math.min.apply(null, vals);
+    const avg = vals.reduce(function(a, b){ return a + b; }, 0) / vals.length;
+    const sorted = vals.slice().sort(function(a, b){ return a - b; });
+    rows.forEach(function(r){
+      if (r.値 == null) return;
+      r.順位 = sorted.indexOf(r.値) + 1;               // 同値は同順位
+      r.最速 = (r.値 === fastest);
+      r.メンバー平均差 = Math.round((r.値 - avg) * 100) / 100;
+      r.最速差 = Math.round((r.値 - fastest) * 100) / 100;
+    });
+  }
+  return { metric: metric, データあり: vals.length, 全体: rows.length, rows: rows };
+}
+
+/* 確認用。コンソールから AGARI.report() で現在のレースぶんを表に出す。 */
+async function asaAgariReport(metric){
+  const race = (typeof CURRENT_VENUE_RACES !== 'undefined') ? CURRENT_VENUE_RACES[CURRENT_RACE_INDEX] : null;
+  const mt = window.__ASA_AGARI_MEETING || await asaAgariBuildMeeting(null, {});
+  if (mt.error){ console.log(mt.error); return mt; }
+  console.log('会場', mt.venue, '節の開催日', mt.days.join(','), '（' + mt.daySource + '）', '過去日', mt.pastDays.join(','), mt.stats);
+  const res = asaAgariForRace(race, mt, metric);
+  if (!res){ console.log('レースが取れません'); return mt; }
+  console.table(res.rows.map(function(r){
+    return { 車: r.car, 選手: r.name, 本数: r.本数, ベスト: r.上りベスト, 直近: r.上り直近,
+             平均: r.上り平均, 順位: r.順位, 最速: r.最速 ? '★' : '', 平均差: r.メンバー平均差, 明細: r.明細.join(' / ') };
+  }));
+  return res;
+}
+
+function asaAgariClearCache(joCode){
+  let n = 0;
+  try{
+    const del = [];
+    for (let i = 0; i < localStorage.length; i++){
+      const k = localStorage.key(i);
+      if (k && k.indexOf(AGARI_V1.CACHE_PREFIX + '|') === 0 && (!joCode || k.indexOf('|' + joCode + '|') >= 0)) del.push(k);
+    }
+    del.forEach(function(k){ localStorage.removeItem(k); n++; });
+  }catch(e){}
+  window.__ASA_AGARI_MEETING = null;
+  return n;
+}
+
+window.AGARI = {
+  V: AGARI_V1,
+  build: asaAgariBuildMeeting,
+  forRace: asaAgariForRace,
+  report: asaAgariReport,
+  parse: asaAgariParse,
+  days: asaAgariMeetingDays,
+  raceCount: asaAgariRaceCount,
+  fetchDay: asaAgariFetchDay,
+  clear: asaAgariClearCache
+};
+
+</script>
 </body>
 </html>
