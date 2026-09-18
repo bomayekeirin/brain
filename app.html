@@ -17676,6 +17676,14 @@ function appRaceToEngine(race){
 function runOmakaseGeneration(){
   let race=null; try{ race=CURRENT_VENUE_RACES[CURRENT_RACE_INDEX]; }catch(e){}
   if(!race || !race.players || !race.lineup) return {target:false,reason:'レースデータなし'};
+  /* ★2026-09-11：セル生成の停止フラグをこの関数にも置く。
+   *   3-0j（2026-08-09）で塞いだのはランプ2箇所・生成ボタン・runOmakaseTransition と
+   *   result.html の1箇所だけで、生成関数そのものは素通りだった。
+   *   管理画面の一括生成（genAll）は runMid3BunsenGeneration が null を返すと
+   *   この関数を直接呼ぶため、フラグが false でも二分戦が生成・記録されていた。
+   *   ここを塞ぐことで「画面の生成／result の一覧／管理画面の一括生成」が必ず一致する。 */
+  if(typeof OMAKASE_CELL_ENABLED !== 'undefined' && !OMAKASE_CELL_ENABLED)
+    return {target:false, reason:'セル生成は停止中です'};
   // ★デイ・ナイターはセル判定を使わない（2026-08-02）。三分戦は手前でミッドロジックへ分岐済み。
   if(typeof mid3IsMidnightRace === 'function' && mid3IsMidnightRace(race))
     return {target:false, reason:'ミッドナイトはミッド脳で生成します'};

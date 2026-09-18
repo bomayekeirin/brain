@@ -2027,8 +2027,10 @@ document.getElementById('toTop').addEventListener('click', ()=>{
          *   app.html 側で二分戦25セルを含むセル生成を停止したため、
          *   ここを塞がないと result.html だけがセル由来のカードを出してしまう。
          *   モーニングは従来どおりセル判定を使う（app.html と同じ扱い）。 */
-        if(typeof OMAKASE_CELL_ENABLED !== 'undefined' && !OMAKASE_CELL_ENABLED
-           && typeof mid3IsDayNighter==='function' && mid3IsDayNighter(race, v.timeSlot)) continue;
+        /* ★2026-09-11：app.html 側は runOmakaseGeneration の入口で全時間帯を塞ぐようにしたため、
+         *   ここも「デイナイターのみ」ではなく、フラグが false ならセル経路を一切通さない形に揃える。
+         *   （モーニングはエンジン内部が dn!==true で見送りになるため、実挙動は変わらない） */
+        if(typeof OMAKASE_CELL_ENABLED !== 'undefined' && !OMAKASE_CELL_ENABLED) continue;
         let _dn2 = false;
         if(typeof mid3IsDayNighter==='function' && mid3IsDayNighter(race, v.timeSlot)){
           // ★判定は app.html と共通の dn2CellAllowed に寄せる（2026-08-07）
