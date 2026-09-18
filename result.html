@@ -2425,7 +2425,11 @@ const GRADE_MIN_ARE = 30.0;
  *                                   デイ・ナイターは三分戦（mid3）のみ対象。
  *   MID3_MIN_ARE = 30.0          … 三分戦の荒れ下限。G戦の GRADE_MIN_ARE とは別定数。
  *   ★初日特選・決勝（lv='全'）はこの判定を通さない＝荒れ指数に関わらず生成対象。 */
-const OMAKASE_CELL_ENABLED = false;
+/* ★2026-09-11：ボンバイエ指示で true に戻した（3-0i の二分戦25セルを復活）。
+ *   デイ・ナイターは三分戦＝mid3経路、二分戦＝セル経路（Lv2/Lv3/全 かつ split=B のみ）。
+ *   細切れ・四分戦・G戦は従来どおり見送り。モーニングのセル経路も一緒に戻る。
+ *   止めるときは false に戻すだけ。app.html / result.html の両方を揃えること。 */
+const OMAKASE_CELL_ENABLED = true;
 const MID3_MIN_ARE = 30.0;
 
 /* ★対抗ラインの振り替え（2026-08-12・app.html と同期）
