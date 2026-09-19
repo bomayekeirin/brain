@@ -13489,7 +13489,29 @@ function pickGradeTankiForC(lineup, players){
  * ・bets（展開形）／compressed（パーサ用 flat）／compressedDisplay（表示用 " / " 連結）を同時に入れ替える。
  * ・記録には axisInfo.swap23 = true を残す（入替前後の母集団を分けるため）。
  * ・ENABLED:false で旧版と完全一致。 */
-const MID_SWAP23 = { ENABLED: true };   // ★2026-09-11 オン（2着↔3着を入替）
+const MID_SWAP23 = {
+  ENABLED: true,             // ★2026-09-11 オン（2着↔3着を入替）
+  DAY2_ONLY: true,           // ★2026-09-18 2日目だけ入替。初日・最終日・3日目以降は入替なし
+  REQUIRE_FINAL_INFO: true   // 最終日かどうかが分からないときは入替しない（安全側）
+};
+
+/* 2着↔3着の入替を適用してよい日か。
+ *   ・2日目のみ適用。初日・最終日・3日目以降は適用しない
+ *   ・2日間開催の2日目は【最終日】なので適用しない
+ *   ・最終日判定は cup API の duration（V3_CUPINFO で race.isFinalDay に入る）。
+ *     取れていないときは REQUIRE_FINAL_INFO=true なら適用しない
+ *   ・DAY2_ONLY=false で 09-11〜09-18 の「全日入替」に戻る */
+function midSwap23Allowed(race, venue){
+  if(!MID_SWAP23.ENABLED) return { ok:false, reason:'オフ' };
+  if(!MID_SWAP23.DAY2_ONLY) return { ok:true,  reason:'全日' };
+  var dayNum = Number((venue && venue.dayNum) || (race && race.dayNum) || 0);
+  if(!dayNum) return { ok:false, reason:'日目不明' };
+  if(dayNum !== 2) return { ok:false, reason:dayNum + '日目' };
+  if(race && race.isFinalDay === true) return { ok:false, reason:'2日目だが最終日' };
+  if(MID_SWAP23.REQUIRE_FINAL_INFO && !(race && race.isFinalDay === false))
+    return { ok:false, reason:'最終日判定なし' };
+  return { ok:true, reason:'2日目' };
+}
 
 function swap23Trio(str){
   const g = String(str).split('-');
@@ -22257,7 +22279,9 @@ function attachTextsToBets(stage4, texts) {
       }
     }
     // ★2026-09-11：2着↔3着の入れ替え（最終形に適用・表示／記録／結果照合すべてこの out を使う）
-    if (typeof MID_SWAP23 !== 'undefined' && MID_SWAP23.ENABLED) out = applySwap23(out);
+    //   2026-09-18：2日目のみ適用に変更（初日・最終日はオフ）
+    var _sw23 = midSwap23Allowed(race, (typeof CURRENT_VENUE !== 'undefined') ? CURRENT_VENUE : null);
+    if (_sw23.ok) out = applySwap23(out);
 
     var highlights = [];
     try{ highlights = pickHighlightsV3(out, race, ex, true); }catch(e){}
@@ -22333,8 +22357,10 @@ function attachTextsToBets(stage4, texts) {
             axis3rdAdded: (out && out.axis3rdAdded != null) ? out.axis3rdAdded : 0,
             taishoVer: (out && out.taisho && out.taisho.reason
                         && String(out.taisho.reason).indexOf('対抗v4') === 0) ? 'v4' : 'v3',
-            /* ★2026-09-11：2着↔3着の入れ替えを適用したか（MID_SWAP23）。母集団の分離用 */
-            swap23: !!(out && out.swap23)
+            /* ★2026-09-11：2着↔3着の入れ替えを適用したか（MID_SWAP23）。母集団の分離用
+               2026-09-18：日目による出し分けを入れたので、判定理由も残す */
+            swap23: !!(out && out.swap23),
+            swap23Reason: _sw23 ? _sw23.reason : null
           }
         }, {
           venue: (typeof CURRENT_VENUE!=='undefined'&&CURRENT_VENUE)?CURRENT_VENUE.venue:'',
