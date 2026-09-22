@@ -712,6 +712,50 @@ body{background:#fff !important;color:var(--ink) !important;}
 #admCode:focus{border-color:var(--sun-3) !important;}
 
 
+
+/* ===== 今日｜明日の大きなタブ（2026-09-22） =====
+ * 選ばれているタブとパネルが一枚のガラスとしてつながって見えるようにする。 */
+.asa-day{position:relative;}
+.asa-day-tabs{display:flex;gap:0;position:relative;z-index:2;}
+.asa-day-tab{
+  flex:1;position:relative;display:flex;align-items:baseline;justify-content:center;gap:7px;
+  padding:13px 8px 12px;border:1px solid transparent;border-bottom:none;border-radius:18px 18px 0 0;
+  background:transparent;color:var(--ink-3);font-family:inherit;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;transition:color .2s,background .25s;
+}
+.asa-day-name{font-size:19px;font-weight:700;letter-spacing:.08em;}
+.asa-day-date{font-size:12px;font-weight:600;opacity:.8;}
+.asa-day-count{font-size:11px;font-weight:700;min-width:18px;padding:1px 6px;border-radius:9px;
+  background:rgba(255,160,40,.12);color:var(--ink-3);}
+.asa-day-tab.active{
+  color:var(--ink);
+  background:linear-gradient(180deg,rgba(255,255,255,.98),rgba(255,251,244,.96));
+  border-color:rgba(255,170,60,.26);
+  box-shadow:0 -8px 20px -14px rgba(255,130,20,.4);
+}
+.asa-day-tab.active .asa-day-name{
+  background:linear-gradient(180deg,var(--sun-2),var(--sun-3));-webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+.asa-day-tab.active .asa-day-count{background:linear-gradient(160deg,var(--sun-1),var(--sun-3));color:#fff;
+  box-shadow:0 3px 8px -3px rgba(255,120,10,.6);}
+/* タブの下辺でパネルとつながる（選択中のタブの下の境界線を隠す） */
+.asa-day-tab.active::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:2px;background:#fffbf4;}
+.asa-day-tab:not(.active):active{background:rgba(255,170,60,.06);}
+.asa-day-panel{
+  position:relative;z-index:1;margin-top:-1px;padding:18px 12px 6px;
+  border:1px solid rgba(255,170,60,.26);border-radius:0 0 20px 20px;
+  background:linear-gradient(180deg,#fffbf4 0%,#ffffff 140px);
+  box-shadow:0 18px 40px -26px rgba(255,130,20,.45),0 1px 0 #fff inset;
+  min-height:180px;
+}
+.asa-day-tabs .asa-day-tab:first-child.active{border-radius:18px 18px 0 0;}
+.asa-day-note{margin:-4px 4px 14px;padding:9px 12px;border-radius:12px;font-size:12px;line-height:1.6;
+  color:var(--ink-2);background:rgba(255,190,70,.14);border:1px solid rgba(255,170,60,.22);}
+.asa-day-panel .venue-card:last-child{margin-bottom:10px;}
+.asa-day-panel .venue-empty{padding:40px 0 !important;line-height:1.8;}
+@media (prefers-reduced-motion:reduce){ .asa-day-tab{transition:none;} }
+
 /* 調整：艶の層を文字の下に回す（反射が通るときに会場名が白く飛んでいた） */
 .venue-card > *{position:relative;z-index:1;}
 .venue-card::before{z-index:0;}
@@ -750,8 +794,22 @@ body{background:#fff !important;color:var(--ink) !important;}
   <!-- コンテンツ：開催カード（app.html流用／内容・仕様は後日変更予定） -->
   <main class="mid-main" id="midMain">
     <section class="mid-race-section">
-      <div id="midRaceCards">
-        <div class="mid-loading"><span class="mid-spinner"></span>開催情報を取得中…</div>
+      <!-- ★2026-09-22 今日｜明日（明日の出走表を前日の晩から見られるように） -->
+      <div class="asa-day" id="asaDay">
+        <div class="asa-day-tabs" role="tablist" aria-label="開催日">
+          <button class="asa-day-tab active" role="tab" aria-selected="true" data-view="today" type="button">
+            <span class="asa-day-name">今日</span><span class="asa-day-date" id="asaDayDateToday"></span><span class="asa-day-count" id="asaDayCountToday"></span>
+          </button>
+          <button class="asa-day-tab" role="tab" aria-selected="false" data-view="tomorrow" type="button">
+            <span class="asa-day-name">明日</span><span class="asa-day-date" id="asaDayDateTomorrow"></span><span class="asa-day-count" id="asaDayCountTomorrow"></span>
+          </button>
+        </div>
+        <div class="asa-day-panel" role="tabpanel">
+          <div class="asa-day-note" id="asaDayNote" hidden></div>
+          <div id="midRaceCards">
+            <div class="mid-loading"><span class="mid-spinner"></span>開催情報を取得中…</div>
+          </div>
+        </div>
       </div>
     </section>
   </main>
@@ -855,8 +913,37 @@ function parseWinticketRaceUrl(link){
   return null;
 }
 
-  let MID_VENUES = [];
+  let MID_VENUES = [];          // いま表示している日の開催（MID_VIEW に対応）
   let MID_REVEALED = false;   // 初回の登場演出を1度だけ走らせる
+
+  /* ===== 今日｜明日（2026-09-22） =====
+   * ・WinTicket の「今日」「明日」両パネルから開催を集め、
+   *   【開催コード＋日目から出したその日の日付】と【日本時間の今日・明日】を比べて振り分ける。
+   *   パネルの切り替わり時刻（WinTicket 側の都合）に左右されないようにするため。
+   * ・日付が変わったら（0時をまたいだら）自動で取り直し、表示を「今日」に戻す。 */
+  let MID_VIEW = 'today';                      // 'today' | 'tomorrow'
+  let MID_ALL  = { today: [], tomorrow: [] };
+  let MID_FETCH_DAY = null;                    // 取得した時点の日本時間の日付（YYYY-MM-DD）
+  function asaPad2(n){ return String(n).padStart(2,'0'); }
+  function asaJstYmd(offsetDays){
+    const d = new Date(Date.now() + 9*3600*1000);
+    d.setUTCDate(d.getUTCDate() + (offsetDays||0));
+    return d.getUTCFullYear() + '-' + asaPad2(d.getUTCMonth()+1) + '-' + asaPad2(d.getUTCDate());
+  }
+  function asaMd(ymd){ if(!ymd) return ''; const a=ymd.split('-'); return (+a[1])+'/'+(+a[2]); }
+  /* その日の日付＋「HH:MM」までの残り分（日本時間）。取れなければ null */
+  function asaMinutesUntil(dateStr, hhmm){
+    if(!hhmm || !/^\d{1,2}:\d{2}$/.test(hhmm)) return null;
+    const hm = hhmm.split(':').map(Number);
+    const nowMinUtc = Math.floor(Date.now()/60000)*60000;
+    if(!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)){
+      const j = new Date(Date.now() + 9*3600*1000);
+      return (hm[0]*60+hm[1]) - (j.getUTCHours()*60 + j.getUTCMinutes());
+    }
+    const y = dateStr.split('-').map(Number);
+    return Math.round((Date.UTC(y[0],y[1]-1,y[2],hm[0],hm[1]) - 9*3600*1000 - nowMinUtc)/60000);
+  }
+  function asaVenueKey(v){ return v.venueId + '|' + v.raceCode + '|' + v.dayNum; }
 
   const TIME_SLOT_ICONS = {
     morning: `<svg viewBox="0 0 24 24" fill="none"><defs><clipPath id="horizon2"><rect x="0" y="0" width="24" height="16"/></clipPath></defs><g clip-path="url(#horizon2)"><circle cx="12" cy="16" r="7" fill="#FFB300"/></g><path d="M12 2v3M4.22 6.22l2.12 2.12M19.78 6.22l-2.12 2.12M2 14h3M19 14h3" stroke="#FFB300" stroke-width="2" stroke-linecap="round"/><path d="M3 20h18" stroke="#FFB300" stroke-width="2" stroke-linecap="round"/></svg>`,
@@ -872,10 +959,14 @@ function parseWinticketRaceUrl(link){
       const html = await resp.text();
       const doc = new DOMParser().parseFromString(html, 'text/html');
       const todayPanel = doc.querySelector('#panel-keirin-race-today');
-      if(!todayPanel){ box.innerHTML = '<div class="venue-empty">開催情報の取得に失敗しました</div>'; return; }
+      const tomorrowPanel = doc.querySelector('#panel-keirin-race-tomorrow');
+      if(!todayPanel && !tomorrowPanel){ box.innerHTML = '<div class="venue-empty">開催情報の取得に失敗しました</div>'; return; }
 
       const venues = [];
-      todayPanel.querySelectorAll('[class*="RecentRaceListItem___Wrapper-sc"]').forEach(el=>{
+      const items = [];
+      if(todayPanel)    todayPanel.querySelectorAll('[class*="RecentRaceListItem___Wrapper-sc"]').forEach(el=>items.push({el, panel:'today'}));
+      if(tomorrowPanel) tomorrowPanel.querySelectorAll('[class*="RecentRaceListItem___Wrapper-sc"]').forEach(el=>items.push({el, panel:'tomorrow'}));
+      items.forEach(({el, panel})=>{
         const venueEl = el.querySelector('[class*="VenueName"]');
         const gradeEl = el.querySelector('[class*="GradeIcon"]');
         let linkEl = el.querySelector('a[href*="racecard"]');
@@ -908,19 +999,40 @@ function parseWinticketRaceUrl(link){
         const parsed = parseWinticketRaceUrl(link);
         if(!parsed) return;
         // ★終了判定（2026-07-14）：レース一覧URL(/races?index=)も終了扱い
-        if(parsed.isRaceList || parsed.linkType === 'raceresult' || /終了/.test(el.textContent||'')) linkType = 'raceresult';
+        // ★2026-09-22：「終了」は結果リンク・「終了」表記のときだけ確定させる。
+        //   一覧形式のURL（/races?index=）は終了の手がかりに留め、時刻が分かるときは時刻（日付つき）で判定する。
+        //   （日付の変わり目に、これから始まる開催が一覧形式URLで載っていても終了扱いにしないため）
+        const listFmt = !!parsed.isRaceList;
+        if(parsed.linkType === 'raceresult' || /終了/.test(el.textContent||'')) linkType = 'raceresult';
         const venueId = parsed.venueId, raceCode = parsed.raceCode, dayNum = parsed.dayNum;
         const currentRaceNum = parsed.currentRaceNum;
         if(venues.find(v=>v.venueId===venueId && v.raceCode===raceCode && v.dayNum===dayNum)) return;
 
         venues.push({ venue, venueId, grade, raceCode, dayNum, day, link, linkType,
                       startTime, timeSlot, currentRaceNum, nextRace:null,
-                      dateStr: cupDateStr(raceCode, dayNum) });
+                      dateStr: cupDateStr(raceCode, dayNum), panel, listFmt });
       });
 
-      MID_VENUES = venues;
-      midRenderVenueCards(venues);            // 先に描画（カップ名は後追いで差し込み）
-      midFetchCupNames(venues);
+      // ★日本時間の今日・明日で振り分ける（取得時点で固定し、日付が変われば取り直す）
+      const todayStr = asaJstYmd(0), tomorrowStr = asaJstYmd(1);
+      const all = { today: [], tomorrow: [] };
+      venues.forEach(v=>{
+        let bucket = null;
+        if(v.dateStr === todayStr) bucket = 'today';
+        else if(v.dateStr === tomorrowStr) bucket = 'tomorrow';
+        else if(!v.dateStr) bucket = v.panel;          // 日付が出せないときだけパネルに従う
+        if(!bucket) return;                            // 昨日以前・明後日以降は出さない
+        // 明日の開催は「終了」になり得ない（前日の一覧URLが /races?index= 形式でも終了扱いにしない）
+        if(bucket === 'tomorrow') v.linkType = 'racecard';
+        v.view = bucket;
+        all[bucket].push(v);
+      });
+      MID_ALL = all;
+      MID_FETCH_DAY = todayStr;
+      asaUpdateDayTabs();
+      MID_VENUES = MID_ALL[MID_VIEW];
+      midRenderVenueCards(MID_VENUES);        // 先に描画（カップ名は後追いで差し込み）
+      midFetchCupNames(MID_ALL.today.concat(MID_ALL.tomorrow));
       // ★朝脳：今節の上がりを裏で先読み（一覧の描画とカップ名取得の後に始める）
       setTimeout(function(){ if (typeof asanouHomeAgariPrefetch === 'function') asanouHomeAgariPrefetch(); }, 1500);
     }catch(e){
@@ -931,7 +1043,7 @@ function parseWinticketRaceUrl(link){
 
   // カップ名（cup API）を並列取得してカードへ差し込み
   async function midFetchCupNames(venues){
-    await Promise.all(venues.map(async (v, idx)=>{
+    await Promise.all(venues.map(async (v)=>{
       try{
         const api = `https://api.winticket.jp/v1/keirin/cups/${v.raceCode}?pfm=web`;
         const resp = await fetch(`${PROXY_URL}?url=${encodeURIComponent(api)}`);
@@ -939,7 +1051,8 @@ function parseWinticketRaceUrl(link){
         const name = (j && j.cup && j.cup.name) ? j.cup.name : '';
         if(!name) return;
         v.cupName = name;
-        const el = document.querySelector(`.venue-card[data-venue-idx="${idx}"] .venue-cup`);
+        const card = [...document.querySelectorAll('.venue-card')].find(c=>c.dataset.vkey === asaVenueKey(v));
+        const el = card ? card.querySelector('.venue-cup') : null;
         if(el) el.textContent = name;
       }catch(e){ /* 取得失敗時は空のまま */ }
     }));
@@ -948,36 +1061,39 @@ function parseWinticketRaceUrl(link){
   function midRenderVenueCards(venues){
     const container = document.getElementById('midRaceCards');
     if(!venues.length){
-      container.innerHTML = '<div class="venue-empty">本日のモーニング開催はありません</div>';
+      container.innerHTML = (MID_VIEW === 'tomorrow')
+        ? '<div class="venue-empty">明日のモーニング開催は<br>まだ発表されていません</div>'
+        : '<div class="venue-empty">本日のモーニング開催はありません</div>';
       return;
     }
     container.innerHTML = venues.map((v, idx)=>{
       const gradeClass = `grade-${v.grade.toLowerCase()}`;
       const nextStart = v.startTime || '--:--';
 
-      // 直近締切＝発走5分前
-      const now = new Date();
-      const nowMinutes = now.getHours()*60 + now.getMinutes();
+      // 直近締切＝発走5分前。★日付つきで比べる（明日の開催を「終了」にしない）
       let deadlineTime = null, deadlineRemaining = null, isUrgent = false;
       let isFinished = (v.linkType === 'raceresult');
+      const isTomorrow = (v.view === 'tomorrow');
 
-      if(nextStart && nextStart !== '--:--'){
+      if(nextStart && nextStart !== '--:--' && /^\d{1,2}:\d{2}$/.test(nextStart)){
         const [h, m] = nextStart.split(':').map(Number);
         const deadlineMinutes = h*60 + m - 5;
         const dH = Math.floor(deadlineMinutes/60), dM = deadlineMinutes % 60;
         deadlineTime = `${String(dH).padStart(2,'0')}:${String(dM).padStart(2,'0')}`;
-        deadlineRemaining = deadlineMinutes - nowMinutes;
-        if(deadlineRemaining <= 0){ isFinished = true; deadlineTime = null; }
-        else if(deadlineRemaining <= 15){ isUrgent = true; }   // 15分以内は赤
+        deadlineRemaining = asaMinutesUntil(v.dateStr, deadlineTime);
+        if(deadlineRemaining != null && deadlineRemaining <= 0){ isFinished = true; deadlineTime = null; }
+        else if(deadlineRemaining != null && deadlineRemaining <= 15){ isUrgent = true; }   // 15分以内は赤
       }
+      // 時刻が分からない一覧形式URLの開催は、従来どおり終了扱い（明日の開催は除く）
+      if(v.listFmt && !isTomorrow && deadlineRemaining == null) isFinished = true;
 
       let rightContent;
       if(isFinished) rightContent = `<span class="venue-finished">終了</span>`;
-      else if(deadlineTime !== null) rightContent = `<span class="venue-start${isUrgent ? ' urgent' : ''}"><span class="venue-start-label">直近締切</span>${deadlineTime}</span>`;
+      else if(deadlineTime !== null) rightContent = `<span class="venue-start${isUrgent ? ' urgent' : ''}"><span class="venue-start-label">${isTomorrow ? '明日 締切' : '直近締切'}</span>${deadlineTime}</span>`;
       else rightContent = `<span class="venue-start"><span class="venue-start-label">発走</span>${nextStart}</span>`;
 
       return `
-      <div class="venue-card ${isFinished ? 'finished' : ''}" data-venue-idx="${idx}" data-finished="${isFinished}" onclick="midToggleVenue(${idx}, event)">
+      <div class="venue-card ${isFinished ? 'finished' : ''}" data-venue-idx="${idx}" data-vkey="${asaVenueKey(v)}" data-finished="${isFinished}" onclick="midToggleVenue(${idx}, event)">
         <div class="venue-main">
           <div class="venue-left">
             <div class="venue-name-row">
@@ -1027,7 +1143,12 @@ function parseWinticketRaceUrl(link){
     if(!card) return;
     const opening = !card.classList.contains('expanded');
     card.classList.toggle('expanded', opening);
-    if(opening && !MID_RACES_CACHE[idx]) midFetchRaces(idx);
+    const v = MID_VENUES[idx];
+    if(opening && v){
+      const ck = asaVenueKey(v);
+      if(MID_RACES_CACHE[ck]) midRenderRaceSelector(idx, MID_RACES_CACHE[ck]);   // 描画し直し（締切表示を最新に）
+      else midFetchRaces(idx);
+    }
 
     // タップ波紋（カード内のどこを押しても）
     if(event){
@@ -1064,8 +1185,8 @@ function parseWinticketRaceUrl(link){
       const races = (j.races || [])
         .filter(r => r.scheduleId === sch.id)
         .sort((a,b) => a.number - b.number);
-      MID_RACES_CACHE[idx] = races;
-      midRenderRaceSelector(idx, races);
+      MID_RACES_CACHE[asaVenueKey(v)] = races;
+      if(MID_VENUES[idx] === v) midRenderRaceSelector(idx, races);   // 取得中にタブが切り替わっていたら描かない
     }catch(e){
       console.error('midFetchRaces error:', e);
       box.innerHTML = '<div class="mid-race-loading">レース情報が取得できませんでした</div>';
@@ -1123,6 +1244,66 @@ function parseWinticketRaceUrl(link){
     });
     location.href = '/asarace?' + q.toString();
   }
+
+  // ===== 今日｜明日タブ =====
+  function asaUpdateDayTabs(){
+    const t = document.getElementById('asaDayDateToday'), m = document.getElementById('asaDayDateTomorrow');
+    if(t) t.textContent = asaMd(asaJstYmd(0));
+    if(m) m.textContent = asaMd(asaJstYmd(1));
+    const ct = document.getElementById('asaDayCountToday'), cm = document.getElementById('asaDayCountTomorrow');
+    if(ct) ct.textContent = String(MID_ALL.today.length);
+    if(cm) cm.textContent = String(MID_ALL.tomorrow.length);
+    document.querySelectorAll('.asa-day-tab').forEach(b=>{
+      const on = (b.dataset.view === MID_VIEW);
+      b.classList.toggle('active', on); b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+  }
+  function asaSetView(view){
+    if(view !== 'today' && view !== 'tomorrow') return;
+    // 日付がすでに変わっていたら、切り替える前に取り直す
+    if(MID_FETCH_DAY && MID_FETCH_DAY !== asaJstYmd(0)){ asaDayRollover(); return; }
+    if(view === MID_VIEW) return;
+    MID_VIEW = view;
+    asaUpdateDayTabs();
+    MID_VENUES = MID_ALL[MID_VIEW];
+    midRenderVenueCards(MID_VENUES);
+    if(MID_REVEALED) midStaggerCards(40);
+  }
+  document.addEventListener('click', function(e){
+    const b = e.target.closest && e.target.closest('.asa-day-tab');
+    if(!b) return;
+    asaSetView(b.dataset.view);
+  });
+
+  /* 日付の変わり目：0時をまたいだら一覧を取り直し、「今日」に戻す。
+   * （昨日の「明日」は今日になる。古い一覧のままレースを選ばせない） */
+  let asaRolling = false;
+  function asaDayNoteShow(msg){
+    const n = document.getElementById('asaDayNote'); if(!n) return;
+    n.textContent = msg; n.hidden = false;
+    clearTimeout(asaDayNoteShow._t);
+    asaDayNoteShow._t = setTimeout(()=>{ n.hidden = true; }, 8000);
+  }
+  async function asaDayRollover(){
+    if(asaRolling) return;
+    asaRolling = true;
+    try{
+      MID_VIEW = 'today';
+      MID_ALL = { today: [], tomorrow: [] };
+      MID_VENUES = [];
+      Object.keys(MID_RACES_CACHE).forEach(k=>delete MID_RACES_CACHE[k]);
+      asaUpdateDayTabs();
+      document.getElementById('midRaceCards').innerHTML = '<div class="mid-loading"><span class="mid-spinner"></span>開催情報を取得中…</div>';
+      await midFetchVenueList();
+      asaDayNoteShow('日付が変わったため、開催一覧を更新しました。');
+    }finally{ asaRolling = false; }
+  }
+  function asaCheckDayChange(){
+    if(MID_FETCH_DAY && MID_FETCH_DAY !== asaJstYmd(0)) asaDayRollover();
+  }
+  setInterval(asaCheckDayChange, 30000);                                   // 開いたままでも30秒ごとに確認
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden) asaCheckDayChange(); });
+  window.addEventListener('pageshow', function(){ asaCheckDayChange(); });   // 戻るボタンで復帰したとき
 
   // 起動時に開催取得（遷移画面と並行）
   if(document.readyState === 'loading'){
@@ -1599,7 +1780,7 @@ window.AGARI = {
 async function asanouHomeAgariPrefetch(){
   try{
     if (!AGARI_V1.ENABLED || !AGARI_V1.PREFETCH) return;
-    const targets = (MID_VENUES || []).filter(v => Number(v.dayNum || 1) >= 2 && v.linkType !== 'raceresult');
+    const targets = (MID_ALL.today || []).concat(MID_ALL.tomorrow || []).filter(v => Number(v.dayNum || 1) >= 2 && v.linkType !== 'raceresult');
     for (const v of targets){
       const kb = v.dateStr ? String(v.dateStr).replace(/-/g,'') : null;
       try{

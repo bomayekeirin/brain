@@ -572,6 +572,53 @@ window.AGARI = {
 };
 
 
+
+/* ===================================================================
+ * 朝脳：日付つきの締切判定（2026-09-22・明日の出走表対応）
+ *   従来は締切の「時刻」だけを今の時刻と比べていたため、
+ *   前日の夜に翌朝のレースを開くと「終了」扱いになり生成できなかった。
+ *   レースの日付（開催コード先頭8桁＝初日＋日目 → CURRENT_VENUE.dateStr）を使い、
+ *   日本時間の「日付＋時刻」で比べる。
+ *   ・同じ日のレースは従来と完全に同じ結果になる（分単位で比較・秒は切り捨て）
+ *   ・日付が取れないときは従来の時刻だけの比較に戻す
+ * =================================================================== */
+function asaPad2(n){ return String(n).padStart(2,'0'); }
+/* 日本時間の YYYY-MM-DD。offsetDays=1 で明日 */
+function asaJstYmd(offsetDays){
+  var d = new Date(Date.now() + 9*3600*1000);
+  d.setUTCDate(d.getUTCDate() + (offsetDays||0));
+  return d.getUTCFullYear() + '-' + asaPad2(d.getUTCMonth()+1) + '-' + asaPad2(d.getUTCDate());
+}
+function asaRaceDateStr(race){
+  var ds = (race && race.dateStr) || ((typeof CURRENT_VENUE !== 'undefined' && CURRENT_VENUE) ? CURRENT_VENUE.dateStr : null);
+  return (ds && /^\d{4}-\d{2}-\d{2}$/.test(ds)) ? ds : null;
+}
+/* 締切までの残り分（整数）。締切を過ぎていれば 0 以下。締切が取れなければ null */
+function asaMinutesToDeadline(deadline, race){
+  if (!deadline) return null;
+  var hm = String(deadline).split(':').map(Number);
+  if (hm.length < 2 || isNaN(hm[0]) || isNaN(hm[1])) return null;
+  var nowMinUtc = Math.floor(Date.now() / 60000) * 60000;          // 秒は切り捨て（従来と同じ分単位）
+  var ds = asaRaceDateStr(race);
+  if (!ds){
+    // 日付不明：従来どおり時刻だけで比べる（日本時間）
+    var j = new Date(Date.now() + 9*3600*1000);
+    return (hm[0]*60 + hm[1]) - (j.getUTCHours()*60 + j.getUTCMinutes());
+  }
+  var ymd = ds.split('-').map(Number);
+  var deadlineUtc = Date.UTC(ymd[0], ymd[1]-1, ymd[2], hm[0], hm[1]) - 9*3600*1000;   // 日本時間 → UTC
+  return Math.round((deadlineUtc - nowMinUtc) / 60000);
+}
+function asaIsDeadlinePassed(deadline, race){
+  var r = asaMinutesToDeadline(deadline, race);
+  return (r != null) && r <= 0;
+}
+/* 表示用：そのレースが明日なら true */
+function asaIsTomorrowRace(race){
+  var ds = asaRaceDateStr(race);
+  return !!ds && ds === asaJstYmd(1);
+}
+
 /* ===== 朝脳：本体側のつなぎ（2026-09-22） ===== */
 /* 出走表の選手 → asanouGenerate の入力 { car, pt }。pt が無い選手は null のまま渡す
    （関数側でライン先頭の欠損を skip 判定する。0 にはしない：指示書 第6章） */
@@ -10126,15 +10173,17 @@ const ODDSPARK_JO_CODES = {
 // オッズパーク レース種別キャッシュ
 const ODDSPARK_RACE_TYPE_CACHE = {};
 
-async function fetchOddsparkRaceTypes(venueId) {
-  // キャッシュチェック
-  if (ODDSPARK_RACE_TYPE_CACHE[venueId]) return ODDSPARK_RACE_TYPE_CACHE[venueId];
+async function fetchOddsparkRaceTypes(venueId, dateStr) {
+  // ★朝脳：開催日ごとにキャッシュする（同じ会場の今日と明日を取り違えない）
+  const _kbDay = (dateStr && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) ? dateStr.replace(/-/g,'') : null;
+  const _ck = venueId + '|' + (_kbDay || 'today');
+  if (ODDSPARK_RACE_TYPE_CACHE[_ck]) return ODDSPARK_RACE_TYPE_CACHE[_ck];
   
   const joCode = ODDSPARK_JO_CODES[venueId];
   if (!joCode) return { types: {}, grade: '', cupName: '' };
   
   try {
-    const kb = opYmd();
+    const kb = _kbDay || opYmd();
     const url = `https://www.oddspark.com/keirin/AllRaceList.do?joCode=${joCode}&kaisaiBi=${kb}`;
     const resp = await fetch(`${PROXY_URL}?url=${encodeURIComponent(url)}`);
     if (!resp.ok) return { types: {}, grade: '', cupName: '' };
@@ -10192,7 +10241,7 @@ async function fetchOddsparkRaceTypes(venueId) {
     });
     
     const result = { types, grade, cupName };
-    ODDSPARK_RACE_TYPE_CACHE[venueId] = result;
+    ODDSPARK_RACE_TYPE_CACHE[_ck] = result;
     console.log('オッズパーク種別取得:', venueId, result);
     return result;
   } catch (e) {
@@ -11291,7 +11340,7 @@ async function fetchVenueRaces(venue, targetRaceNum, silent = false) {
     const races = await Promise.all(racePromises);
     
     // オッズパークからレース種別を取得
-    const oddsparkData = await fetchOddsparkRaceTypes(venue.venueId);
+    const oddsparkData = await fetchOddsparkRaceTypes(venue.venueId, venue.dateStr);
     const raceTypes = oddsparkData.types || {};
     
     // エラーでないレースだけフィルタ
@@ -11401,13 +11450,17 @@ function renderRaceSelector() {
     if (race.deadline) {
       const [h, m] = race.deadline.split(':').map(Number);
       const deadlineMinutes = h * 60 + m;
-      const remaining = deadlineMinutes - nowMinutes;
+      // ★朝脳：日付つきで比べる（明日のレースを「終了」にしない）
+      const _rm = (typeof asaMinutesToDeadline === 'function') ? asaMinutesToDeadline(race.deadline, race) : null;
+      const remaining = (_rm != null) ? _rm : (deadlineMinutes - nowMinutes);
       if (remaining <= 0) {
         deadlineText = '終了';
         deadlineClass = 'ended';
       } else if (remaining <= 20) {
         deadlineText = `締切${remaining}分前`;
         deadlineClass = 'countdown';
+      } else if (typeof asaIsTomorrowRace === 'function' && asaIsTomorrowRace(race)) {
+        deadlineText = `明日${race.deadline}`;
       } else {
         deadlineText = `締切${race.deadline}`;
       }
@@ -15434,11 +15487,8 @@ function showRaceTable(raceData, keepTab = false) {
   // 終了判定：締切時刻を過ぎているかチェック
   let isRaceFinished = false;
   if (raceData.deadline) {
-    const now = new Date();
-    const nowMinutes = now.getHours() * 60 + now.getMinutes();
-    const [dh, dm] = raceData.deadline.split(':').map(Number);
-    const deadlineMinutes = dh * 60 + dm;
-    isRaceFinished = deadlineMinutes <= nowMinutes;
+    // ★朝脳：日付つきで比べる（明日のレースを「終了」にしない）
+    isRaceFinished = asaIsDeadlinePassed(raceData.deadline, raceData);
   }
   
   const generateWrap = document.getElementById('rtGenerateWrap');
@@ -16166,10 +16216,8 @@ function updateGenerateZone(){
   // 未確定（発走前）判定
   let isRaceFinished = false;
   if (currentRace && currentRace.deadline) {
-    const now = new Date();
-    const nowMinutes = now.getHours() * 60 + now.getMinutes();
-    const [dh, dm] = currentRace.deadline.split(':').map(Number);
-    isRaceFinished = (dh * 60 + dm) <= nowMinutes;
+    // ★朝脳：日付つきで比べる（明日のレースでも締切前なら生成できる）
+    isRaceFinished = asaIsDeadlinePassed(currentRace.deadline, currentRace);
   }
 
   // TENKAI展開エンジンは二分戦・細切れ・単騎混在も扱えるため三分戦制限は課さない。
