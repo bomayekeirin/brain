@@ -7576,6 +7576,10 @@ body.omk-shake{animation:omkShake .42s linear;}
  * ミッド脳の暗色オーバーレイ群の【後ろ】に置き、色だけを上書きする（レイアウトは触らない）。
  * 車番の枠色（rt-c* / rt-lc* / tk-ic）は競輪の決まりなので変えない。
  * ===================================================================== */
+/* ---- 自動レイヤー：元CSSで暗い背景／明るい文字を指定している規則をすべて白地用に置換（2026-09-22） ---- */
+#asa #admGate,#asa #screen-admin,#asa #screen-compress-test,#asa #screen-odds-diag,#asa #screen-racetable,#asa #screen-racetable .arebuy-table-scroll,#asa #screen-racetable .arebuy-table-toggle,#asa #screen-racetable .custom-line-section,#asa #screen-racetable .custom-line-selector,#asa #screen-racetable .custom-selection-item,#asa #screen-racetable .custom-selection-result,#asa #screen-racetable .grt-cm-card,#asa #screen-racetable .grt-ex-table tbody tr:nth-child(even) td,#asa #screen-racetable .grt-ex-table tbody tr:nth-child(even) td.ex-col-name,#asa #screen-racetable .grt-ex-table tbody tr:nth-child(even) td.ex-col-num,#asa #screen-racetable .grt-ex-table tbody tr:nth-child(odd) td,#asa #screen-racetable .grt-ex-table tbody tr:nth-child(odd) td.ex-col-name,#asa #screen-racetable .grt-ex-table tbody tr:nth-child(odd) td.ex-col-num,#asa #screen-racetable .grt-ex-table thead th,#asa #screen-racetable .grt-ex-table thead th.ex-col-name,#asa #screen-racetable .grt-ex-table thead th.ex-col-num,#asa #screen-racetable .manual-add-btn:disabled,#asa #screen-racetable .manual-bet-item,#asa #screen-racetable .manual-bet-type-btn.active,#asa #screen-racetable .manual-bets-empty,#asa #screen-racetable .manual-bets-list,#asa #screen-racetable .manual-box,#asa #screen-racetable .manual-empty,#asa #screen-racetable .manual-generate-btn:disabled,#asa #screen-racetable .manual-lineup-bar,#asa #screen-racetable .manual-list,#asa #screen-racetable .manual-odds-section > div,#asa #screen-racetable .manual-output-btn:disabled,#asa #screen-racetable .manual-sheet,#asa #screen-racetable .manual-stacked-empty,#asa #screen-racetable .manual-stacked-item,#asa #screen-racetable .manual-sticky-header,#asa #screen-racetable .manual-table tbody tr:nth-child(even) td,#asa #screen-racetable .manual-table tbody tr:nth-child(odd) td,#asa #screen-racetable .manual-table thead th,#asa #screen-racetable .manual-th-check,#asa #screen-racetable .manual-th-mark,#asa #screen-racetable .manual-th-name,#asa #screen-racetable .manual-th-num,#asa #screen-racetable .manual-th-score,#asa #screen-racetable .manual-th-spacer-l,#asa #screen-racetable .odds-card,#asa #screen-racetable .odds-diag-card,#asa #screen-racetable .odds-list,#asa #screen-racetable .odds-row,#asa #screen-racetable .rt-card,#asa #screen-racetable .rt-comment-card,#asa #screen-racetable .rt-conditions,#asa #screen-racetable .rt-cup-bar,#asa #screen-racetable .rt-data-card,#asa #screen-racetable .rt-header,#asa #screen-racetable .rt-info-bar,#asa #screen-racetable .rt-lineup-bar,#asa #screen-racetable .rt-odds-card,#asa #screen-racetable .rt-odds-container,#asa #screen-racetable .rt-odds-list,#asa #screen-racetable .rt-point-box,#asa #screen-racetable .rt-race-btn,#asa #screen-racetable .rt-race-btn.active,#asa #screen-racetable .rt-race-selector,#asa #screen-racetable .rt-result-card,#asa #screen-racetable .rt-tab-body th,#asa #screen-racetable .rt-table tbody tr,#asa #screen-racetable .rt-table tbody tr:nth-child(even),#asa #screen-racetable .rt-table tbody tr:nth-child(even) td.rt-col-name,#asa #screen-racetable .rt-table tbody tr:nth-child(even) td.rt-col-num,#asa #screen-racetable .rt-table tbody tr:nth-child(odd) td.rt-col-name,#asa #screen-racetable .rt-table tbody tr:nth-child(odd) td.rt-col-num,#asa #screen-racetable .rt-table thead th.rt-col-name,#asa #screen-racetable .rt-table thead th.rt-col-num,#asa #screen-racetable .rt-table thead tr,#asa #screen-racetable .rt-table-wrap,#asa #screen-racetable .rt-tabs-wrap,#asa #screen-racetable button.manual-btn:disabled,#asa #screen-racetable.arebuy-mode .arebuy-cards,#asa #screen-result,#asa #screen-result .result-bet-card,#asa #screen-result .result-header,#asa .adm-btn,#asa .adm-head,#asa .adm-log,#asa .app-header,#asa .are-results-btn,#asa .are-results-cta-bar,#asa .are-results-zone,#asa .arerace-blackout,#asa .arerace-card,#asa .arerace-fire.fire-red,#asa .arerace-footer,#asa .arerace-header,#asa .arerace-load-btn,#asa .arerace-loading-overlay,#asa .arerace-popup-overlay,#asa .aretext-load-wrap .aretext-load-btn,#asa .bet-code-block,#asa .bet-code-copy,#asa .bet-result-code,#asa .bet-result-overlay,#asa .boot-blackout,#asa .car-2,#asa .car-3,#asa .car-8,#asa .car-9,#asa .content-zone-header-bg,#asa .crt-c-genbtn.loading,#asa .crt-card,#asa .crt-chip,#asa .crt-mk-red,#asa .ct-header,#asa .ct-input,#asa .ct-result,#asa .dark-content-zone,#asa .dc-footer,#asa .dc-header,#asa .dc-results,#asa .hit-band,#asa .hit-item,#asa .icon-config-header,#asa .icon-preview-badge,#asa .icon-set-btn,#asa .icon-set-btn:active,#asa .icon-toast,#asa .lab-code-dot.filled,#asa .lab-code-overlay,#asa .lab-footer,#asa .lab-header,#asa .loading-overlay,#asa .manual-add-btn,#asa .manual-bet-type-btn.active,#asa .manual-check.checked,#asa .manual-generate-btn,#asa .menu-overlay,#asa .menu-panel,#asa .mid-footer,#asa .mid-footer .brand::after,#asa .odds-diag-card,#asa .odds-diag-card:active,#asa .odds-diag-footer,#asa .odds-diag-header,#asa .odds-type-btn.active,#asa .omk-cancel,#asa .omk-cancel:active,#asa .omk-trans,#asa .point-card,#asa .result-footer,#asa .result-header,#asa .rt-bottom-zone,#asa .rt-fixed-genbar,#asa .rt-fixed-genbtn.tenkai-genbtn,#asa .rt-footer.races-footer,#asa .rt-header,#asa .rt-lineup-bar,#asa .rt-point-box,#asa .tk-overlay,#asa .url-fetch-btn,#asa .url-fetch-btn:not(:disabled):hover,#asa .venues-footer,body,body::before,html{background-color:#fff !important;background-image:linear-gradient(180deg,#ffffff,#fffaf3) !important;}
+#asa #admCode,#asa #screen-admin,#asa #screen-compress-test,#asa #screen-odds-diag,#asa #screen-racetable .arebuy-back-label,#asa #screen-racetable .arebuy-table-toggle,#asa #screen-racetable .bubbly-button,#asa #screen-racetable .crt-c-genbtn,#asa #screen-racetable .custom-line-header,#asa #screen-racetable .custom-line-hint,#asa #screen-racetable .custom-line-sep,#asa #screen-racetable .custom-line-top,#asa #screen-racetable .custom-reset-btn,#asa #screen-racetable .custom-role-label,#asa #screen-racetable .custom-role-tanki,#asa #screen-racetable .custom-selection-empty,#asa #screen-racetable .custom-selection-name,#asa #screen-racetable .custom-selection-points,#asa #screen-racetable .custom-selection-role,#asa #screen-racetable .custom-step-label,#asa #screen-racetable .grt-cm-a,#asa #screen-racetable .grt-cm-head,#asa #screen-racetable .grt-cm-name,#asa #screen-racetable .grt-cm-q,#asa #screen-racetable .grt-cm-srclabel,#asa #screen-racetable .grt-cm-state,#asa #screen-racetable .grt-ex-cattab,#asa #screen-racetable .grt-ex-cattab.active,#asa #screen-racetable .grt-ex-pct,#asa #screen-racetable .grt-ex-ratio,#asa #screen-racetable .grt-ex-state,#asa #screen-racetable .grt-ex-table tbody td,#asa #screen-racetable .grt-ex-table thead th,#asa #screen-racetable .grt-ex-table thead th.ex-col-name,#asa #screen-racetable .grt-ex-table thead th.ex-col-num,#asa #screen-racetable .manual-add-btn,#asa #screen-racetable .manual-add-btn:disabled,#asa #screen-racetable .manual-bet-arrow,#asa #screen-racetable .manual-bet-combo,#asa #screen-racetable .manual-bet-odds,#asa #screen-racetable .manual-bet-type-btn,#asa #screen-racetable .manual-bet-type-btn.active,#asa #screen-racetable .manual-bets-count,#asa #screen-racetable .manual-bets-empty,#asa #screen-racetable .manual-bets-list,#asa #screen-racetable .manual-form-header,#asa #screen-racetable .manual-generate-btn,#asa #screen-racetable .manual-generate-btn:disabled,#asa #screen-racetable .manual-mark-text,#asa #screen-racetable .manual-odds-title,#asa #screen-racetable .manual-output-btn,#asa #screen-racetable .manual-output-btn:disabled,#asa #screen-racetable .manual-player-info,#asa #screen-racetable .manual-player-name,#asa #screen-racetable .manual-reset-btn,#asa #screen-racetable .manual-sheet,#asa #screen-racetable .manual-stacked-count,#asa #screen-racetable .manual-stacked-delete,#asa #screen-racetable .manual-stacked-empty,#asa #screen-racetable .manual-stacked-formation,#asa #screen-racetable .manual-stacked-header,#asa #screen-racetable .manual-table tbody td,#asa #screen-racetable .manual-table thead th,#asa #screen-racetable .manual-td-mark,#asa #screen-racetable .manual-td-name,#asa #screen-racetable .manual-td-score,#asa #screen-racetable .manual-th-check,#asa #screen-racetable .manual-th-mark,#asa #screen-racetable .manual-th-name,#asa #screen-racetable .manual-th-num,#asa #screen-racetable .manual-th-score,#asa #screen-racetable .manual-th-spacer-l,#asa #screen-racetable .manual-total-points,#asa #screen-racetable .odds-diag-empty,#asa #screen-racetable .odds-diag-title,#asa #screen-racetable .odds-type-btn,#asa #screen-racetable .odds-type-btn.active,#asa #screen-racetable .odds-type-sep,#asa #screen-racetable .rt-ai-mark,#asa #screen-racetable .rt-ai-mark.c20,#asa #screen-racetable .rt-ai-mark.caretta,#asa #screen-racetable .rt-ai-mark.cbatsu,#asa #screen-racetable .rt-ai-mark.ckuro,#asa #screen-racetable .rt-ai-mark.csankaku,#asa #screen-racetable .rt-ai-mark.cstar1,#asa #screen-racetable .rt-ai-mark.cstar2,#asa #screen-racetable .rt-ai-mark.ctan,#asa #screen-racetable .rt-ai-mark.rt-ai-renka,#asa #screen-racetable .rt-are-inline-num,#asa #screen-racetable .rt-are-inline-title,#asa #screen-racetable .rt-are-inline-unit,#asa #screen-racetable .rt-back-arrow,#asa #screen-racetable .rt-conditions,#asa #screen-racetable .rt-cup-bar,#asa #screen-racetable .rt-home-btn,#asa #screen-racetable .rt-lineup-body,#asa #screen-racetable .rt-lineup-lbl,#asa #screen-racetable .rt-lineup-mark,#asa #screen-racetable .rt-nval,#asa #screen-racetable .rt-nval.dash,#asa #screen-racetable .rt-odds-dash,#asa #screen-racetable .rt-odds-loading,#asa #screen-racetable .rt-odds-mark-label,#asa #screen-racetable .rt-odds-rank,#asa #screen-racetable .rt-odds-refresh,#asa #screen-racetable .rt-odds-time,#asa #screen-racetable .rt-odds-title,#asa #screen-racetable .rt-odds-value,#asa #screen-racetable .rt-pct,#asa #screen-racetable .rt-pname,#asa #screen-racetable .rt-pname-sub,#asa #screen-racetable .rt-point-box,#asa #screen-racetable .rt-pt,#asa #screen-racetable .rt-race-btn-class,#asa #screen-racetable .rt-race-btn-deadline,#asa #screen-racetable .rt-race-btn-num,#asa #screen-racetable .rt-race-class,#asa #screen-racetable .rt-race-num,#asa #screen-racetable .rt-rate,#asa #screen-racetable .rt-recent-box,#asa #screen-racetable .rt-recent-box *,#asa #screen-racetable .rt-recent-mark,#asa #screen-racetable .rt-recent-venue,#asa #screen-racetable .rt-sty,#asa #screen-racetable .rt-subtab,#asa #screen-racetable .rt-subtab.active,#asa #screen-racetable .rt-tab,#asa #screen-racetable .rt-tab-body td,#asa #screen-racetable .rt-tab-body th,#asa #screen-racetable .rt-tab.active,#asa #screen-racetable .rt-tab:hover,#asa #screen-racetable .rt-tab[data-tab="auto"].active,#asa #screen-racetable .rt-tab[data-tab="comment"].active,#asa #screen-racetable .rt-tab[data-tab="custom"].active,#asa #screen-racetable .rt-tab[data-tab="data"].active,#asa #screen-racetable .rt-tab[data-tab="gen"].active,#asa #screen-racetable .rt-tab[data-tab="manual"].active,#asa #screen-racetable .rt-tab[data-tab="odds"].active,#asa #screen-racetable .rt-tab[data-tab="result"].active,#asa #screen-racetable .rt-table tbody td,#asa #screen-racetable .rt-table thead th,#asa #screen-racetable .rt-table thead th.rt-col-name,#asa #screen-racetable .rt-table thead th.rt-col-num,#asa #screen-racetable .rt-time-lbl,#asa #screen-racetable .rt-time-val,#asa #screen-racetable .rt-top,#asa #screen-racetable .rt-venue-name,#asa #screen-racetable button.manual-btn,#asa #screen-racetable button.manual-btn:disabled,#asa #screen-racetable.arebuy-mode .arebuy-back-label,#asa #screen-result .result-back,#asa #screen-result .result-bet-card-header,#asa #screen-result .result-header-title,#asa .adm-btn,#asa .adm-btn.sub,#asa .adm-card .v,#asa .adm-head h2,#asa .adm-row span:last-child,#asa .adm-vname,#asa .adm-vroi,#asa .adm-vroi.plus,#asa .are-result-wide-sep,#asa .are-results-btn,#asa .arerace-back-btn,#asa .arerace-card-deadline,#asa .arerace-card-formation,#asa .arerace-card-pct,#asa .arerace-card-rnum,#asa .arerace-card-venue,#asa .arerace-finished-btn,#asa .arerace-finished-tag,#asa .arerace-footer,#asa .arerace-header-title,#asa .arerace-home-btn,#asa .arerace-load-btn,#asa .arerace-loading-text,#asa .bet-card-user-x,#asa .bet-code-block,#asa .bet-code-close,#asa .bet-code-copy,#asa .bet-code-header,#asa .bet-result-close,#asa .bet-result-code,#asa .bet-result-copy,#asa .bet-result-header,#asa .bet-share-badge.points,#asa .car-2,#asa .car-3,#asa .car-4,#asa .car-6,#asa .car-7,#asa .car-8,#asa .car-9,#asa .card-picker-pattern,#asa .card-picker-title,#asa .crt-bets .crt-sep,#asa .crt-block-title,#asa .crt-block-title .crt-pt,#asa .crt-c-genbtn,#asa .crt-c-head,#asa .crt-card *,#asa .crt-card .crt-mk-red,#asa .crt-card .crt-mk-rose,#asa .crt-card-head,#asa .crt-chip,#asa .crt-section-head,#asa .ct-back-btn,#asa .ct-error,#asa .ct-input,#asa .ct-result-list,#asa .ct-result-stat,#asa .ct-result-stat .ok,#asa .ct-result-title,#asa .ct-run-btn,#asa .ct-sample-btn,#asa .ct-verify.ng,#asa .ct-verify.ok,#asa .custom-line-car,#asa .custom-role-tanki,#asa .dc-back-btn,#asa .dc-back-btn:active,#asa .dc-footer,#asa .dc-title,#asa .dc-toolbar-btn,#asa .dc-toolbar-btn:active,#asa .gen-transition-text,#asa .hit-payout,#asa .hit-race-points,#asa .hit-venue,#asa .icon-config-back-btn,#asa .icon-config-header,#asa .icon-config-home-btn,#asa .icon-preview-badge,#asa .icon-preview-info-num.taisho,#asa .icon-preview-x,#asa .icon-set-btn,#asa .icon-toast,#asa .icon-upload-btn,#asa .k0 .klabel,#asa .k1 .klabel,#asa .k2 .klabel,#asa .k3 .klabel,#asa .k4 .klabel,#asa .k5 .klabel,#asa .k6 .klabel,#asa .k7 .klabel,#asa .k8 .klabel,#asa .k9 .klabel,#asa .lab-back-btn,#asa .lab-back-btn:active,#asa .lab-footer,#asa .lab-menu-arrow,#asa .lab-title,#asa .manual-add-btn,#asa .manual-bet-type-btn.active,#asa .manual-check.checked::after,#asa .manual-generate-btn,#asa .manual-generate-btn:disabled,#asa .manual-stacked-delete,#asa .manual-th-check.disabled-col,#asa .menu-close-btn,#asa .menu-close-btn:active,#asa .menu-footer,#asa .menu-header-title,#asa .menu-item,#asa .mid-footer .brand,#asa .mid-footer .mid-copy,#asa .mid-footer .mid-nav a,#asa .mid-footer .mid-nav a:hover,#asa .mid-footer .mid-nav span,#asa .mid-footer .mid-nav span:hover,#asa .odds-diag-back-btn,#asa .odds-diag-card-meta,#asa .odds-diag-card-meta .ok,#asa .odds-diag-card-meta .warn,#asa .odds-diag-card-title,#asa .odds-type-btn.active,#asa .odds-type-sep,#asa .omk-cancel,#asa .omk-copy.copied,#asa .omk-done,#asa .omk-guide,#asa .omk-thinking,#asa .point-card,#asa .result-code-copy.copied,#asa .result-code-pattern,#asa .result-code-title,#asa .result-header-title,#asa .result-odds-car,#asa .result-odds-group-count,#asa .result-odds-group-title,#asa .rt-back-arrow,#asa .rt-back-arrow:active,#asa .rt-fixed-genbtn.tenkai-genbtn,#asa .rt-footer-copy,#asa .rt-footer-link,#asa .rt-footer-link:hover,#asa .rt-generate-label,#asa .rt-generate-suffix,#asa .rt-header-deadline,#asa .rt-header-info,#asa .rt-home-btn,#asa .rt-home-btn:active,#asa .rt-lineup-bar .rt-lineup-arrow,#asa .rt-lineup-bar .rt-lineup-lbl,#asa .rt-lineup-bar .rt-lineup-mark.c20,#asa .rt-lineup-bar .rt-lineup-mark.caretta,#asa .rt-lineup-bar .rt-lineup-mark.cbatsu,#asa .rt-lineup-bar .rt-lineup-mark.ckuro,#asa .rt-lineup-bar .rt-lineup-mark.csankaku,#asa .rt-lineup-bar .rt-lineup-mark.cstar1,#asa .rt-lineup-bar .rt-lineup-mark.cstar2,#asa .rt-lineup-bar .rt-lineup-mark.ctan,#asa .rt-odds-car,#asa .rt-point-arrow,#asa .rt-point-value,#asa .tk-bet-combo,#asa .tk-buy-row,#asa .tk-close,#asa .tk-head-main,#asa .tk-head-main #tkRnum,#asa .tk-honsen .tk-bet-tier,#asa .tk-osae   .tk-bet-tier,#asa .tk-pt-tx,#asa .tk-scn-body,#asa .tk-text-body,#asa .tk-text-row.is-honsen .tk-text-tier,#asa .tk-text-row.is-osae   .tk-text-tier,#asa .toggle-text,#asa .url-add-btn,#asa .url-clear-btn,#asa .url-empty-desc,#asa .url-empty-icon svg,#asa .url-fetch-btn,#asa .url-input-label svg,#asa .url-source-delete,#asa .url-toast,#asa .venue-grade{color:#2B2016 !important;-webkit-text-fill-color:currentColor;}
+#asa #screen-racetable .arebuy-table-scroll,#asa #screen-racetable .arebuy-table-toggle,#asa #screen-racetable .grt-cm-card,#asa #screen-racetable .manual-add-btn,#asa #screen-racetable .manual-generate-btn,#asa #screen-racetable .manual-output-btn,#asa #screen-racetable .odds-type-btn.active,#asa #screen-racetable .rt-card,#asa #screen-racetable .rt-comment-card,#asa #screen-racetable .rt-data-card,#asa #screen-racetable .rt-info-bar,#asa #screen-racetable .rt-lineup-bar,#asa #screen-racetable .rt-odds-card,#asa #screen-racetable .rt-race-btn,#asa #screen-racetable .rt-result-card,#asa #screen-racetable .rt-subtab.active,#asa #screen-racetable .rt-tab.active,#asa #screen-racetable .rt-table-wrap,#asa #screen-racetable button.manual-btn,#asa #screen-result .result-bet-card,#asa .are-result-card,#asa .are-results-btn,#asa .are-results-btn.back-mode,#asa .are-results-btn:active,#asa .are-results-cta-bar,#asa .arerace-load-btn,#asa .arerace-load-btn:active,#asa .arerace-popup,#asa .aretext-load-wrap .aretext-load-btn,#asa .bet-code-card,#asa .bet-result-modal,#asa .bet-share-card,#asa .bubbly-button,#asa .bubbly-button.ready,#asa .bubbly-button:active,#asa .card-picker-card,#asa .crt-card,#asa .dc-btn,#asa .dc-btn:active,#asa .icon-config-header,#asa .icon-set-btn,#asa .lab-code-modal,#asa .lab-menu-card:active,#asa .manual-add-btn,#asa .manual-check.checked,#asa .manual-generate-btn,#asa .omk-copy,#asa .omk-copy:active,#asa .point-card,#asa .result-bet-card,#asa .result-code-card,#asa .result-code-copy,#asa .result-odds-list,#asa .rt-fixed-genbar,#asa .rt-race-btn,#asa .rt-subtab.active,#asa .rt-tab.active,#asa .url-fetch-btn:not(:disabled):hover,#asa .url-toast,#asa .venue-card,#asa .venue-card:active,#asa .venue-grade{box-shadow:0 10px 24px -16px rgba(255,130,20,.4),0 1px 3px rgba(120,70,20,.07) !important;}
 :root{
   --bg:#ffffff; --bg2:#fffaf2; --bg3:#fff4e4;
   --border:rgba(255,160,40,.18); --border2:rgba(255,150,30,.32);
@@ -7590,198 +7594,292 @@ body.omk-shake{animation:omkShake .42s linear;}
 }
 html,body{background:#fff !important;}
 body::before{background:#fff !important;}
-#asa #screen-racetable,#asa #screen-racetable.show,#asa #screen-racetable .rt-content,#asa #screen-racetable .rt-bg,#asa #screen-racetable .rt-panel,#asa #screen-racetable .rt-pane,#asa #screen-racetable .rt-tab-body,#asa #screen-racetable .rt-tab-content,#asa #screen-racetable .rt-tab-panel,#asa #screen-racetable .arebuy-table-scroll,#asa #screen-racetable .rt-table-wrap,#asa #screen-racetable .rt-bottom-zone{background:#fff !important;color:var(--ink) !important;}
-#asa #screen-racetable .rt-header{
+#asa#asa #screen-racetable,#asa#asa #screen-racetable.show,#asa#asa #screen-racetable .rt-content,#asa#asa #screen-racetable .rt-bg,#asa#asa #screen-racetable .rt-panel,#asa#asa #screen-racetable .rt-pane,#asa#asa #screen-racetable .rt-tab-body,#asa#asa #screen-racetable .rt-tab-content,#asa#asa #screen-racetable .rt-tab-panel,#asa#asa #screen-racetable .arebuy-table-scroll,#asa#asa #screen-racetable .rt-table-wrap,#asa#asa #screen-racetable .rt-bottom-zone{background:#fff !important;color:var(--ink) !important;}
+#asa#asa #screen-racetable .rt-header{
   background:rgba(255,255,255,.86) !important;
   -webkit-backdrop-filter:saturate(1.4) blur(14px);backdrop-filter:saturate(1.4) blur(14px);
   border-bottom:1px solid rgba(255,160,40,.14) !important;box-shadow:0 6px 18px -14px rgba(255,130,20,.45) !important;
 }
-#asa #screen-racetable .rt-back-arrow,#asa #screen-racetable .rt-home-btn{color:var(--ink) !important;}
-#asa #screen-racetable .rt-back-arrow svg,#asa #screen-racetable .rt-home-btn svg{stroke:var(--ink) !important;}
-#asa #screen-racetable .rt-header-center,#asa #screen-racetable .rt-header-info,#asa #screen-racetable .rt-header-deadline,#asa #screen-racetable .rt-title-detail{color:var(--ink) !important;}
-#asa #screen-racetable .rt-info-bar{background:#fff !important;}
-#asa #screen-racetable .rt-venue-name{color:var(--ink) !important;text-shadow:none !important;}
-#asa #screen-racetable .rt-race-num{
+#asa#asa #screen-racetable .rt-back-arrow,#asa#asa #screen-racetable .rt-home-btn{color:var(--ink) !important;}
+#asa#asa #screen-racetable .rt-back-arrow svg,#asa#asa #screen-racetable .rt-home-btn svg{stroke:var(--ink) !important;}
+#asa#asa #screen-racetable .rt-header-center,#asa#asa #screen-racetable .rt-header-info,#asa#asa #screen-racetable .rt-header-deadline,#asa#asa #screen-racetable .rt-title-detail{color:var(--ink) !important;}
+#asa#asa #screen-racetable .rt-info-bar{background:#fff !important;}
+#asa#asa #screen-racetable .rt-venue-name{color:var(--ink) !important;text-shadow:none !important;}
+#asa#asa #screen-racetable .rt-race-num{
   background:linear-gradient(180deg,var(--sun-2),var(--sun-3));-webkit-background-clip:text;background-clip:text;
   -webkit-text-fill-color:transparent;color:var(--sun-3) !important;text-shadow:none !important;
 }
-#asa #screen-racetable .rt-race-class{color:var(--ink-2) !important;}
-#asa #screen-racetable .rt-time-lbl{color:var(--ink-3) !important;}
-#asa #screen-racetable .rt-time-val{color:var(--ink) !important;}
-#asa #screen-racetable .rt-grade-badge{box-shadow:0 2px 6px rgba(0,0,0,.16),inset 0 1px 0 rgba(255,255,255,.35) !important;}
-#asa #screen-racetable .rt-cup-bar,#asa #screen-racetable .rt-conditions{background:#fff !important;border-color:rgba(255,160,40,.12) !important;}
-#asa #screen-racetable #rtCupName,#asa #screen-racetable .rt-cond-item{color:var(--ink-2) !important;}
-#asa #screen-racetable .rt-race-selector,#asa #screen-racetable .rt-race-selector.open,#asa #screen-racetable .rt-race-selector-inner{background:#fff !important;}
-#asa #screen-racetable .rt-race-btn{
+#asa#asa #screen-racetable .rt-race-class{color:var(--ink-2) !important;}
+#asa#asa #screen-racetable .rt-time-lbl{color:var(--ink-3) !important;}
+#asa#asa #screen-racetable .rt-time-val{color:var(--ink) !important;}
+#asa#asa #screen-racetable .rt-grade-badge{box-shadow:0 2px 6px rgba(0,0,0,.16),inset 0 1px 0 rgba(255,255,255,.35) !important;}
+#asa#asa #screen-racetable .rt-cup-bar,#asa#asa #screen-racetable .rt-conditions{background:#fff !important;border-color:rgba(255,160,40,.12) !important;}
+#asa#asa #screen-racetable #rtCupName,#asa#asa #screen-racetable .rt-cond-item{color:var(--ink-2) !important;}
+#asa#asa #screen-racetable .rt-race-selector,#asa#asa #screen-racetable .rt-race-selector.open,#asa#asa #screen-racetable .rt-race-selector-inner{background:#fff !important;}
+#asa#asa #screen-racetable .rt-race-btn{
   background:linear-gradient(180deg,#ffffff 0%,#fff6e8 100%) !important;
   border:var(--edge) !important;box-shadow:var(--lift) !important;position:relative;overflow:hidden;
 }
-#asa #screen-racetable .rt-race-btn::before{
+#asa#asa #screen-racetable .rt-race-btn::before{
   content:'';position:absolute;left:0;right:0;top:0;height:48%;
   background:linear-gradient(180deg,rgba(255,255,255,.95),rgba(255,255,255,0));pointer-events:none;
 }
-#asa #screen-racetable .rt-race-btn-num{color:var(--ink) !important;}
-#asa #screen-racetable .rt-race-btn-deadline{color:var(--ink-2) !important;}
-#asa #screen-racetable .rt-race-btn-deadline.countdown{color:var(--red) !important;text-shadow:none !important;}
-#asa #screen-racetable .rt-race-btn-deadline.ended{color:var(--ink-3) !important;}
-#asa #screen-racetable .rt-race-btn-class{color:var(--ink-3) !important;}
-#asa #screen-racetable .rt-race-btn.active{
+#asa#asa #screen-racetable .rt-race-btn-num{color:var(--ink) !important;}
+#asa#asa #screen-racetable .rt-race-btn-deadline{color:var(--ink-2) !important;}
+#asa#asa #screen-racetable .rt-race-btn-deadline.countdown{color:var(--red) !important;text-shadow:none !important;}
+#asa#asa #screen-racetable .rt-race-btn-deadline.ended{color:var(--ink-3) !important;}
+#asa#asa #screen-racetable .rt-race-btn-class{color:var(--ink-3) !important;}
+#asa#asa #screen-racetable .rt-race-btn.active{
   background:linear-gradient(160deg,var(--sun-1) 0%,var(--sun-2) 45%,var(--sun-3) 100%) !important;
   border:1px solid rgba(255,255,255,.7) !important;
   box-shadow:0 1px 0 rgba(255,255,255,.65) inset,0 -6px 14px rgba(200,80,0,.18) inset,
              0 12px 26px -12px rgba(255,120,10,.65),0 0 0 1px rgba(255,150,30,.25) !important;
 }
-#asa #screen-racetable .rt-race-btn.active::before{background:linear-gradient(180deg,rgba(255,255,255,.55),rgba(255,255,255,0)) !important;}
-#asa #screen-racetable .rt-race-btn.active .rt-race-btn-num,#asa #screen-racetable .rt-race-btn.active .rt-race-btn-deadline,#asa #screen-racetable .rt-race-btn.active .rt-race-btn-class{
+#asa#asa #screen-racetable .rt-race-btn.active::before{background:linear-gradient(180deg,rgba(255,255,255,.55),rgba(255,255,255,0)) !important;}
+#asa#asa #screen-racetable .rt-race-btn.active .rt-race-btn-num,#asa#asa #screen-racetable .rt-race-btn.active .rt-race-btn-deadline,#asa#asa #screen-racetable .rt-race-btn.active .rt-race-btn-class{
   color:#fff !important;text-shadow:0 1px 2px rgba(170,70,0,.35) !important;}
-#asa #screen-racetable .rt-race-lamp{background:#22c36b !important;box-shadow:0 0 0 2px #fff,0 0 8px rgba(34,195,107,.75) !important;z-index:2;}
-#asa #screen-racetable .rt-tabs-wrap{background:#fff !important;}
-#asa #screen-racetable .rt-tabs{background:rgba(255,170,60,.1) !important;border:1px solid rgba(255,170,60,.14);}
-#asa #screen-racetable .rt-tab{color:var(--ink-2) !important;background:transparent !important;}
-#asa #screen-racetable .rt-tab.active{
+#asa#asa #screen-racetable .rt-race-lamp{background:#22c36b !important;box-shadow:0 0 0 2px #fff,0 0 8px rgba(34,195,107,.75) !important;z-index:2;}
+#asa#asa #screen-racetable .rt-tabs-wrap{background:#fff !important;}
+#asa#asa #screen-racetable .rt-tabs{background:rgba(255,170,60,.1) !important;border:1px solid rgba(255,170,60,.14);}
+#asa#asa #screen-racetable .rt-tab{color:var(--ink-2) !important;background:transparent !important;}
+#asa#asa #screen-racetable .rt-tab.active{
   background:linear-gradient(180deg,#ffffff,#fffaf2) !important;color:var(--sun-3) !important;
   box-shadow:0 1px 0 #fff inset,0 6px 14px -8px rgba(255,130,20,.5),0 1px 2px rgba(120,70,20,.1) !important;
 }
-#asa #screen-racetable .rt-lineup-bar{background:linear-gradient(180deg,#fffbf4,#fff) !important;border-color:rgba(255,160,40,.14) !important;}
-#asa #screen-racetable .rt-lineup-lbl,#asa #screen-racetable .rt-lineup-arrow,#asa #screen-racetable .rt-lineup-sep{color:var(--ink-2) !important;}
-#asa #screen-racetable .rt-lineup-mark{color:var(--ink) !important;}
-#asa #screen-racetable .rt-lineup-num{box-shadow:0 2px 5px rgba(0,0,0,.16),inset 0 1px 0 rgba(255,255,255,.35) !important;}
-#asa #screen-racetable .rt-are-inline-title{color:var(--ink-3) !important;}
-#asa #screen-racetable .rt-are-inline-num,#asa #screen-racetable .rt-are-inline-unit,#asa #screen-racetable .rt-are-inline-pct{
+#asa#asa #screen-racetable .rt-lineup-bar{background:linear-gradient(180deg,#fffbf4,#fff) !important;border-color:rgba(255,160,40,.14) !important;}
+#asa#asa #screen-racetable .rt-lineup-lbl,#asa#asa #screen-racetable .rt-lineup-arrow,#asa#asa #screen-racetable .rt-lineup-sep{color:var(--ink-2) !important;}
+#asa#asa #screen-racetable .rt-lineup-mark{color:var(--ink) !important;}
+#asa#asa #screen-racetable .rt-lineup-num{box-shadow:0 2px 5px rgba(0,0,0,.16),inset 0 1px 0 rgba(255,255,255,.35) !important;}
+#asa#asa #screen-racetable .rt-are-inline-title{color:var(--ink-3) !important;}
+#asa#asa #screen-racetable .rt-are-inline-num,#asa#asa #screen-racetable .rt-are-inline-unit,#asa#asa #screen-racetable .rt-are-inline-pct{
   background:linear-gradient(180deg,var(--sun-2),var(--sun-3));-webkit-background-clip:text;background-clip:text;
   -webkit-text-fill-color:transparent;color:var(--sun-3) !important;text-shadow:none !important;}
-#asa #screen-racetable .rt-table,#asa #screen-racetable .rt-table tr,#asa #screen-racetable .rt-table td,#asa #screen-racetable .rt-table th{background:#fff !important;color:var(--ink) !important;border-color:rgba(120,80,30,.08) !important;}
-#asa #screen-racetable .rt-table thead th,#asa #screen-racetable .rt-table thead td,#asa #screen-racetable .rt-table tr:first-child th{
+#asa#asa #screen-racetable .rt-table,#asa#asa #screen-racetable .rt-table tr,#asa#asa #screen-racetable .rt-table td,#asa#asa #screen-racetable .rt-table th{background:#fff !important;color:var(--ink) !important;border-color:rgba(120,80,30,.08) !important;}
+#asa#asa #screen-racetable .rt-table thead th,#asa#asa #screen-racetable .rt-table thead td,#asa#asa #screen-racetable .rt-table tr:first-child th{
   background:linear-gradient(180deg,#fff7ea,#fff1dc) !important;color:var(--ink-2) !important;}
-#asa #screen-racetable .rt-table tbody tr:nth-child(even) td{background:var(--row-odd) !important;}
-#asa #screen-racetable .rt-col-fix{background:inherit !important;}
-#asa #screen-racetable .rt-table td.rt-col-fix{background:#fff !important;}
-#asa #screen-racetable .rt-table tbody tr:nth-child(even) td.rt-col-fix{background:var(--row-odd) !important;}
-#asa #screen-racetable .rt-sep-l{border-left-color:rgba(120,80,30,.08) !important;}
-#asa #screen-racetable .rt-sep-r{border-right-color:rgba(120,80,30,.08) !important;}
-#asa #screen-racetable .rt-pname{color:var(--ink) !important;}
-#asa #screen-racetable .rt-pname-sub{color:var(--ink-3) !important;}
-#asa #screen-racetable .rt-pt,#asa #screen-racetable .rt-rate,#asa #screen-racetable .rt-nval,#asa #screen-racetable .rt-sty,#asa #screen-racetable .rt-pct,#asa #screen-racetable .rt-recent-inner,#asa #screen-racetable .rt-recent-venue{color:var(--ink) !important;}
-#asa #screen-racetable .rt-top{color:var(--sun-3) !important;background:linear-gradient(180deg,rgba(255,216,74,.28),rgba(255,178,30,.18)) !important;
+#asa#asa #screen-racetable .rt-table tbody tr:nth-child(even) td{background:var(--row-odd) !important;}
+#asa#asa #screen-racetable .rt-col-fix{background:inherit !important;}
+#asa#asa #screen-racetable .rt-table td.rt-col-fix{background:#fff !important;}
+#asa#asa #screen-racetable .rt-table tbody tr:nth-child(even) td.rt-col-fix{background:var(--row-odd) !important;}
+#asa#asa #screen-racetable .rt-sep-l{border-left-color:rgba(120,80,30,.08) !important;}
+#asa#asa #screen-racetable .rt-sep-r{border-right-color:rgba(120,80,30,.08) !important;}
+#asa#asa #screen-racetable .rt-pname{color:var(--ink) !important;}
+#asa#asa #screen-racetable .rt-pname-sub{color:var(--ink-3) !important;}
+#asa#asa #screen-racetable .rt-pt,#asa#asa #screen-racetable .rt-rate,#asa#asa #screen-racetable .rt-nval,#asa#asa #screen-racetable .rt-sty,#asa#asa #screen-racetable .rt-pct,#asa#asa #screen-racetable .rt-recent-inner,#asa#asa #screen-racetable .rt-recent-venue{color:var(--ink) !important;}
+#asa#asa #screen-racetable .rt-top{color:var(--sun-3) !important;background:linear-gradient(180deg,rgba(255,216,74,.28),rgba(255,178,30,.18)) !important;
   border-radius:4px;box-shadow:none !important;text-shadow:none !important;}
-#asa #screen-racetable .rt-ai-mark{color:var(--ink) !important;}
-#asa #screen-racetable .rt-ai-honmei{color:#E8413C !important;}
-#asa #screen-racetable .rt-ai-taisho{color:#1565C0 !important;}
-#asa #screen-racetable .rt-ai-tanana,#asa #screen-racetable .rt-ai-renka{color:var(--ink-2) !important;}
-#asa #screen-racetable .rt-recent-box{background:#fff !important;border-color:rgba(255,160,40,.2) !important;color:var(--ink) !important;}
-#asa #screen-racetable .rt-bnum{box-shadow:0 1px 3px rgba(0,0,0,.18) !important;}
-#asa #screen-racetable .rt-card,#asa #screen-racetable .rt-data-card,#asa #screen-racetable .rt-comment-card,#asa #screen-racetable .rt-odds-card,#asa #screen-racetable .rt-result-card,#asa #screen-racetable .odds-card,#asa #screen-racetable .result-bet-card,#asa #screen-racetable .rt-odds-container,#asa #screen-racetable .rt-odds-wrap,#asa #screen-racetable .odds-wrap,#asa #screen-racetable .rt-result-content,#asa #screen-racetable .result-content,#asa #screen-racetable .rt-sanrentan-box,#asa #screen-racetable .rt-payout-table{
+#asa#asa #screen-racetable .rt-ai-mark{color:var(--ink) !important;}
+#asa#asa #screen-racetable .rt-ai-honmei{color:#E8413C !important;}
+#asa#asa #screen-racetable .rt-ai-taisho{color:#1565C0 !important;}
+#asa#asa #screen-racetable .rt-ai-tanana,#asa#asa #screen-racetable .rt-ai-renka{color:var(--ink-2) !important;}
+#asa#asa #screen-racetable .rt-recent-box{background:#fff !important;border-color:rgba(255,160,40,.2) !important;color:var(--ink) !important;}
+#asa#asa #screen-racetable .rt-bnum{box-shadow:0 1px 3px rgba(0,0,0,.18) !important;}
+#asa#asa #screen-racetable .rt-card,#asa#asa #screen-racetable .rt-data-card,#asa#asa #screen-racetable .rt-comment-card,#asa#asa #screen-racetable .rt-odds-card,#asa#asa #screen-racetable .rt-result-card,#asa#asa #screen-racetable .odds-card,#asa#asa #screen-racetable .result-bet-card,#asa#asa #screen-racetable .rt-odds-container,#asa#asa #screen-racetable .rt-odds-wrap,#asa#asa #screen-racetable .odds-wrap,#asa#asa #screen-racetable .rt-result-content,#asa#asa #screen-racetable .result-content,#asa#asa #screen-racetable .rt-sanrentan-box,#asa#asa #screen-racetable .rt-payout-table{
   background:var(--glass) !important;border:var(--edge) !important;box-shadow:var(--lift) !important;color:var(--ink) !important;}
-#asa #screen-racetable [class^="rt-odds-"],#asa #screen-racetable [class^="rt-result-"],#asa #screen-racetable [class^="rt-payout-"],#asa #screen-racetable [class^="rt-sanrentan-"],#asa #screen-racetable [class^="rt-place-"],#asa #screen-racetable [class^="odds-"],#asa #screen-racetable [class^="ex-"],#asa #screen-racetable .rt-empty-state,#asa #screen-racetable .rt-unavailable-state{color:var(--ink) !important;}
-#asa #screen-racetable .rt-odds-title,#asa #screen-racetable .rt-result-title,#asa #screen-racetable .rt-odds-time,#asa #screen-racetable .rt-odds-rank,#asa #screen-racetable .rt-sanrentan-label,#asa #screen-racetable .rt-sanrentan-ninki,#asa #screen-racetable .rt-payout-type,#asa #screen-racetable .rt-place-rank{color:var(--ink-2) !important;}
-#asa #screen-racetable .rt-odds-value,#asa #screen-racetable .rt-payout-amount,#asa #screen-racetable .rt-sanrentan-payout-amount{color:var(--sun-3) !important;}
-#asa #screen-racetable .odds-type-btn{background:#fff !important;border:var(--edge) !important;color:var(--ink-2) !important;}
-#asa #screen-racetable .odds-type-btn.active{background:linear-gradient(160deg,var(--sun-1),var(--sun-3)) !important;color:#fff !important;border-color:rgba(255,255,255,.6) !important;
+#asa#asa #screen-racetable .rt-empty-state,#asa#asa #screen-racetable .rt-unavailable-state{color:var(--ink) !important;}
+#asa#asa #screen-racetable .rt-odds-title,#asa#asa #screen-racetable .rt-result-title,#asa#asa #screen-racetable .rt-odds-time,#asa#asa #screen-racetable .rt-odds-rank,#asa#asa #screen-racetable .rt-sanrentan-label,#asa#asa #screen-racetable .rt-sanrentan-ninki,#asa#asa #screen-racetable .rt-payout-type,#asa#asa #screen-racetable .rt-place-rank{color:var(--ink-2) !important;}
+#asa#asa #screen-racetable .rt-odds-value,#asa#asa #screen-racetable .rt-payout-amount,#asa#asa #screen-racetable .rt-sanrentan-payout-amount{color:var(--sun-3) !important;}
+#asa#asa #screen-racetable .odds-type-btn{background:#fff !important;border:var(--edge) !important;color:var(--ink-2) !important;}
+#asa#asa #screen-racetable .odds-type-btn.active{background:linear-gradient(160deg,var(--sun-1),var(--sun-3)) !important;color:#fff !important;border-color:rgba(255,255,255,.6) !important;
   box-shadow:0 8px 18px -10px rgba(255,120,10,.6) !important;}
-#asa #screen-racetable table th,#asa #screen-racetable table td{color:var(--ink);}
-#asa #screen-racetable .rt-result-spinner{border-color:rgba(255,170,60,.2) !important;border-top-color:var(--sun-3) !important;}
-#asa #screen-racetable .rt-c1,#asa #tenkaiOverlay .rt-c1{color:#333 !important;}
-#asa #screen-racetable .rt-c2,#asa #tenkaiOverlay .rt-c2{color:#fff !important;}
-#asa #screen-racetable .rt-c3{color:#fff !important;}
-#asa #screen-racetable .rt-c4{color:#fff !important;}
-#asa #screen-racetable .rt-c5{color:#333 !important;}
-#asa #screen-racetable .rt-c6{color:#fff !important;}
-#asa #screen-racetable .rt-c7{color:#fff !important;}
-#asa #screen-racetable .rt-c8{color:#fff !important;}
-#asa #screen-racetable .rt-c9{color:#fff !important;}
-#asa #screen-racetable .rt-lc1{color:#333 !important;}
-#asa #screen-racetable .rt-lc2,#asa #screen-racetable .rt-lc3,#asa #screen-racetable .rt-lc4,#asa #screen-racetable .rt-lc6,#asa #screen-racetable .rt-lc7,#asa #screen-racetable .rt-lc8,#asa #screen-racetable .rt-lc9{color:#fff !important;}
-#asa #screen-racetable .rt-lc5{color:#333 !important;}
-#asa #screen-racetable .rt-fixed-genbar{
+#asa#asa #screen-racetable table th,#asa#asa #screen-racetable table td{color:var(--ink);}
+#asa#asa #screen-racetable .rt-result-spinner{border-color:rgba(255,170,60,.2) !important;border-top-color:var(--sun-3) !important;}
+#asa#asa #screen-racetable .rt-c1,#asa#asa #tenkaiOverlay .rt-c1{color:#333 !important;}
+#asa#asa #screen-racetable .rt-c2,#asa#asa #tenkaiOverlay .rt-c2{color:#fff !important;}
+#asa#asa #screen-racetable .rt-c3{color:#fff !important;}
+#asa#asa #screen-racetable .rt-c4{color:#fff !important;}
+#asa#asa #screen-racetable .rt-c5{color:#333 !important;}
+#asa#asa #screen-racetable .rt-c6{color:#fff !important;}
+#asa#asa #screen-racetable .rt-c7{color:#fff !important;}
+#asa#asa #screen-racetable .rt-c8{color:#fff !important;}
+#asa#asa #screen-racetable .rt-c9{color:#fff !important;}
+#asa#asa #screen-racetable .rt-lc1{color:#333 !important;}
+#asa#asa #screen-racetable .rt-lc2,#asa#asa #screen-racetable .rt-lc3,#asa#asa #screen-racetable .rt-lc4,#asa#asa #screen-racetable .rt-lc6,#asa#asa #screen-racetable .rt-lc7,#asa#asa #screen-racetable .rt-lc8,#asa#asa #screen-racetable .rt-lc9{color:#fff !important;}
+#asa#asa #screen-racetable .rt-lc5{color:#333 !important;}
+#asa#asa #screen-racetable .rt-fixed-genbar{
   background:rgba(255,255,255,.82) !important;
   -webkit-backdrop-filter:saturate(1.4) blur(16px);backdrop-filter:saturate(1.4) blur(16px);
   border-top:1px solid rgba(255,160,40,.14);box-shadow:0 -10px 26px -18px rgba(255,130,20,.55) !important;
 }
-#asa #screen-racetable .rt-fixed-genbtn,#asa .tenkai-genbtn{
+#asa#asa #screen-racetable .rt-fixed-genbtn,#asa#asa .tenkai-genbtn{
   background:linear-gradient(160deg,var(--sun-1) 0%,var(--sun-2) 46%,var(--sun-3) 100%) !important;
   color:#fff !important;border:1px solid rgba(255,255,255,.65) !important;
   text-shadow:0 1px 2px rgba(160,60,0,.35) !important;position:relative;overflow:hidden;
   box-shadow:0 1px 0 rgba(255,255,255,.7) inset,0 -8px 16px rgba(190,70,0,.2) inset,
              0 14px 30px -12px rgba(255,120,10,.7),0 0 22px -6px rgba(255,170,40,.55) !important;
 }
-#asa #screen-racetable .rt-fixed-genbtn::before,#asa .tenkai-genbtn::before{
+#asa#asa #screen-racetable .rt-fixed-genbtn::before,#asa#asa .tenkai-genbtn::before{
   content:'' !important;position:absolute;left:6%;right:6%;top:2px;height:46%;border-radius:12px 12px 20px 20px;
   background:linear-gradient(180deg,rgba(255,255,255,.62),rgba(255,255,255,0)) !important;pointer-events:none;
 }
-#asa .mid-footer,#asa #screen-racetable .rt-footer,#asa #screen-racetable .rt-footer-minimal{background:#fff !important;border-top:1px solid rgba(255,160,40,.14) !important;}
-#asa .mid-footer .brand{color:var(--ink) !important;}
-#asa .mid-footer .brand::after{background:linear-gradient(90deg,var(--sun-1),var(--sun-3)) !important;box-shadow:0 0 8px rgba(255,150,30,.5);}
-#asa .mid-divider,#asa #screen-racetable .rt-footer-divider{background:rgba(255,160,40,.14) !important;}
-#asa .mid-nav a,#asa .mid-nav span,#asa .js-to-top,#asa #screen-racetable .rt-footer-link{color:var(--ink-2) !important;}
-#asa .mid-nav .js-admin-lock svg{stroke:var(--ink-2) !important;}
-#asa .mid-copy,#asa #screen-racetable .rt-footer-copy{color:var(--ink-3) !important;}
-#asa .url-toast{background:rgba(255,255,255,.95) !important;color:var(--ink) !important;border:var(--edge);
+#asa#asa .mid-footer,#asa#asa #screen-racetable .rt-footer,#asa#asa #screen-racetable .rt-footer-minimal{background:#fff !important;border-top:1px solid rgba(255,160,40,.14) !important;}
+#asa#asa .mid-footer .brand{color:var(--ink) !important;}
+#asa#asa .mid-footer .brand::after{background:linear-gradient(90deg,var(--sun-1),var(--sun-3)) !important;box-shadow:0 0 8px rgba(255,150,30,.5);}
+#asa#asa .mid-divider,#asa#asa #screen-racetable .rt-footer-divider{background:rgba(255,160,40,.14) !important;}
+#asa#asa .mid-nav a,#asa#asa .mid-nav span,#asa#asa .js-to-top,#asa#asa #screen-racetable .rt-footer-link{color:var(--ink-2) !important;}
+#asa#asa .mid-nav .js-admin-lock svg{stroke:var(--ink-2) !important;}
+#asa#asa .mid-copy,#asa#asa #screen-racetable .rt-footer-copy{color:var(--ink-3) !important;}
+#asa#asa .url-toast{background:rgba(255,255,255,.95) !important;color:var(--ink) !important;border:var(--edge);
   -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);box-shadow:0 14px 34px -14px rgba(255,120,10,.45),0 2px 8px rgba(0,0,0,.06) !important;}
-#asa #toastMessage{color:var(--ink) !important;}
-#asa .boot-blackout,#asa .loading-overlay,#asa #loadingOverlay,#asa .gen-transition-overlay,#asa .gen-transition-bg{background:#fff !important;}
-#asa .boot-blackout-logo,#asa .loading-logo,#asa .gen-transition-logo{filter:drop-shadow(0 8px 18px rgba(255,140,20,.3));}
-#asa .boot-blackout-logo.visible{opacity:1 !important;}
-#asa .loading-logo{opacity:1 !important;}
-#asa .gen-transition-text,#asa .gen-transition-loading{color:var(--ink-2) !important;}
-#asa .tk-overlay{
+#asa#asa #toastMessage{color:var(--ink) !important;}
+#asa#asa .boot-blackout,#asa#asa .loading-overlay,#asa#asa #loadingOverlay,#asa#asa .gen-transition-overlay,#asa#asa .gen-transition-bg{background:#fff !important;}
+#asa#asa .boot-blackout-logo,#asa#asa .loading-logo,#asa#asa .gen-transition-logo,#asa#asa #screen-racetable .arebuy-loading-logo{filter:none !important;}
+#asa#asa .boot-blackout-logo{width:76px !important;}
+#asa#asa .loading-logo,#asa#asa .gen-transition-logo{width:82px !important;}
+#asa#asa .boot-blackout-logo.visible{opacity:.82 !important;}
+#asa#asa .loading-logo,#asa#asa .gen-transition-logo{opacity:.82 !important;}
+#asa#asa .gen-transition-text,#asa#asa .gen-transition-loading{color:var(--ink-2) !important;}
+#asa#asa .tk-overlay{
   background:
     radial-gradient(120% 60% at 50% 0%,rgba(255,216,74,.28) 0%,rgba(255,255,255,0) 60%),
     linear-gradient(180deg,#ffffff 0%,#fffaf2 100%) !important;
   -webkit-backdrop-filter:none;backdrop-filter:none;
 }
-#asa .tk-close{color:var(--ink-2) !important;background:rgba(255,255,255,.8) !important;border:var(--edge) !important;box-shadow:var(--lift) !important;}
-#asa .tk-head,#asa .tk-head-main,#asa #tkVenue,#asa #tkRnum{color:var(--ink) !important;text-shadow:none !important;}
-#asa #tkRnum{background:linear-gradient(180deg,var(--sun-2),var(--sun-3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
-#asa .tk-head-sub,#asa #tkClass,#asa #tkDeadline{color:var(--ink-2) !important;}
-#asa .tk-ic{box-shadow:0 3px 8px rgba(0,0,0,.16),inset 0 1px 0 rgba(255,255,255,.35) !important;}
-#asa .tk-sec-h{color:var(--ink-2) !important;border-color:rgba(255,160,40,.18) !important;}
-#asa .tk-pat{background:linear-gradient(160deg,var(--sun-1),var(--sun-3)) !important;color:#fff !important;border:none !important;
+#asa#asa .tk-close{color:var(--ink-2) !important;background:rgba(255,255,255,.8) !important;border:var(--edge) !important;box-shadow:var(--lift) !important;}
+#asa#asa .tk-head,#asa#asa .tk-head-main,#asa#asa #tkVenue,#asa#asa #tkRnum{color:var(--ink) !important;text-shadow:none !important;}
+#asa#asa #tkRnum{background:linear-gradient(180deg,var(--sun-2),var(--sun-3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+#asa#asa .tk-head-sub,#asa#asa #tkClass,#asa#asa #tkDeadline{color:var(--ink-2) !important;}
+#asa#asa .tk-ic{box-shadow:0 3px 8px rgba(0,0,0,.16),inset 0 1px 0 rgba(255,255,255,.35) !important;}
+#asa#asa .tk-sec-h{color:var(--ink-2) !important;border-color:rgba(255,160,40,.18) !important;}
+#asa#asa .tk-pat{background:linear-gradient(160deg,var(--sun-1),var(--sun-3)) !important;color:#fff !important;border:none !important;
   box-shadow:0 6px 14px -8px rgba(255,120,10,.7) !important;text-shadow:0 1px 1px rgba(160,60,0,.3);}
-#asa .tk-pt{color:var(--ink) !important;}
-#asa .tk-pt-tx{color:var(--ink) !important;}
-#asa .tk-buy-row{
+#asa#asa .tk-pt{color:var(--ink) !important;}
+#asa#asa .tk-pt-tx{color:var(--ink) !important;}
+#asa#asa .tk-buy-row{
   background:var(--glass) !important;color:var(--ink) !important;border:var(--edge) !important;
   box-shadow:0 1px 0 #fff inset,0 12px 26px -18px rgba(255,120,10,.55),0 1px 3px rgba(120,70,20,.06) !important;
   position:relative;overflow:hidden;
 }
-#asa .tk-buy-row::before{content:'';position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;
+#asa#asa .tk-buy-row::before{content:'';position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;
   background:linear-gradient(180deg,var(--sun-1),var(--sun-3));box-shadow:0 0 10px rgba(255,150,30,.6);}
-#asa .tk-text,#asa .tk-text-body,#asa .tk-text-row,#asa .tk-bet,#asa .tk-bet-combo{color:var(--ink) !important;}
-#asa .tk-footer{color:var(--ink-3) !important;}
-#asa #screen-admin{background:#fff !important;color:var(--ink) !important;}
-#asa .adm-head{background:rgba(255,255,255,.9) !important;border-bottom:1px solid rgba(255,160,40,.14) !important;
+#asa#asa .tk-text,#asa#asa .tk-text-body,#asa#asa .tk-text-row,#asa#asa .tk-bet,#asa#asa .tk-bet-combo{color:var(--ink) !important;}
+#asa#asa .tk-footer{color:var(--ink-3) !important;}
+#asa#asa #screen-admin{background:#fff !important;color:var(--ink) !important;}
+#asa#asa .adm-head{background:rgba(255,255,255,.9) !important;border-bottom:1px solid rgba(255,160,40,.14) !important;
   -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);}
-#asa .adm-head h2{color:var(--ink) !important;}
-#asa .adm-back{color:var(--ink-2) !important;}
-#asa .adm-sec-h{color:var(--ink-3) !important;}
-#asa .adm-btn{background:linear-gradient(160deg,var(--sun-1) 0%,var(--sun-2) 46%,var(--sun-3) 100%) !important;color:#fff !important;
+#asa#asa .adm-head h2{color:var(--ink) !important;}
+#asa#asa .adm-back{color:var(--ink-2) !important;}
+#asa#asa .adm-sec-h{color:var(--ink-3) !important;}
+#asa#asa .adm-btn{background:linear-gradient(160deg,var(--sun-1) 0%,var(--sun-2) 46%,var(--sun-3) 100%) !important;color:#fff !important;
   border:1px solid rgba(255,255,255,.6) !important;text-shadow:0 1px 2px rgba(160,60,0,.3);
   box-shadow:0 1px 0 rgba(255,255,255,.6) inset,0 10px 22px -12px rgba(255,120,10,.65) !important;}
-#asa .adm-btn.sub{background:var(--glass) !important;color:var(--ink) !important;border:var(--edge) !important;text-shadow:none;box-shadow:var(--lift) !important;}
-#asa .adm-log{background:#fffaf2 !important;border:var(--edge) !important;color:var(--ink-2) !important;}
-#asa .adm-card,#asa .adm-vrow{background:var(--glass) !important;border:var(--edge) !important;box-shadow:var(--lift) !important;}
-#asa .adm-card .k,#asa .adm-vsub{color:var(--ink-3) !important;}
-#asa .adm-card .v,#asa .adm-vname,#asa .adm-row span:last-child{color:var(--ink) !important;}
-#asa .adm-vroi{color:var(--ink-2) !important;}
-#asa .adm-vroi.plus{color:#16a35a !important;}
-#asa .adm-row{border-bottom-color:rgba(120,80,30,.08) !important;color:var(--ink-2);}
-#asa #admGate{background:rgba(255,255,255,.94) !important;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);}
-#asa .adm-gate-box .t{color:var(--ink-2) !important;}
-#asa #admCode{background:#fff !important;border:1px solid rgba(255,170,60,.45) !important;color:var(--ink) !important;}
-#asa #screen-racetable *{text-shadow:none !important;}
-#asa .tk-overlay *{text-shadow:none !important;}
-#asa #screen-racetable .rt-fixed-genbtn,#asa .tenkai-genbtn{
+#asa#asa .adm-btn.sub{background:var(--glass) !important;color:var(--ink) !important;border:var(--edge) !important;text-shadow:none;box-shadow:var(--lift) !important;}
+#asa#asa .adm-log{background:#fffaf2 !important;border:var(--edge) !important;color:var(--ink-2) !important;}
+#asa#asa .adm-card,#asa#asa .adm-vrow{background:var(--glass) !important;border:var(--edge) !important;box-shadow:var(--lift) !important;}
+#asa#asa .adm-card .k,#asa#asa .adm-vsub{color:var(--ink-3) !important;}
+#asa#asa .adm-card .v,#asa#asa .adm-vname,#asa#asa .adm-row span:last-child{color:var(--ink) !important;}
+#asa#asa .adm-vroi{color:var(--ink-2) !important;}
+#asa#asa .adm-vroi.plus{color:#16a35a !important;}
+#asa#asa .adm-row{border-bottom-color:rgba(120,80,30,.08) !important;color:var(--ink-2);}
+#asa#asa #admGate{background:rgba(255,255,255,.94) !important;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);}
+#asa#asa .adm-gate-box .t{color:var(--ink-2) !important;}
+#asa#asa #admCode{background:#fff !important;border:1px solid rgba(255,170,60,.45) !important;color:var(--ink) !important;}
+#asa#asa #screen-racetable *{text-shadow:none !important;}
+#asa#asa .tk-overlay *{text-shadow:none !important;}
+#asa#asa #screen-racetable .rt-fixed-genbtn,#asa#asa .tenkai-genbtn{
   background:linear-gradient(160deg,#FFC73A 0%,#FF9E1E 48%,#FF7414 100%) !important;
   text-shadow:0 1px 2px rgba(150,55,0,.45) !important;letter-spacing:.14em !important;
 }
-#asa #screen-racetable .rt-fixed-genbtn::before,#asa .tenkai-genbtn::before{
+#asa#asa #screen-racetable .rt-fixed-genbtn::before,#asa#asa .tenkai-genbtn::before{
   left:10% !important;right:10% !important;top:1px !important;height:40% !important;border-radius:14px 14px 30px 30px !important;
   background:linear-gradient(180deg,rgba(255,255,255,.38),rgba(255,255,255,0)) !important;
 }
-#asa #screen-racetable .rt-race-btn.active .rt-race-btn-num,#asa #screen-racetable .rt-race-btn.active .rt-race-btn-deadline,#asa #screen-racetable .rt-race-btn.active .rt-race-btn-class,#asa .adm-btn,#asa .tk-pat{text-shadow:0 1px 2px rgba(150,55,0,.4) !important;}
-#asa #screen-racetable .rt-info-bar{box-shadow:none !important;}
-#asa #screen-racetable .rt-race-btn > *:not(.rt-race-lamp){position:relative;z-index:1;}
-#asa #screen-racetable .rt-race-lamp{position:absolute !important;top:5px !important;right:5px !important;}
+#asa#asa #screen-racetable .rt-race-btn.active .rt-race-btn-num,#asa#asa #screen-racetable .rt-race-btn.active .rt-race-btn-deadline,#asa#asa #screen-racetable .rt-race-btn.active .rt-race-btn-class,#asa#asa .adm-btn,#asa#asa .tk-pat{text-shadow:0 1px 2px rgba(150,55,0,.4) !important;}
+#asa#asa #screen-racetable .rt-info-bar{box-shadow:none !important;}
+#asa#asa #screen-racetable .rt-race-btn > *:not(.rt-race-lamp){position:relative;z-index:1;}
+#asa#asa #screen-racetable .rt-race-lamp{position:absolute !important;top:5px !important;right:5px !important;}
+#asa#asa #screen-racetable .grt-ex-tabs,#asa#asa #screen-racetable .grt-ex-wrap,#asa#asa #screen-racetable .grt-cm-wrap{background:#fff !important;color:var(--ink) !important;}
+#asa#asa #screen-racetable .grt-ex-state,#asa#asa #screen-racetable .grt-cm-state,#asa#asa #screen-racetable .grt-cm-srclabel{color:var(--ink-2) !important;background:transparent !important;}
+#asa#asa #screen-racetable .grt-ex-table{background:#fff !important;border-color:rgba(120,80,30,.08) !important;}
+#asa#asa #screen-racetable .grt-ex-table th,#asa#asa #screen-racetable .grt-ex-table td{background:#fff !important;color:var(--ink) !important;border-color:rgba(120,80,30,.08) !important;}
+#asa#asa #screen-racetable .grt-ex-table thead th{background:linear-gradient(180deg,#fff7ea,#fff1dc) !important;color:var(--ink-2) !important;}
+#asa#asa #screen-racetable .grt-ex-table tbody tr:nth-child(even) td{background:var(--row-odd) !important;}
+#asa#asa #screen-racetable .grt-ex-table .ex-col-num,#asa#asa #screen-racetable .grt-ex-table .ex-col-name{background:#fff !important;}
+#asa#asa #screen-racetable .grt-ex-table tbody tr:nth-child(even) .ex-col-num,#asa#asa #screen-racetable .grt-ex-table tbody tr:nth-child(even) .ex-col-name{background:var(--row-odd) !important;}
+#asa#asa #screen-racetable .grt-ex-table .ex-sub-first{border-left-color:rgba(255,150,30,.22) !important;}
+#asa#asa #screen-racetable .grt-cm-card{background:var(--glass) !important;border:var(--edge) !important;box-shadow:var(--lift) !important;color:var(--ink) !important;}
+#asa#asa #screen-racetable .grt-cm-player{color:var(--ink) !important;}
+#asa#asa #screen-racetable .odds-type-selector,#asa#asa #screen-racetable .rt-odds-header,#asa#asa #screen-racetable .rt-odds-sub-row,#asa#asa #screen-racetable .rt-odds-list{background:transparent !important;}
+#asa#asa #screen-racetable .odds-type-sep{color:var(--ink-3) !important;}
+#asa#asa #screen-racetable .rt-odds-row{background:#fff !important;border-color:rgba(120,80,30,.07) !important;color:var(--ink) !important;}
+#asa#asa #screen-racetable .rt-odds-row:nth-child(even){background:var(--row-odd) !important;}
+#asa#asa #screen-racetable .rt-odds-rank,#asa#asa #screen-racetable .rt-odds-time,#asa#asa #screen-racetable .rt-odds-mark-label,#asa#asa #screen-racetable .rt-odds-dash,#asa#asa #screen-racetable .rt-odds-mark-sep{color:var(--ink-2) !important;}
+#asa#asa #screen-racetable .rt-odds-title{color:var(--ink) !important;}
+#asa#asa #screen-racetable .rt-odds-mark-box{color:var(--ink) !important;background:#fff !important;border-color:rgba(255,160,40,.3) !important;}
+#asa#asa #screen-racetable .rt-odds-refresh{color:var(--sun-3) !important;background:#fff !important;border:var(--edge) !important;}
+#asa#asa #screen-racetable .rt-odds-loading{color:var(--ink-2) !important;}
+#asa#asa #screen-racetable .toggle-switch{background:rgba(120,80,30,.14) !important;}
+#asa#asa #screen-racetable .toggle-text{color:var(--ink-2) !important;}
+#asa#asa #screen-racetable .toggle-knob{background:#fff !important;box-shadow:0 1px 3px rgba(0,0,0,.2) !important;}
+#asa#asa #screen-racetable .rt-result-loading,#asa#asa #screen-racetable .rt-result-empty,#asa#asa #screen-racetable .rt-result-error{color:var(--ink-2) !important;background:transparent !important;}
+#asa#asa #screen-racetable .grt-ex-cattab{background:#fff !important;color:var(--ink-2) !important;border:var(--edge) !important;box-shadow:0 1px 0 #fff inset,0 4px 10px -8px rgba(255,130,20,.45) !important;}
+#asa#asa #screen-racetable .grt-ex-cattab.active{background:linear-gradient(160deg,#FFC73A,#FF7A14) !important;color:#fff !important;border-color:rgba(255,255,255,.6) !important;
+  box-shadow:0 8px 16px -10px rgba(255,120,10,.65) !important;text-shadow:0 1px 1px rgba(150,55,0,.35) !important;}
+/* ---- 枠色・グレード色の復元（競輪の決まり色は変えない） ---- */
+#asa#asa#asa .grade-f1{background:linear-gradient(180deg, #f0a020 0%, #cc7a00 50%, #b86e00 100%) !important}
+#asa#asa#asa .grade-f2{background:linear-gradient(180deg, #2874c0 0%, #1a5a9e 50%, #144a85 100%) !important}
+#asa#asa#asa .grade-g3{background:linear-gradient(180deg, #4caf50 0%, #2e8b32 50%, #1b6e20 100%) !important}
+#asa#asa#asa .grade-g2{background:linear-gradient(180deg, #b040c8 0%, #8e24aa 50%, #6a1b80 100%) !important}
+#asa#asa#asa .grade-g1{background:linear-gradient(180deg, #ef4444 0%, #c62828 50%, #a01e1e 100%) !important}
+#asa#asa#asa .grade-gp{background:linear-gradient(180deg, #ffd700 0%, #d4a800 50%, #b08e00 100%) !important;color:#0f0f0f !important}
+#asa#asa#asa .rt-grade-badge{color:#fff !important}
+#asa#asa#asa .rt-grade-badge.gp{background:linear-gradient(180deg, #ffd700 0%, #d4a800 50%, #b08e00 100%) !important;color:#0f0f0f !important}
+#asa#asa#asa .rt-grade-badge.g1{background:linear-gradient(180deg, #ef4444 0%, #c62828 50%, #a01e1e 100%) !important}
+#asa#asa#asa .rt-grade-badge.g2{background:linear-gradient(180deg, #b040c8 0%, #8e24aa 50%, #6a1b80 100%) !important}
+#asa#asa#asa .rt-grade-badge.g3{background:linear-gradient(180deg, #4caf50 0%, #2e8b32 50%, #1b6e20 100%) !important}
+#asa#asa#asa .rt-grade-badge.f1{background:linear-gradient(180deg, #f0a020 0%, #cc7a00 50%, #b86e00 100%) !important}
+#asa#asa#asa .rt-grade-badge.f2{background:linear-gradient(180deg, #2874c0 0%, #1a5a9e 50%, #144a85 100%) !important}
+#asa#asa#asa .rt-race-lamp{background:#3ddc84 !important}
+#asa#asa#asa .rt-race-lamp.axis{background:#e8830f !important}
+#asa#asa#asa .toggle-switch.on{background:rgba(255,220,100,.7) !important}
+#asa#asa#asa .rt-odds-car.c1{background:#F0F0F0 !important;color:#333 !important}
+#asa#asa#asa .rt-odds-car.c2{background:#333 !important}
+#asa#asa#asa .rt-odds-car.c3{background:#C62828 !important}
+#asa#asa#asa .rt-odds-car.c4{background:#1565C0 !important}
+#asa#asa#asa .rt-odds-car.c5{background:#FFD54F !important;color:#333 !important}
+#asa#asa#asa .rt-odds-car.c6{background:#2E7D32 !important}
+#asa#asa#asa .rt-odds-car.c7{background:#EF6C00 !important}
+#asa#asa#asa .rt-odds-car.c8{background:#FF1493 !important}
+#asa#asa#asa .rt-odds-car.c9{background:#6A1B9A !important}
+#asa#asa#asa .rt-c1{background:#F0F0F0 !important;border-color:#ccc !important;color:#333 !important}
+#asa#asa#asa .rt-c2{background:#333 !important;border-color:#0f0f0f !important;color:#fff !important}
+#asa#asa#asa .rt-c3{background:#C62828 !important;border-color:#9C1C1C !important;color:#fff !important}
+#asa#asa#asa .rt-c4{background:#1565C0 !important;border-color:#0D47A1 !important;color:#fff !important}
+#asa#asa#asa .rt-c5{background:#FFD54F !important;border-color:#E6C200 !important;color:#333 !important}
+#asa#asa#asa .rt-c6{background:#2E7D32 !important;border-color:#1B5E20 !important;color:#fff !important}
+#asa#asa#asa .rt-c7{background:#EF6C00 !important;border-color:#E65100 !important;color:#fff !important}
+#asa#asa#asa .rt-c8{background:#FF1493 !important;border-color:#CC1177 !important;color:#fff !important}
+#asa#asa#asa .rt-c9{background:#6A1B9A !important;border-color:#4A148C !important;color:#fff !important}
+#asa#asa#asa .rt-lc1{background:#F0F0F0 !important;color:#333 !important}
+#asa#asa#asa .rt-lc2{background:#333 !important;color:#fff !important}
+#asa#asa#asa .rt-lc3{background:#C62828 !important;color:#fff !important}
+#asa#asa#asa .rt-lc4{background:#1565C0 !important;color:#fff !important}
+#asa#asa#asa .rt-lc5{background:#FFD54F !important;color:#333 !important}
+#asa#asa#asa .rt-lc6{background:#2E7D32 !important;color:#fff !important}
+#asa#asa#asa .rt-lc7{background:#EF6C00 !important;color:#fff !important}
+#asa#asa#asa .rt-lc8{background:#FF1493 !important;color:#fff !important}
+#asa#asa#asa .rt-lc9{background:#6A1B9A !important;color:#fff !important}
+#asa#asa#asa .result-bet-badge{background:linear-gradient(180deg, rgba(210,85,130,.85) 0%, rgba(224,160,32,.9) 50%, rgba(165,55,90,.95) 100%) !important;color:#fff !important}
+#asa#asa#asa .result-bet-badge.custom{background:linear-gradient(180deg, rgba(80,110,180,.8) 0%, rgba(64,89,153,.85) 50%, rgba(50,70,130,.9) 100%) !important}
+#asa#asa#asa .result-bet-badge.manual{background:linear-gradient(180deg, rgba(20,110,80,.8) 0%, rgba(14,90,68,.85) 50%, rgba(10,70,52,.9) 100%) !important}
+#asa#asa#asa .result-odds-car.c1{background:#F0F0F0 !important;color:#333 !important}
+#asa#asa#asa .result-odds-car.c2{background:#333 !important}
+#asa#asa#asa .result-odds-car.c3{background:#C62828 !important}
+#asa#asa#asa .result-odds-car.c4{background:#1565C0 !important}
+#asa#asa#asa .result-odds-car.c5{background:#FFD54F !important;color:#333 !important}
+#asa#asa#asa .result-odds-car.c6{background:#2E7D32 !important}
+#asa#asa#asa .result-odds-car.c7{background:#EF6C00 !important}
+#asa#asa#asa .result-odds-car.c8{background:#FF1493 !important}
+#asa#asa#asa .result-odds-car.c9{background:#6A1B9A !important}
+#asa#asa#asa .rt-odds-car.c1,#asa#asa#asa .result-odds-car.c1{color:#333 !important;-webkit-text-fill-color:#333 !important;}
+#asa#asa#asa .rt-odds-car.c2,#asa#asa#asa .result-odds-car.c2{color:#fff !important;-webkit-text-fill-color:#fff !important;}
+#asa#asa#asa .rt-odds-car.c3,#asa#asa#asa .result-odds-car.c3{color:#fff !important;-webkit-text-fill-color:#fff !important;}
+#asa#asa#asa .rt-odds-car.c4,#asa#asa#asa .result-odds-car.c4{color:#fff !important;-webkit-text-fill-color:#fff !important;}
+#asa#asa#asa .rt-odds-car.c5,#asa#asa#asa .result-odds-car.c5{color:#333 !important;-webkit-text-fill-color:#333 !important;}
+#asa#asa#asa .rt-odds-car.c6,#asa#asa#asa .result-odds-car.c6{color:#fff !important;-webkit-text-fill-color:#fff !important;}
+#asa#asa#asa .rt-odds-car.c7,#asa#asa#asa .result-odds-car.c7{color:#fff !important;-webkit-text-fill-color:#fff !important;}
+#asa#asa#asa .rt-odds-car.c8,#asa#asa#asa .result-odds-car.c8{color:#fff !important;-webkit-text-fill-color:#fff !important;}
+#asa#asa#asa .rt-odds-car.c9,#asa#asa#asa .result-odds-car.c9{color:#fff !important;-webkit-text-fill-color:#fff !important;}
 </style>
 </head>
 <body>

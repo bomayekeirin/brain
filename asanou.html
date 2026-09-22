@@ -695,8 +695,9 @@ body{background:#fff !important;color:var(--ink) !important;}
 
 /* 起動画面：白。ロゴはそのままの色で、ふわっと光る */
 .mn-boot{background:#fff !important;}
-.mn-boot-logo{width:104px !important;filter:drop-shadow(0 8px 18px rgba(255,140,20,.28));}
-.mn-boot-logo.visible{opacity:1 !important;}
+/* ロゴ：発光なし・少し小さく・若干透過（2026-09-22 ボンバイエ指示） */
+.mn-boot-logo{width:76px !important;filter:none !important;}
+.mn-boot-logo.visible{opacity:.82 !important;}
 
 /* 管理コード入力 */
 #admGate{background:rgba(255,255,255,.94) !important;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);}
