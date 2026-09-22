@@ -7729,7 +7729,7 @@ body::before{background:#fff !important;}
   background:var(--glass) !important;border:var(--edge) !important;box-shadow:var(--lift) !important;color:var(--ink) !important;}
 #asa#asa #screen-racetable .rt-empty-state,#asa#asa #screen-racetable .rt-unavailable-state{color:var(--ink) !important;}
 #asa#asa #screen-racetable .rt-odds-title,#asa#asa #screen-racetable .rt-result-title,#asa#asa #screen-racetable .rt-odds-time,#asa#asa #screen-racetable .rt-odds-rank,#asa#asa #screen-racetable .rt-sanrentan-label,#asa#asa #screen-racetable .rt-sanrentan-ninki,#asa#asa #screen-racetable .rt-payout-type,#asa#asa #screen-racetable .rt-place-rank{color:var(--ink-2) !important;}
-#asa#asa #screen-racetable .rt-odds-value,#asa#asa #screen-racetable .rt-payout-amount,#asa#asa #screen-racetable .rt-sanrentan-payout-amount{color:var(--sun-3) !important;}
+#asa#asa #screen-racetable .rt-payout-amount,#asa#asa #screen-racetable .rt-sanrentan-payout-amount{color:var(--sun-3) !important;}
 #asa#asa #screen-racetable .odds-type-btn{background:#fff !important;border:var(--edge) !important;color:var(--ink-2) !important;}
 #asa#asa #screen-racetable .odds-type-btn.active{background:linear-gradient(160deg,var(--sun-1),var(--sun-3)) !important;color:#fff !important;border-color:rgba(255,255,255,.6) !important;
   box-shadow:0 8px 18px -10px rgba(255,120,10,.6) !important;}
@@ -7866,6 +7866,32 @@ body::before{background:#fff !important;}
 #asa#asa #screen-racetable .grt-ex-cattab{background:#fff !important;color:var(--ink-2) !important;border:var(--edge) !important;box-shadow:0 1px 0 #fff inset,0 4px 10px -8px rgba(255,130,20,.45) !important;}
 #asa#asa #screen-racetable .grt-ex-cattab.active{background:linear-gradient(160deg,#FFC73A,#FF7A14) !important;color:#fff !important;border-color:rgba(255,255,255,.6) !important;
   box-shadow:0 8px 16px -10px rgba(255,120,10,.65) !important;text-shadow:0 1px 1px rgba(150,55,0,.35) !important;}
+#asa#asa #screen-racetable .rt-venue-name,#asa#asa #screen-racetable .rt-time-val,#asa#asa #screen-racetable .rt-race-btn-num{color:#3B342D !important;}
+#asa#asa #screen-racetable .rt-race-btn{
+  background:#ffffff !important;
+  border:1px solid rgba(90,60,30,.10) !important;
+  box-shadow:0 3px 7px -1px rgba(80,50,20,.20),0 1px 2px rgba(0,0,0,.08) !important;
+}
+#asa#asa #screen-racetable .rt-race-btn::before{background:none !important;}
+#asa#asa #screen-racetable .rt-race-btn.active{
+  box-shadow:0 1px 0 rgba(255,255,255,.65) inset,0 -6px 14px rgba(200,80,0,.18) inset,
+             0 5px 12px -3px rgba(220,100,0,.5),0 1px 3px rgba(120,50,0,.25) !important;
+}
+#asa#asa #screen-racetable .rt-race-btn.active::before{background:linear-gradient(180deg,rgba(255,255,255,.4),rgba(255,255,255,0)) !important;}
+#asa#asa #screen-racetable .rt-race-btn.active .rt-race-btn-num{font-size:24px !important;line-height:1.05 !important;}
+#asa#asa #screen-racetable .rt-race-btn.active .rt-race-btn-num,#asa#asa #screen-racetable .rt-race-btn.active .rt-race-btn-deadline,#asa#asa #screen-racetable .rt-race-btn.active .rt-race-btn-class{
+  color:#ffffff !important;
+  text-shadow:0 1px 2px rgba(110,40,0,.7),0 0 1px rgba(110,40,0,.55) !important;
+}
+#asa#asa #screen-racetable .rt-tab.active{
+  box-shadow:0 1px 0 #fff inset,0 4px 10px -2px rgba(120,60,10,.28),0 1px 3px rgba(0,0,0,.12) !important;
+}
+#asa#asa #screen-racetable .grt-cm-card{background:#ffffff !important;}
+#asa#asa #screen-racetable .grt-ex-table .ex-col-num,#asa#asa #screen-racetable .grt-ex-table .ex-col-name{background:#fff !important;}
+#asa#asa #screen-racetable .grt-ex-table thead .ex-col-num,#asa#asa #screen-racetable .grt-ex-table thead .ex-col-name,#asa#asa #screen-racetable .grt-ex-table thead th.ex-col-num,#asa#asa #screen-racetable .grt-ex-table thead th.ex-col-name{
+  background:linear-gradient(180deg,#fff7ea,#fff1dc) !important;color:var(--ink-2) !important;}
+#asa#asa #screen-racetable .rt-odds-value{color:#3B342D !important;}
+#asa#asa #screen-racetable .rt-odds-value.hot{color:#D9392F !important;}
 /* ---- 枠色・グレード色の復元（競輪の決まり色は変えない） ---- */
 #asa#asa#asa .grade-f1{background:linear-gradient(180deg, #f0a020 0%, #cc7a00 50%, #b86e00 100%) !important}
 #asa#asa#asa .grade-f2{background:linear-gradient(180deg, #2874c0 0%, #1a5a9e 50%, #144a85 100%) !important}
