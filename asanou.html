@@ -614,9 +614,11 @@ body{background:#fff !important;color:var(--ink) !important;}
   box-shadow:0 0 12px rgba(255,160,40,.45) !important;
 }
 
-/* 開催カード：白いガラス。縁に細い光、上面に反射、影は橙を薄く */
+/* 開催カード：右下以外は真っ白。右下だけオレンジ系のグラデーションでアクセント（2026-09-22） */
 .venue-card{
-  background:var(--glass) !important;
+  background:
+    radial-gradient(130% 110% at 100% 100%,rgba(255,150,40,.34) 0%,rgba(255,176,60,.16) 26%,rgba(255,214,140,.05) 44%,rgba(255,255,255,0) 58%),
+    #ffffff !important;
   border:1px solid rgba(255,170,60,.22) !important;
   box-shadow:0 1px 0 rgba(255,255,255,.9) inset, 0 -1px 0 rgba(255,160,40,.06) inset,
              0 12px 30px -16px rgba(255,130,20,.35), 0 2px 6px rgba(120,70,20,.06) !important;
@@ -627,24 +629,17 @@ body{background:#fff !important;color:var(--ink) !important;}
     linear-gradient(100deg,rgba(255,255,255,0) 38%,rgba(255,214,120,.22) 48%,rgba(255,255,255,.55) 50%,rgba(255,214,120,.18) 52%,rgba(255,255,255,0) 62%) !important;
   background-size:100% 100%,220% 100% !important;
 }
-/* カード左端の細い光の帯（開催の目印） */
-.venue-card::after{
-  content:'';position:absolute;left:0;top:14px;bottom:14px;width:3px;border-radius:0 3px 3px 0;
-  background:linear-gradient(180deg,var(--sun-1),var(--sun-3));box-shadow:0 0 10px rgba(255,150,30,.55);
-  pointer-events:none;
-}
 .venue-card.tapped::after{
-  width:60px !important;top:var(--tap-y,50%) !important;bottom:auto !important;border-radius:50% !important;
   background:radial-gradient(circle,rgba(255,190,60,.55) 0%,rgba(255,150,30,.15) 40%,transparent 70%) !important;
-  box-shadow:none !important;
 }
-.venue-card.finished::after{background:linear-gradient(180deg,#e6ddd2,#d6cabd) !important;box-shadow:none !important;}
 @keyframes shadowFloat{
   0%,100%{box-shadow:0 1px 0 rgba(255,255,255,.9) inset,0 12px 30px -16px rgba(255,130,20,.35),0 2px 6px rgba(120,70,20,.06);}
   50%{box-shadow:0 1px 0 rgba(255,255,255,.9) inset,0 16px 34px -16px rgba(255,130,20,.45),0 3px 8px rgba(120,70,20,.07);}
 }
 .venue-card:active{
-  background:linear-gradient(180deg,#fffaf1,#fff3e0) !important;
+  background:
+    radial-gradient(130% 110% at 100% 100%,rgba(255,150,40,.42) 0%,rgba(255,176,60,.2) 26%,rgba(255,255,255,0) 58%),
+    #fffdf9 !important;
   box-shadow:0 1px 0 rgba(255,255,255,.9) inset,0 6px 16px -10px rgba(255,130,20,.4) !important;
 }
 @keyframes cardShimmer{
@@ -780,10 +775,6 @@ body{background:#fff !important;color:var(--ink) !important;}
   <!-- ヘッダー画像 -->
   <div class="mid-hero">
     <img src="asanou-ogp.jpg" alt="朝脳 モーニング競輪 買い目生成" width="1672" height="941">
-    <!-- 右上：家ボタン（タップでホームへ） -->
-    <a class="mid-home-btn" href="https://brainkeirin.jp" aria-label="Brainホームへ戻る">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9.5 21v-6h5v6"/></svg>
-    </a>
   </div>
 
   <!-- 見出し：モーニング開催一覧 -->

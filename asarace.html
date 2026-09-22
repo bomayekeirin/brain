@@ -10301,7 +10301,7 @@ function renderRtConditions(data){
 let RT_CUPBAR_LAST_KEY = null;
 async function updateRtCupBar(venue, raceNum){
   if(!venue) return;
-  const key = (venue.venueId||'')+'_'+(venue.dayNum||'1');
+  const key = (venue.venueId||'')+'_'+(venue.raceCode||'')+'_'+(venue.dayNum||'1');   // ★開催コードも含める
   if(key === RT_CUPBAR_LAST_KEY) return; // 同開催内のレース番号移動：再読み込みしない
   const cupBar = document.getElementById('rtCupName');
   const dayLabel = '開催'+(venue.dayNum||'1')+'日目';
@@ -10309,7 +10309,7 @@ async function updateRtCupBar(venue, raceNum){
   const joCode = ODDSPARK_JO_CODES[venue.venueId];
   if(!joCode) return;
   try{
-    const kb = opYmd();
+    const kb = (venue.dateStr && /^\d{4}-\d{2}-\d{2}$/.test(venue.dateStr)) ? venue.dateStr.replace(/-/g,'') : opYmd();   // ★そのレースの日付
     const urls = [
       `https://www.oddspark.com/keirin/RaceList.do?joCode=${joCode}&kaisaiBi=${kb}&raceNo=${raceNum}`,
       `https://www.oddspark.com/keirin/AllRaceList.do?joCode=${joCode}&kaisaiBi=${kb}`
@@ -16255,7 +16255,19 @@ async function fetchRaceResult() {
   document.getElementById('resultContent').style.display = 'none';
   document.getElementById('resultEmpty').style.display = 'none';
   document.getElementById('resultError').style.display = 'none';
-  
+
+  // ★2026-09-22：明日（まだ行われていない日）のレースは結果を取りに行かない。
+  //   以前は常に「今日」の日付で取っていたため、明日の大宮3Rを開くと今日の大宮3Rの結果が出ていた。
+  const _raceDs = (typeof asaRaceDateStr === 'function') ? asaRaceDateStr(currentRace) : null;
+  if (_raceDs && _raceDs > asaJstYmd(0)) {
+    document.getElementById('resultLoading').style.display = 'none';
+    const _em = document.getElementById('resultEmpty');
+    _em.style.display = 'flex';
+    _em.querySelector('p').textContent = 'このレースはまだ行われていません（' + (+_raceDs.slice(5,7)) + '/' + (+_raceDs.slice(8,10)) + ' 開催）';
+    return;
+  }
+  { const _em = document.getElementById('resultEmpty'); if (_em) _em.querySelector('p').textContent = 'レース結果はまだ確定していません'; }
+
   try {
     // 場コードを取得
     const joCode = ODDSPARK_JO_CODES[currentVenue.venueId];
@@ -16268,15 +16280,17 @@ async function fetchRaceResult() {
       return;
     }
     
-    // 日付をYYYYMMDD形式で取得
-    // CURRENT_DATE_VIEWが'today'なら今日、'tomorrow'なら明日
-    const targetDate = getOperatingDate();
-    if (CURRENT_DATE_VIEW === 'tomorrow') {
-      targetDate.setDate(targetDate.getDate() + 1);
+    // ★2026-09-22：そのレースの日付（開催コード＋日目）で取る。取れないときだけ従来どおり今日
+    let kaisaiBi;
+    if (_raceDs) {
+      kaisaiBi = _raceDs.replace(/-/g, '');
+    } else {
+      const targetDate = getOperatingDate();
+      if (CURRENT_DATE_VIEW === 'tomorrow') targetDate.setDate(targetDate.getDate() + 1);
+      kaisaiBi = targetDate.getFullYear().toString() +
+        String(targetDate.getMonth() + 1).padStart(2, '0') +
+        String(targetDate.getDate()).padStart(2, '0');
     }
-    const kaisaiBi = targetDate.getFullYear().toString() +
-      String(targetDate.getMonth() + 1).padStart(2, '0') +
-      String(targetDate.getDate()).padStart(2, '0');
     
     const raceNo = currentRace.raceNum;
     
@@ -16765,6 +16779,11 @@ function displayOdds(odds, betType) {
   const now = new Date();
   const timeStr = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')} 現在`;
   timeEl.textContent = timeStr;
+  // ★2026-09-22：明日のレースのオッズは前日発売のもの。票が少なく動きやすいことを明示する
+  try{
+    const _cr = CURRENT_VENUE_RACES[CURRENT_RACE_INDEX];
+    if (typeof asaIsTomorrowRace === 'function' && asaIsTomorrowRace(_cr)) timeEl.textContent = '前日発売 ' + timeStr;
+  }catch(_e){}
   
   // カレッタ印マップを構築
   const markMap = {};
