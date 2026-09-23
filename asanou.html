@@ -774,6 +774,37 @@ body{background:#fff !important;color:var(--ink) !important;}
   background:transparent !important;box-shadow:none !important;min-height:120px;
 }
 
+
+/* ===== 無料枠とメンバーシップの案内（2026-09-23） ===== */
+.asa-promo{padding:8px 20px 48px;text-align:center;background:#fff;}
+.asa-promo-h{margin:34px 0 14px;font-size:20px;font-weight:700;letter-spacing:.06em;color:var(--ink);}
+.asa-promo-h span{position:relative;display:inline-block;padding:0 4px 2px;z-index:0;}
+.asa-promo-h span::after{
+  content:'';position:absolute;left:0;right:0;bottom:2px;height:.3em;border-radius:4px;z-index:-1;
+  background:linear-gradient(90deg,var(--sun-1) 0%,var(--sun-2) 55%,var(--sun-3) 100%);opacity:.5;
+}
+.asa-promo-lead{font-size:14px;line-height:1.9;color:var(--ink-2);font-weight:500;}
+.asa-promo-body{font-size:14px;line-height:1.9;color:var(--ink);margin-top:6px;}
+.asa-promo-body strong{color:var(--sun-3);font-weight:700;}
+.asa-promo-list{list-style:none;margin:10px auto 8px;padding:0;max-width:330px;text-align:left;}
+.asa-promo-list li{
+  font-size:13.5px;line-height:1.5;color:var(--ink);padding:10px 14px;margin:0 0 7px;border-radius:12px;
+  background:linear-gradient(180deg,#ffffff,#fffaf2);border:1px solid rgba(255,170,60,.22);
+  box-shadow:0 1px 0 #fff inset,0 6px 14px -12px rgba(255,130,20,.5);
+}
+.asa-promo-note{margin-top:8px;font-size:11.5px;color:var(--ink-3);}
+.asa-promo-img{display:block;max-width:360px;margin:22px auto 0;border-radius:16px;overflow:hidden;
+  border:1px solid rgba(0,0,0,.06);box-shadow:0 14px 30px -18px rgba(120,60,10,.55),0 2px 6px rgba(0,0,0,.06);}
+.asa-promo-img img{display:block;width:100%;height:auto;}
+.asa-promo-cta{
+  display:block;max-width:360px;margin:16px auto 0;padding:15px 16px;border-radius:14px;
+  background:linear-gradient(160deg,#FFC73A 0%,#FF9E1E 48%,#FF7414 100%);color:#fff;text-decoration:none;
+  font-size:15px;font-weight:700;letter-spacing:.1em;text-shadow:0 1px 2px rgba(150,55,0,.45);
+  border:1px solid rgba(255,255,255,.65);
+  box-shadow:0 1px 0 rgba(255,255,255,.7) inset,0 -8px 16px rgba(190,70,0,.2) inset,0 14px 30px -12px rgba(255,120,10,.7);
+}
+.asa-promo-cta:active{transform:scale(.99);}
+
 /* 調整：艶の層を文字の下に回す（反射が通るときに会場名が白く飛んでいた） */
 .venue-card > *{position:relative;z-index:1;}
 .venue-card::before{z-index:0;}
@@ -812,10 +843,10 @@ body{background:#fff !important;color:var(--ink) !important;}
       <div class="asa-day" id="asaDay">
         <div class="asa-day-tabs" role="tablist" aria-label="開催日">
           <button class="asa-day-tab active" role="tab" aria-selected="true" data-view="today" type="button">
-            <span class="asa-day-name">今日</span><span class="asa-day-date" id="asaDayDateToday"></span><span class="asa-day-count" id="asaDayCountToday"></span>
+            <span class="asa-day-name">今日</span><span class="asa-day-date" id="asaDayDateToday"></span>
           </button>
           <button class="asa-day-tab" role="tab" aria-selected="false" data-view="tomorrow" type="button">
-            <span class="asa-day-name">明日</span><span class="asa-day-date" id="asaDayDateTomorrow"></span><span class="asa-day-count" id="asaDayCountTomorrow"></span>
+            <span class="asa-day-name">明日</span><span class="asa-day-date" id="asaDayDateTomorrow"></span>
           </button>
         </div>
         <div class="asa-day-panel" role="tabpanel">
@@ -825,6 +856,30 @@ body{background:#fff !important;color:var(--ink) !important;}
           </div>
         </div>
       </div>
+    </section>
+
+    <!-- ===== 無料枠とメンバーシップの案内（2026-09-23 ボンバイエ指示：朝脳は Brain の広告も担う） ===== -->
+    <section class="asa-promo" aria-label="ご利用案内">
+      <h2 class="asa-promo-h"><span>毎日1~3Rが無料</span></h2>
+      <p class="asa-promo-lead">4~7Rの買い目生成は<br>メンバーシップ会員限定となります<br>メンバーの方は掲示板固定投稿に記載の<br>入場コードを入力して出走表画面から<br>買い目を生成してください</p>
+
+      <h2 class="asa-promo-h"><span>Brainメンバーシップ</span></h2>
+      <p class="asa-promo-body">Brainメンバーシップ会員は、</p>
+      <ul class="asa-promo-list">
+        <li>【競輪レースの荒れ予報指数】</li>
+        <li>【モーニング競輪専用　朝脳】</li>
+        <li>【デイナイター買い目生成】</li>
+        <li>【ミッドナイト競輪専用　ミッド脳】</li>
+        <li>【軸指定･点数指定での買い目生成】</li>
+        <li>【出走表・レース情報のテキスト生成】</li>
+      </ul>
+      <p class="asa-promo-body">等のコンテンツが全て<br><strong>月額390円のみ</strong>でご利用いただけます</p>
+      <p class="asa-promo-note">※利用できるコンテンツは随時拡張予定です</p>
+
+      <a class="asa-promo-img" href="https://note.com/brainkeirin/membership/join" target="_blank" rel="noopener">
+        <img src="/membership-card.jpg" alt="Brain メンバーシップ" loading="lazy" width="900" height="471">
+      </a>
+      <a class="asa-promo-cta" href="https://note.com/brainkeirin/membership/join" target="_blank" rel="noopener">メンバーシップへ入会する</a>
     </section>
   </main>
 
@@ -944,7 +999,12 @@ function parseWinticketRaceUrl(link){
     d.setUTCDate(d.getUTCDate() + (offsetDays||0));
     return d.getUTCFullYear() + '-' + asaPad2(d.getUTCMonth()+1) + '-' + asaPad2(d.getUTCDate());
   }
-  function asaMd(ymd){ if(!ymd) return ''; const a=ymd.split('-'); return (+a[1])+'/'+(+a[2]); }
+  function asaMd(ymd){
+    if(!ymd) return '';
+    const a = ymd.split('-').map(Number);
+    const wd = '日月火水木金土'.charAt(new Date(Date.UTC(a[0], a[1]-1, a[2])).getUTCDay());   // 日付そのものから曜日を出す（端末の時差に影響されない）
+    return a[1] + '/' + a[2] + ' (' + wd + ')';
+  }
   /* その日の日付＋「HH:MM」までの残り分（日本時間）。取れなければ null */
   function asaMinutesUntil(dateStr, hhmm){
     if(!hhmm || !/^\d{1,2}:\d{2}$/.test(hhmm)) return null;
