@@ -619,6 +619,62 @@ function asaIsTomorrowRace(race){
   return !!ds && ds === asaJstYmd(1);
 }
 
+/* ===================================================================
+ * 朝脳：無料枠とメンバー判定（2026-09-23）
+ *   1〜3R  … 誰でも出走表を見て生成できる
+ *   4R以降 … Brain会員（brain_session）または朝脳のコード（asa_session）が要る
+ *   認証はWorkerが持っている。CookieはHttpOnlyでページから読めないため、
+ *   /auth-status に尋ねて状態を受け取る。
+ * =================================================================== */
+const ASA_GATE = {
+  FREE_MAX_RACE: 3,                                     // ここまでは無料
+  MEMBERSHIP_URL: 'https://note.com/brainkeirin/membership/join',
+  MEMBERSHIP_IMG: '/membership-card.jpg',
+  MEMBERSHIP_NOTE: '月額390円でBrainの全機能が利用可能（モーニング･デイナイター･ミッドナイトのおまかせ生成含む）',
+};
+let ASA_MEMBER = false;          // 認証済みか（/auth-status の結果）
+let ASA_MEMBER_CHECKED = false;  // 一度でも確認できたか
+
+async function asaCheckMember(){
+  try{
+    const r = await fetch('/auth-status?realm=asa', { credentials: 'same-origin', cache: 'no-store' });
+    if (!r.ok) return ASA_MEMBER;
+    const j = await r.json();
+    ASA_MEMBER = !!j.authed;
+    ASA_MEMBER_CHECKED = true;
+  }catch(e){ /* 取得できないときは未認証のまま（無料枠だけ使える） */ }
+  return ASA_MEMBER;
+}
+/* そのレースが会員限定か */
+function asaRaceLocked(race){
+  if (ASA_MEMBER) return false;
+  const n = Number(race && (race.raceNum != null ? race.raceNum : race));
+  return !!n && n > ASA_GATE.FREE_MAX_RACE;
+}
+/* 認証が通ったあとの画面の作り直し */
+function asaApplyMemberState(){
+  try{ if (typeof renderRaceSelector === 'function') renderRaceSelector(); }catch(e){}
+  try{ if (typeof updateGenerateZone === 'function') updateGenerateZone(); }catch(e){}
+}
+
+/* 管理画面の保護（2026-09-23）
+ *   /asarace を公開ページにしたため、?admin=1 が誰でも開ける状態になる。
+ *   Brain のセッション（brain_session）が無ければホームへ戻す。
+ *   ページ内の4桁コードだけに頼らない。 */
+async function asaGuardAdmin(){
+  try{
+    const r = await fetch('/auth-status?realm=brain', { credentials:'same-origin', cache:'no-store' });
+    if (r.ok){
+      const j = await r.json();
+      if (j && j.authed) return true;
+    }
+  }catch(e){
+    return true;   // 状態を確認できないとき（ローカル検証など）は従来どおり
+  }
+  location.href = '/asanou';
+  return false;
+}
+
 /* ===== 朝脳：本体側のつなぎ（2026-09-22） ===== */
 /* 出走表の選手 → asanouGenerate の入力 { car, pt }。pt が無い選手は null のまま渡す
    （関数側でライン先頭の欠損を skip 判定する。0 にはしない：指示書 第6章） */
@@ -7957,6 +8013,93 @@ body::before{background:#fff !important;}
 #asa#asa#asa .rt-odds-car.c7,#asa#asa#asa .result-odds-car.c7{color:#fff !important;-webkit-text-fill-color:#fff !important;}
 #asa#asa#asa .rt-odds-car.c8,#asa#asa#asa .result-odds-car.c8{color:#fff !important;-webkit-text-fill-color:#fff !important;}
 #asa#asa#asa .rt-odds-car.c9,#asa#asa#asa .result-odds-car.c9{color:#fff !important;-webkit-text-fill-color:#fff !important;}
+<style id="asanou-gate">
+
+/* ===================================================================
+ * 朝脳：会員限定レースの表示とコード入力（2026-09-23）
+ * =================================================================== */
+#asa #screen-racetable .rt-race-btn.asa-locked{
+  background:#f7f4f0 !important;border:1px solid rgba(90,60,30,.10) !important;
+  box-shadow:0 2px 5px -1px rgba(80,50,20,.14) !important;opacity:.7;
+}
+#asa #screen-racetable .rt-race-btn.asa-locked .rt-race-btn-num,
+#asa #screen-racetable .rt-race-btn.asa-locked .rt-race-btn-deadline,
+#asa #screen-racetable .rt-race-btn.asa-locked .rt-race-btn-class{color:#A79C90 !important;}
+#asa #screen-racetable .asa-lock-mark{
+  position:absolute;top:5px;right:6px;color:#C3B4A4;z-index:2;line-height:0;
+}
+/* 生成ボタンの位置に出す「解放」バー */
+#asa #asaLockBar{
+  position:fixed;left:0;right:0;bottom:0;z-index:600;display:none;
+  padding:12px 16px calc(12px + env(safe-area-inset-bottom));
+  background:rgba(255,255,255,.86);
+  -webkit-backdrop-filter:saturate(1.4) blur(16px);backdrop-filter:saturate(1.4) blur(16px);
+  border-top:1px solid rgba(255,160,40,.14);box-shadow:0 -10px 26px -18px rgba(255,130,20,.55);
+}
+#asa #asaLockBar.show{display:block;}
+#asa #asaLockBar .asa-lock-msg{
+  text-align:center;font-size:11.5px;color:#7D6B58;letter-spacing:.02em;margin-bottom:9px;
+}
+#asa #asaLockBtn{
+  width:100%;padding:15px 16px;border:1px solid rgba(255,255,255,.65);border-radius:14px;
+  background:linear-gradient(160deg,#FFC73A 0%,#FF9E1E 48%,#FF7414 100%);
+  color:#fff;font-family:inherit;font-size:15px;font-weight:700;letter-spacing:.1em;cursor:pointer;
+  text-shadow:0 1px 2px rgba(150,55,0,.45);
+  box-shadow:0 1px 0 rgba(255,255,255,.7) inset,0 -8px 16px rgba(190,70,0,.2) inset,
+             0 14px 30px -12px rgba(255,120,10,.7);
+}
+#asa #asaLockBtn:active{transform:scale(.99);}
+/* コード入力 */
+#asa #asaGate{
+  position:fixed;inset:0;z-index:12000;display:none;
+  background:rgba(255,255,255,.96);
+  -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+  overflow-y:auto;-webkit-overflow-scrolling:touch;
+}
+#asa #asaGate.show{display:block;}
+#asa .asa-gate-inner{
+  min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:28px 20px calc(28px + env(safe-area-inset-bottom));
+}
+#asa .asa-gate-close{
+  position:absolute;top:calc(10px + env(safe-area-inset-top));right:12px;
+  width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,170,60,.28);
+  background:#fff;color:#7D6B58;font-size:20px;line-height:1;cursor:pointer;
+  box-shadow:0 8px 18px -12px rgba(255,130,20,.5);
+}
+#asa .asa-gate-title{font-size:17px;font-weight:700;color:#2B2016;letter-spacing:.06em;}
+#asa .asa-gate-sub{margin-top:10px;font-size:12px;line-height:1.8;color:#7D6B58;text-align:center;}
+#asa .asa-pin{display:flex;gap:11px;margin-top:24px;}
+#asa .asa-pin input{
+  width:52px;height:62px;text-align:center;font-family:inherit;font-size:26px;font-weight:700;
+  color:#2B2016;background:#fff;border:1px solid rgba(255,170,60,.38);border-radius:13px;outline:none;
+  box-shadow:0 8px 18px -14px rgba(255,130,20,.55);
+}
+#asa .asa-pin input:focus{border-color:#FF8A1A;box-shadow:0 0 0 3px rgba(255,170,60,.22);}
+#asa .asa-pin.error{animation:asaShakeX .42s ease;}
+@keyframes asaShakeX{0%,100%{transform:translateX(0);}18%{transform:translateX(-9px);}38%{transform:translateX(9px);}58%{transform:translateX(-6px);}78%{transform:translateX(6px);}}
+#asa .asa-gate-err{height:18px;margin-top:14px;font-size:12px;color:#D9392F;opacity:0;transition:opacity .2s;}
+#asa .asa-gate-err.show{opacity:1;}
+/* メンバーシップ導線（ログイン画面と同じ作り） */
+#asa .ms-wrap{width:100%;max-width:330px;margin:14px auto 0;text-align:center;}
+#asa .ms-toggle{
+  background:none;border:none;padding:6px 4px;cursor:pointer;font-family:inherit;
+  font-size:12px;letter-spacing:.04em;color:#8a8a92;text-decoration:underline;text-underline-offset:4px;
+}
+#asa .ms-panel{max-height:0;overflow:hidden;opacity:0;
+  transition:max-height .42s cubic-bezier(.22,1,.36,1),opacity .3s ease;}
+#asa .ms-wrap.open .ms-panel{max-height:560px;opacity:1;}
+#asa .ms-inner{padding:14px 0 4px;}
+#asa .ms-img{display:block;border-radius:14px;overflow:hidden;border:1px solid rgba(0,0,0,.08);
+  background:#fff;box-shadow:0 8px 20px rgba(0,0,0,.1);}
+#asa .ms-img img{display:block;width:100%;height:auto;}
+#asa .ms-note{margin-top:12px;font-size:11.5px;line-height:1.75;color:#666;text-align:left;}
+#asa .ms-cta{display:block;margin-top:14px;padding:13px 16px;border-radius:12px;color:#fff;text-decoration:none;
+  font-size:14px;font-weight:600;letter-spacing:.06em;
+  background:linear-gradient(160deg,#FFC73A,#FF7414);box-shadow:0 10px 22px -12px rgba(255,120,10,.7);}
+@media (prefers-reduced-motion:reduce){ #asa .ms-panel{transition:none;} #asa .asa-pin.error{animation:none;} }
+
+</style>
 </style>
 </head>
 <body>
@@ -11492,9 +11635,13 @@ function renderRaceSelector() {
       }
     }
     
+    // ★朝脳：4R以降は未認証だと選べない（グレーアウト）
+    const locked = (typeof asaRaceLocked === 'function') ? asaRaceLocked(race) : false;
+
     return `
-      <button class="rt-race-btn ${isActive ? 'active' : ''}" data-race-idx="${idx}">
-        ${deadlineClass !== 'ended' && (typeof isV3Generatable==='function' ? isV3Generatable(race) : false) ? '<span class="rt-race-lamp"></span>' : ''}
+      <button class="rt-race-btn ${isActive ? 'active' : ''}${locked ? ' asa-locked' : ''}" data-race-idx="${idx}"${locked ? ' data-locked="1" aria-disabled="true"' : ''}>
+        ${locked ? '<span class="asa-lock-mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10.5" width="15" height="9.5" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg></span>' : ''}
+        ${!locked && deadlineClass !== 'ended' && (typeof isV3Generatable==='function' ? isV3Generatable(race) : false) ? '<span class="rt-race-lamp"></span>' : ''}
         <span class="rt-race-btn-num">${race.raceNum}R</span>
         <span class="rt-race-btn-deadline ${deadlineClass}">${deadlineText}</span>
         <span class="rt-race-btn-class">${raceClass}</span>
@@ -11506,6 +11653,8 @@ function renderRaceSelector() {
   container.querySelectorAll('.rt-race-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const idx = parseInt(btn.dataset.raceIdx);
+      // ★朝脳：会員限定のレースは開かず、コード入力を出す
+      if (btn.dataset.locked === '1') { asaOpenGate(CURRENT_VENUE_RACES[idx]); return; }
       if (idx !== CURRENT_RACE_INDEX) {
         CURRENT_RACE_INDEX = idx;
         // オッズキャッシュをクリア
@@ -15936,6 +16085,8 @@ async function startBootTransition() {
       if (bo) { bo.classList.remove('show'); bo.style.display = 'none'; }
       const lo = document.getElementById('loadingOverlay');
       if (lo) lo.classList.add('hidden');
+      // ★2026-09-23：/asarace は公開ページになったので、管理画面は Brain のセッションがある人だけに出す
+      asaGuardAdmin();
       const boot = function(){
         if (window.ADMIN && typeof window.ADMIN.open === 'function') window.ADMIN.open();
         else setTimeout(boot, 120);
@@ -15984,6 +16135,7 @@ async function midBootFromParams(){
   //   開催一覧が空・壊れているときに復旧手段まで失わないための導線。
   if (p.get('admin') === '1') {
     document.getElementById('loadingOverlay')?.classList.add('hidden');
+    asaGuardAdmin();   // ★2026-09-23：Brain のセッションが無ければホームへ戻す
     const boot = function(){
       if (window.ADMIN && typeof window.ADMIN.open === 'function') window.ADMIN.open();
       else setTimeout(boot, 120);
@@ -16020,6 +16172,22 @@ async function midBootFromParams(){
     await fetchVenueRaces(venue, raceNum);
     // ★朝脳：今節の上がりを裏で取得（2日目以降のみ。生成は待たない）
     if (typeof asaAgariKickForVenue === 'function') asaAgariKickForVenue(venue);
+    // ★朝脳：会員限定のレースを直接開いた場合は、無料枠の先頭に寄せてコード入力を出す
+    try{
+      await asaCheckMember();
+      const _cur = CURRENT_VENUE_RACES[CURRENT_RACE_INDEX];
+      if (_cur && asaRaceLocked(_cur)) {
+        const free = CURRENT_VENUE_RACES.findIndex(r => !asaRaceLocked(r));
+        if (free >= 0) {
+          CURRENT_RACE_INDEX = free;
+          showRaceTable(CURRENT_VENUE_RACES[free], true);
+        }
+        asaApplyMemberState();
+        asaOpenGate(_cur);
+      } else {
+        asaApplyMemberState();
+      }
+    }catch(e){}
   }catch(e){
     console.error('midBootFromParams error:', e);
   }finally{
@@ -16249,6 +16417,15 @@ function updateGenerateZone(){
   // TENKAI展開エンジンは二分戦・細切れ・単騎混在も扱えるため三分戦制限は課さない。
   // 選手2名以上＋ライン配列ありで生成可（データ不足のみガード）。
   // v3（軸指定）は三分戦・単騎含む三分戦のみ対応。生成対象レースだけボタンを出す。
+  // ★朝脳：4R以降で未認証なら、生成ボタンの代わりに解放の案内を出す
+  if (typeof asaRaceLocked === 'function' && asaRaceLocked(currentRace)) {
+    asaShowLockBar(true);
+    if(screen){ screen.classList.add('has-fixed-genbar'); }
+    hideFixed();
+    return;
+  }
+  asaShowLockBar(false);
+
   const ok = (typeof isV3Generatable==='function' ? isV3Generatable(currentRace) : false) && !isRaceFinished;
 
   if (ok) {
@@ -26778,6 +26955,143 @@ body.tk-lock{ overflow:hidden; }
   window.TENKAI_RENDER = { open: open, openV2: openV2, openV3: openV3, close: close, frameColor: frameColor };
 })();
 
+</script>
+
+<!-- ===== 朝脳：会員限定の案内バー（生成ボタンの位置）2026-09-23 ===== -->
+<div id="asaLockBar">
+  <div class="asa-lock-msg">4R以降はメンバー限定です（1〜3Rは無料でご利用いただけます）</div>
+  <button type="button" id="asaLockBtn">コードを入力して解放する</button>
+</div>
+
+<!-- ===== 朝脳：コード入力 ===== -->
+<div id="asaGate" role="dialog" aria-modal="true" aria-label="コード入力">
+  <button type="button" class="asa-gate-close" id="asaGateClose" aria-label="閉じる">×</button>
+  <div class="asa-gate-inner">
+    <div class="asa-gate-title">4R以降はメンバー限定</div>
+    <div class="asa-gate-sub">メンバーシップのコード、またはワンデーコードを入力してください。<br>1〜3Rはコードなしでご利用いただけます。</div>
+    <div class="asa-pin" id="asaPin">
+      <input type="tel" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="コード1桁目">
+      <input type="tel" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="コード2桁目">
+      <input type="tel" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="コード3桁目">
+      <input type="tel" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="コード4桁目">
+    </div>
+    <div class="asa-gate-err" id="asaGateErr">コードが違います</div>
+    <div class="ms-wrap">
+      <button type="button" class="ms-toggle" id="asaMsToggle" aria-expanded="false">※コードをお持ちでない方はコチラ</button>
+      <div class="ms-panel">
+        <div class="ms-inner">
+          <a class="ms-img" id="asaMsImg" href="#" target="_blank" rel="noopener"><img id="asaMsImgSrc" src="" alt="Brain メンバーシップ" loading="lazy"></a>
+          <div class="ms-note" id="asaMsNote"></div>
+          <a class="ms-cta" id="asaMsCta" href="#" target="_blank" rel="noopener">メンバーシップに入会する</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===================================================================
+ * 朝脳：会員限定レースのコード入力（2026-09-23）
+ *   Worker の /auth（realm:'asa'）に4桁を送り、通れば Cookie が発行される。
+ *   Brainの本線コード・朝脳のワンデーコードのどちらでも通る（判定はWorker側）。
+ * =================================================================== */
+(function(){
+  function $(id){ return document.getElementById(id); }
+  var gate, pinWrap, inputs, errEl, checking = false;
+
+  function fillMembership(){
+    var img = $('asaMsImgSrc'), a1 = $('asaMsImg'), a2 = $('asaMsCta'), note = $('asaMsNote');
+    if (img && !img.getAttribute('src')) img.setAttribute('src', ASA_GATE.MEMBERSHIP_IMG);
+    if (a1) a1.href = ASA_GATE.MEMBERSHIP_URL;
+    if (a2) a2.href = ASA_GATE.MEMBERSHIP_URL;
+    if (note) note.textContent = ASA_GATE.MEMBERSHIP_NOTE;
+  }
+
+  window.asaOpenGate = function(race){
+    gate = $('asaGate'); if(!gate) return;
+    fillMembership();
+    var sub = gate.querySelector('.asa-gate-sub');
+    if (sub && race && race.raceNum) {
+      sub.innerHTML = String(race.raceNum) + 'R はメンバー限定です。<br>メンバーシップのコード、またはワンデーコードを入力してください。<br>1〜' + ASA_GATE.FREE_MAX_RACE + 'Rはコードなしでご利用いただけます。';
+    }
+    inputs.forEach(function(i){ i.value=''; });
+    errEl.classList.remove('show');
+    gate.classList.add('show');
+    setTimeout(function(){ inputs[0].focus(); }, 180);
+  };
+  window.asaCloseGate = function(){ if(gate) gate.classList.remove('show'); };
+
+  window.asaShowLockBar = function(on){
+    var bar = $('asaLockBar'); if(!bar) return;
+    bar.classList.toggle('show', !!on);
+    var screen = $('screen-racetable');
+    if (screen) {
+      if (on) { requestAnimationFrame(function(){ screen.style.paddingBottom = ((bar.offsetHeight||0) + 14) + 'px'; }); }
+    }
+  };
+
+  function codeStr(){ return inputs.map(function(i){ return i.value; }).join(''); }
+  function allFilled(){ return inputs.every(function(i){ return i.value !== ''; }); }
+
+  function onError(){
+    errEl.classList.add('show');
+    pinWrap.classList.remove('error'); void pinWrap.offsetWidth; pinWrap.classList.add('error');
+    setTimeout(function(){ inputs.forEach(function(i){ i.value=''; }); inputs[0].focus(); }, 420);
+  }
+
+  async function verify(){
+    if (checking) return;
+    checking = true;
+    try{
+      var r = await fetch('/auth', {
+        method:'POST', credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ code: codeStr(), realm: 'asa' })
+      });
+      if (r.ok){
+        ASA_MEMBER = true; ASA_MEMBER_CHECKED = true;
+        window.asaCloseGate();
+        asaApplyMemberState();
+        if (typeof showToast === 'function') showToast('解放しました。4R以降もご利用いただけます');
+        checking = false;
+        return;
+      }
+    }catch(e){}
+    onError();
+    checking = false;
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    gate = $('asaGate'); pinWrap = $('asaPin'); errEl = $('asaGateErr');
+    if(!gate || !pinWrap) return;
+    inputs = Array.prototype.slice.call(pinWrap.querySelectorAll('input'));
+    inputs.forEach(function(inp, idx){
+      inp.addEventListener('input', function(){
+        inp.value = inp.value.replace(/[^0-9]/g,'').slice(0,1);
+        errEl.classList.remove('show');
+        if (inp.value && idx < inputs.length-1) inputs[idx+1].focus();
+        if (allFilled()) verify();
+      });
+      inp.addEventListener('keydown', function(e){
+        if (e.key === 'Backspace' && !inp.value && idx > 0){ inputs[idx-1].focus(); inputs[idx-1].value=''; }
+        if (e.key === 'Enter' && allFilled()) verify();
+      });
+    });
+    var close = $('asaGateClose'); if (close) close.addEventListener('click', window.asaCloseGate);
+    var lockBtn = $('asaLockBtn');
+    if (lockBtn) lockBtn.addEventListener('click', function(){
+      var r = (typeof CURRENT_VENUE_RACES !== 'undefined') ? CURRENT_VENUE_RACES[CURRENT_RACE_INDEX] : null;
+      window.asaOpenGate(r);
+    });
+    var msT = $('asaMsToggle');
+    if (msT) msT.addEventListener('click', function(){
+      var w = msT.closest('.ms-wrap');
+      var open = w.classList.toggle('open');
+      msT.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open) setTimeout(function(){ w.scrollIntoView({behavior:'smooth', block:'nearest'}); }, 260);
+    });
+  });
+})();
 </script>
 </body>
 </html>
