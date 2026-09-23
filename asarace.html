@@ -26968,7 +26968,7 @@ body.tk-lock{ overflow:hidden; }
   <button type="button" class="asa-gate-close" id="asaGateClose" aria-label="閉じる">×</button>
   <div class="asa-gate-inner">
     <div class="asa-gate-title">4R以降はメンバー限定</div>
-    <div class="asa-gate-sub">メンバーシップのコード、またはワンデーコードを入力してください。<br>1〜3Rはコードなしでご利用いただけます。</div>
+    <div class="asa-gate-sub">4R以降はメンバー限定です<br>メンバーシップに記載の入場コードを<br>入力してください<br>朝脳は1~3Rのみ無料でご利用頂けます</div>
     <div class="asa-pin" id="asaPin">
       <input type="tel" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="コード1桁目">
       <input type="tel" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="コード2桁目">
@@ -27012,7 +27012,7 @@ body.tk-lock{ overflow:hidden; }
     fillMembership();
     var sub = gate.querySelector('.asa-gate-sub');
     if (sub && race && race.raceNum) {
-      sub.innerHTML = String(race.raceNum) + 'R はメンバー限定です。<br>メンバーシップのコード、またはワンデーコードを入力してください。<br>1〜' + ASA_GATE.FREE_MAX_RACE + 'Rはコードなしでご利用いただけます。';
+      sub.innerHTML = String(race.raceNum) + 'R はメンバー限定です<br>メンバーシップに記載の入場コードを<br>入力してください<br>朝脳は1~' + ASA_GATE.FREE_MAX_RACE + 'Rのみ無料でご利用頂けます';
     }
     inputs.forEach(function(i){ i.value=''; });
     errEl.classList.remove('show');

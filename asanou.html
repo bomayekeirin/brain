@@ -752,6 +752,28 @@ body{background:#fff !important;color:var(--ink) !important;}
 .asa-day-panel .venue-empty{padding:40px 0 !important;line-height:1.8;}
 @media (prefers-reduced-motion:reduce){ .asa-day-tab{transition:none;} }
 
+/* ===== 今日｜明日：囲いをなくし、上部の切り替えタブだけにする（2026-09-23 ボンバイエ指示） =====
+ * 以前は「選ばれたタブとパネルが一枚につながる」形だったが、囲いが重なって見づらいため廃止。
+ * タブはレース画面のタブと同じ「溝の中に白い駒」の形にそろえる。 */
+.asa-day-tabs{
+  gap:4px;padding:4px;margin:0 2px 18px;border-radius:16px;
+  background:rgba(255,170,60,.10);border:1px solid rgba(255,170,60,.16);
+}
+.asa-day-tab{
+  border:none !important;border-radius:12px !important;padding:11px 8px 10px;
+  background:transparent;box-shadow:none;
+}
+.asa-day-tab.active{
+  background:linear-gradient(180deg,#ffffff,#fffaf2) !important;
+  box-shadow:0 1px 0 #fff inset,0 4px 10px -2px rgba(120,60,10,.26),0 1px 3px rgba(0,0,0,.10) !important;
+}
+.asa-day-tab.active::after{display:none !important;}
+.asa-day-name{font-size:18px;}
+.asa-day-panel{
+  margin-top:0 !important;padding:0 !important;border:none !important;border-radius:0 !important;
+  background:transparent !important;box-shadow:none !important;min-height:120px;
+}
+
 /* 調整：艶の層を文字の下に回す（反射が通るときに会場名が白く飛んでいた） */
 .venue-card > *{position:relative;z-index:1;}
 .venue-card::before{z-index:0;}
