@@ -805,6 +805,13 @@ body{background:#fff !important;color:var(--ink) !important;}
 }
 .asa-promo-cta:active{transform:scale(.99);}
 
+/* ===== 2026-09-23 調整：タブとカードの間隔・見出しサイズ・案内の時間差表示 ===== */
+.asa-day-tabs{margin-bottom:30px !important;}
+.asa-promo-h{font-size:23px !important;}
+.asa-promo-part{opacity:0;transform:translateY(20px);transition:opacity .65s ease,transform .65s cubic-bezier(.22,1,.36,1);}
+.asa-promo-part.in{opacity:1;transform:none;}
+@media (prefers-reduced-motion:reduce){ .asa-promo-part{opacity:1;transform:none;transition:none;} }
+
 /* 調整：艶の層を文字の下に回す（反射が通るときに会場名が白く飛んでいた） */
 .venue-card > *{position:relative;z-index:1;}
 .venue-card::before{z-index:0;}
@@ -860,9 +867,12 @@ body{background:#fff !important;color:var(--ink) !important;}
 
     <!-- ===== 無料枠とメンバーシップの案内（2026-09-23 ボンバイエ指示：朝脳は Brain の広告も担う） ===== -->
     <section class="asa-promo" aria-label="ご利用案内">
+      <div class="asa-promo-part" id="asaPromo1">
       <h2 class="asa-promo-h"><span>毎日1~3Rが無料</span></h2>
       <p class="asa-promo-lead">4~7Rの買い目生成は<br>メンバーシップ会員限定となります<br>メンバーの方は掲示板固定投稿に記載の<br>入場コードを入力して出走表画面から<br>買い目を生成してください</p>
+      </div>
 
+      <div class="asa-promo-part" id="asaPromo2">
       <h2 class="asa-promo-h"><span>Brainメンバーシップ</span></h2>
       <p class="asa-promo-body">Brainメンバーシップ会員は、</p>
       <ul class="asa-promo-list">
@@ -880,6 +890,7 @@ body{background:#fff !important;color:var(--ink) !important;}
         <img src="/membership-card.jpg" alt="Brain メンバーシップ" loading="lazy" width="900" height="471">
       </a>
       <a class="asa-promo-cta" href="https://note.com/brainkeirin/membership/join" target="_blank" rel="noopener">メンバーシップへ入会する</a>
+      </div>
     </section>
   </main>
 
@@ -1138,6 +1149,7 @@ function parseWinticketRaceUrl(link){
       container.innerHTML = (MID_VIEW === 'tomorrow')
         ? '<div class="venue-empty">明日のモーニング開催は<br>まだ発表されていません</div>'
         : '<div class="venue-empty">本日のモーニング開催はありません</div>';
+      if(MID_REVEALED) asaRevealPromo(500);
       return;
     }
     container.innerHTML = venues.map((v, idx)=>{
@@ -1206,7 +1218,26 @@ function parseWinticketRaceUrl(link){
       if(card.classList.contains('show')) return;
       setTimeout(()=>card.classList.add('show'), (startDelay || 0) + 90 * i);
     });
+    // ★2026-09-23：開催カードが出終わってから、下の案内を順に出す。
+    //   まだ一覧を取得中（カードも「開催なし」表示も無い）のときは出さない（案内が先に出てしまうため）。
+    if (cards.length) {
+      asaRevealPromo((startDelay || 0) + 90 * (cards.length - 1) + 600);
+    } else if (document.querySelector('#midRaceCards .venue-empty')) {
+      asaRevealPromo((startDelay || 0) + 300);
+    }
   }
+
+  /* 下の案内の時間差表示。案内1（毎日1~3Rが無料）→ 案内2（Brainメンバーシップ）。1回だけ。 */
+  let asaPromoRevealed = false;
+  function asaRevealPromo(delay){
+    if(asaPromoRevealed || !MID_REVEALED) return;
+    asaPromoRevealed = true;
+    const p1 = document.getElementById('asaPromo1'), p2 = document.getElementById('asaPromo2');
+    setTimeout(()=>{ if(p1) p1.classList.add('in'); }, Math.max(0, delay));
+    setTimeout(()=>{ if(p2) p2.classList.add('in'); }, Math.max(0, delay) + 700);
+  }
+  // 開催が無い日・取得に失敗した日でも案内は出す（カードの表示を待たない保険）
+  setTimeout(()=>{ if(MID_REVEALED) asaRevealPromo(0); }, 7000);
 
   // 開催カードのトグル：下方向に伸びてレースセレクターを表示
   const MID_RACES_CACHE = {};   // idx → races[]

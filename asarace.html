@@ -8018,15 +8018,17 @@ body::before{background:#fff !important;}
 /* ===================================================================
  * 朝脳：会員限定レースの表示とコード入力（2026-09-23）
  * =================================================================== */
-#asa #screen-racetable .rt-race-btn.asa-locked{
-  background:#f7f4f0 !important;border:1px solid rgba(90,60,30,.10) !important;
-  box-shadow:0 2px 5px -1px rgba(80,50,20,.14) !important;opacity:.7;
+/* ★ライトテーマの明示層（#asa#asa）より強くしないと、グレー表示と鍵の位置が上書きされて効かない */
+#asa#asa#asa #screen-racetable .rt-race-btn.asa-locked{
+  background:#f3efea !important;border:1px solid rgba(90,60,30,.10) !important;
+  box-shadow:0 2px 5px -1px rgba(80,50,20,.14) !important;
 }
-#asa #screen-racetable .rt-race-btn.asa-locked .rt-race-btn-num,
-#asa #screen-racetable .rt-race-btn.asa-locked .rt-race-btn-deadline,
-#asa #screen-racetable .rt-race-btn.asa-locked .rt-race-btn-class{color:#A79C90 !important;}
-#asa #screen-racetable .asa-lock-mark{
-  position:absolute;top:5px;right:6px;color:#C3B4A4;z-index:2;line-height:0;
+#asa#asa#asa #screen-racetable .rt-race-btn.asa-locked .rt-race-btn-num,
+#asa#asa#asa #screen-racetable .rt-race-btn.asa-locked .rt-race-btn-deadline,
+#asa#asa#asa #screen-racetable .rt-race-btn.asa-locked .rt-race-btn-class{color:#B2A698 !important;}
+#asa#asa#asa #screen-racetable .rt-race-btn > .asa-lock-mark{
+  position:absolute !important;top:6px !important;left:7px !important;right:auto !important;
+  color:#B9A999;z-index:2;line-height:0;   /* 左上（右上は生成可能ランプの位置） */
 }
 /* 生成ボタンの位置に出す「解放」バー */
 #asa #asaLockBar{
@@ -11641,7 +11643,7 @@ function renderRaceSelector() {
     return `
       <button class="rt-race-btn ${isActive ? 'active' : ''}${locked ? ' asa-locked' : ''}" data-race-idx="${idx}"${locked ? ' data-locked="1" aria-disabled="true"' : ''}>
         ${locked ? '<span class="asa-lock-mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10.5" width="15" height="9.5" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg></span>' : ''}
-        ${!locked && deadlineClass !== 'ended' && (typeof isV3Generatable==='function' ? isV3Generatable(race) : false) ? '<span class="rt-race-lamp"></span>' : ''}
+        ${deadlineClass !== 'ended' && (typeof isV3Generatable==='function' ? isV3Generatable(race) : false) ? '<span class="rt-race-lamp"></span>' : ''}
         <span class="rt-race-btn-num">${race.raceNum}R</span>
         <span class="rt-race-btn-deadline ${deadlineClass}">${deadlineText}</span>
         <span class="rt-race-btn-class">${raceClass}</span>
