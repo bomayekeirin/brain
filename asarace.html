@@ -671,7 +671,28 @@ async function asaGuardAdmin(){
   }catch(e){
     return true;   // 状態を確認できないとき（ローカル検証など）は従来どおり
   }
-  location.href = '/asanou';
+  /* ★2026-09-23 修正：以前はここでホームへ戻していたため、Brain のセッションが無い端末では
+   *   管理画面が一瞬見えてすぐ朝脳ホームへ飛ばされていた（Brain本体のホームを公開にしたことで、
+   *   Brain にログインしていない状態が普通に起こるようになった）。
+   *   → その場で Brain の入場コードを求め、通れば管理画面を開き直す。閉じた場合だけホームへ戻す。 */
+  const openAdminGate = function(){
+    window.__ASA_GATE_REALM  = 'brain';
+    window.__ASA_GATE_AFTER  = function(){ location.reload(); };
+    window.__ASA_GATE_CANCEL = function(){ location.href = '/asanou'; };
+    if (typeof asaOpenGate === 'function') {
+      asaOpenGate(null);
+      const sub = document.querySelector('#asaGate .asa-gate-sub');
+      const ttl = document.querySelector('#asaGate .asa-gate-title');
+      if (ttl) ttl.textContent = '管理画面';
+      if (sub) sub.innerHTML = '管理画面を開くには<br>Brainの入場コードを入力してください';
+      const ms = document.querySelector('#asaGate .ms-wrap');
+      if (ms) ms.style.display = 'none';
+    } else {
+      location.href = '/asanou';
+    }
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', openAdminGate);
+  else openAdminGate();
   return false;
 }
 
@@ -27048,9 +27069,10 @@ body.tk-lock{ overflow:hidden; }
       var r = await fetch('/auth', {
         method:'POST', credentials:'same-origin',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ code: codeStr(), realm: 'asa' })
+        body: JSON.stringify({ code: codeStr(), realm: (window.__ASA_GATE_REALM || 'asa') })
       });
       if (r.ok){
+        if (typeof window.__ASA_GATE_AFTER === 'function') { checking = false; window.__ASA_GATE_AFTER(); return; }
         ASA_MEMBER = true; ASA_MEMBER_CHECKED = true;
         window.asaCloseGate();
         asaApplyMemberState();
@@ -27079,7 +27101,11 @@ body.tk-lock{ overflow:hidden; }
         if (e.key === 'Enter' && allFilled()) verify();
       });
     });
-    var close = $('asaGateClose'); if (close) close.addEventListener('click', window.asaCloseGate);
+    var close = $('asaGateClose');
+    if (close) close.addEventListener('click', function(){
+      if (typeof window.__ASA_GATE_CANCEL === 'function') { window.__ASA_GATE_CANCEL(); return; }
+      window.asaCloseGate();
+    });
     var lockBtn = $('asaLockBtn');
     if (lockBtn) lockBtn.addEventListener('click', function(){
       var r = (typeof CURRENT_VENUE_RACES !== 'undefined') ? CURRENT_VENUE_RACES[CURRENT_RACE_INDEX] : null;
