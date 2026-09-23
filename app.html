@@ -6594,6 +6594,17 @@ body.omk-shake{animation:omkShake .42s linear;}
 .bms-rv.in{opacity:1;transform:none;}
 @media (prefers-reduced-motion:reduce){ .bms-rv{opacity:1;transform:none;transition:none;} }
 </style>
+<style id="brain-home-banners">
+
+/* ===== ミッド脳・朝脳のバナー（2026-09-23） =====
+ * 荒れ予報バナーと同じ左右余白（16px）・同じ幅で縦に並べる。バナー同士は 18px あける。 */
+.home-banner-stack{display:flex;flex-direction:column;gap:18px;padding:0 16px 30px;}
+.dark-content-zone .banner-slider-wrap{padding-bottom:18px !important;}
+.home-banner{display:block;text-decoration:none;-webkit-tap-highlight-color:transparent;}
+.home-banner .banner-img-wrap{animation:none;}               /* 揺れは荒れ予報バナーだけに残す */
+.home-banner .banner-img-wrap:active{transform:scale(.97);}
+
+</style>
 <style id="brain-gate-css">
 
 /* ===================================================================
@@ -6869,6 +6880,18 @@ body.omk-shake{animation:omkShake .42s linear;}
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- ===== ミッド脳・朝脳のバナー（2026-09-23 ボンバイエ指示）=====
+         荒れ予報バナー（banner1.png・1372×468）と同じ寸法・同じ枠（banner-img-wrap）で縦に並べる。
+         行き先の /midnight・/asanou は公開ページなので、ホームのコード入力の対象にはしない。 -->
+    <div class="home-banner-stack">
+      <a class="home-banner" href="/midnight" aria-label="ミッド脳（ミッドナイト競輪）">
+        <div class="banner-img-wrap"><img src="banner-midnight.png" alt="ミッド脳" class="banner-img" width="1372" height="468" loading="lazy"></div>
+      </a>
+      <a class="home-banner" href="/asanou" aria-label="朝脳（モーニング競輪）">
+        <div class="banner-img-wrap"><img src="banner-asanou.png" alt="朝脳 モーニング競輪 買い目生成" class="banner-img" width="1372" height="468" loading="lazy"></div>
+      </a>
     </div>
 
     <!-- ===== Brainメンバーシップ案内（2026-09-23 ボンバイエ指示）=====
