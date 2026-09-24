@@ -6605,6 +6605,32 @@ body.omk-shake{animation:omkShake .42s linear;}
 .home-banner .banner-img-wrap:active{transform:scale(.97);}
 
 </style>
+<style id="brain-slot-guide">
+
+/* ===== モーニング・ミッドナイトの開催カードを押したときの案内（2026-09-23） ===== */
+#slotGuide{position:fixed;inset:0;z-index:4800;display:none;align-items:center;justify-content:center;
+  padding:calc(20px + env(safe-area-inset-top, 0px)) 20px calc(20px + env(safe-area-inset-bottom, 0px));
+  background:rgba(10,10,14,.55);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);opacity:0;transition:opacity .25s ease;}
+#slotGuide.show{display:flex;}
+#slotGuide.in{opacity:1;}
+.sg-card{width:100%;max-width:360px;border-radius:20px;overflow:hidden;background:#fff;
+  box-shadow:0 24px 60px rgba(0,0,0,.35),0 2px 8px rgba(0,0,0,.12);transform:translateY(14px) scale(.97);transition:transform .32s cubic-bezier(.22,1,.36,1);}
+#slotGuide.in .sg-card{transform:translateY(0) scale(1);}
+.sg-thumb{display:block;width:100%;height:auto;aspect-ratio:1672/941;object-fit:cover;background:#111;}
+.sg-body{padding:20px 20px 22px;text-align:center;}
+.sg-lead{font-size:13px;color:#777;letter-spacing:.06em;}
+.sg-title{margin-top:6px;font-size:18px;font-weight:700;color:#222;line-height:1.6;}
+.sg-go{display:block;width:100%;margin-top:18px;padding:14px 16px;border:none;border-radius:13px;cursor:pointer;
+  font-family:inherit;font-size:15px;font-weight:700;letter-spacing:.06em;color:#fff;text-decoration:none;}
+.sg-go.morning{background:linear-gradient(160deg,#FFC73A 0%,#FF9E1E 48%,#FF7414 100%);box-shadow:0 12px 26px -12px rgba(255,120,10,.7);
+  text-shadow:0 1px 2px rgba(150,55,0,.4);}
+.sg-go.midnight{background:linear-gradient(160deg,#8e5fc0 0%,#6b3fa0 100%);box-shadow:0 12px 26px -12px rgba(107,63,160,.75);}
+.sg-stay{display:block;width:100%;margin-top:10px;padding:13px 16px;border-radius:13px;cursor:pointer;
+  font-family:inherit;font-size:14px;font-weight:600;color:#555;background:#fff;border:1px solid rgba(0,0,0,.12);}
+.sg-go:active,.sg-stay:active{transform:scale(.98);}
+@media (prefers-reduced-motion:reduce){ #slotGuide,.sg-card{transition:none;} }
+
+</style>
 <style id="brain-gate-css">
 
 /* ===================================================================
@@ -10150,13 +10176,15 @@ function renderRaceSelector() {
     }
     
     // 生成可能判定（軸指定=旧ロジック / 新ロジック=エンジン）
-    const wasGeneratable = is3Bunsen && !isPatternInvalid;  // 軸指定可能
+    const wasGeneratable = is3Bunsen && !isPatternInvalid
+      && !(typeof mid3IsMorningRace === 'function' && mid3IsMorningRace(race));  // 軸指定可能（★モーニングは朝脳専用）
     let engineGeneratable = false;  // 新ロジック生成可能
     try{
       // ★デイ・ナイターはセル判定を使わない（2026-08-02）。三分戦のみミッドロジックで生成する。
       //   モーニングは従来どおり。ミッドナイトは mid3LampGeneratable 側で除外済み。
       if (race.players && race.lineup && window.BrainEngine && window.BRAIN_MODEL && window.BRAIN_CELLMAP
           && !(typeof mid3IsMidnightRace === 'function' && mid3IsMidnightRace(race))
+          && !(typeof mid3IsMorningRace === 'function' && mid3IsMorningRace(race))   // ★朝脳専用
           && !(typeof isGradeRace === 'function' && isGradeRace(race))
           // ★デイナイターは原則セル判定を使わないが、二分戦だけは通す（2026-08-07・3-0i）
           && (!(typeof mid3IsDayNighter === 'function' && mid3IsDayNighter(race))
@@ -14997,12 +15025,14 @@ function updateSubtabLamps(raceData, isRaceFinished, is3Bunsen, isPatternInvalid
   const autoLamp = subtabs.querySelector('.rt-subtab[data-subtab="auto"] .rt-subtab-lamp');
   const customLamp = subtabs.querySelector('.rt-subtab[data-subtab="custom"] .rt-subtab-lamp');
   let engineGeneratable = false;   // おまかせ（新ロジック v2）
-  const wasGeneratable = !!(is3Bunsen && !isPatternInvalid);  // 軸指定（旧ロジック）
+  const wasGeneratable = !!(is3Bunsen && !isPatternInvalid)
+    && !(typeof mid3IsMorningRace === 'function' && mid3IsMorningRace(raceData));  // 軸指定（旧ロジック）★モーニングは朝脳専用
   if (!isRaceFinished) {
     try {
       // ★デイ・ナイターはセル判定を使わない（2026-08-02）
       if (typeof window.BrainEngine !== 'undefined' && window.BRAIN_MODEL && window.BRAIN_CELLMAP
           && !(typeof mid3IsMidnightRace === 'function' && mid3IsMidnightRace(raceData))
+          && !(typeof mid3IsMorningRace === 'function' && mid3IsMorningRace(raceData))   // ★朝脳専用
           && !(typeof isGradeRace === 'function' && isGradeRace(raceData))
           // ★デイナイターは原則セル判定を使わないが、二分戦だけは通す（2026-08-07・3-0i）
           && (!(typeof mid3IsDayNighter === 'function' && mid3IsDayNighter(raceData))
@@ -15633,7 +15663,8 @@ function updateGenerateZone(){
     if (is3Bunsen && currentRace && currentRace.players && currentRace.players.length >= 2) {
       isPatternInvalid = checkRacePattern(currentRace) === 'INVALID';
     }
-    const ok = is3Bunsen && !isRaceFinished && !isPatternInvalid;
+    const ok = is3Bunsen && !isRaceFinished && !isPatternInvalid
+      && !(typeof mid3IsMorningRace === 'function' && mid3IsMorningRace(currentRace));   // ★モーニングは朝脳専用
     if (sub === 'auto') {
       // ★おまかせ：点数指定廃止→最下部固定ボタン（2026-06-26）。生成可否はエンジン判定
       generateWrap.style.display = 'none';
@@ -15645,6 +15676,7 @@ function updateGenerateZone(){
         if (currentRace && currentRace.players && currentRace.lineup && !isRaceFinished
             && window.BrainEngine && window.BRAIN_MODEL && window.BRAIN_CELLMAP
             && !(typeof mid3IsMidnightRace === 'function' && mid3IsMidnightRace(currentRace))
+          && !(typeof mid3IsMorningRace === 'function' && mid3IsMorningRace(currentRace))   // ★朝脳専用
             && !(typeof isGradeRace === 'function' && isGradeRace(currentRace))
             // ★デイナイターは原則セル判定を使わないが、二分戦だけは通す（2026-08-07・3-0i）
             && (!(typeof mid3IsDayNighter === 'function' && mid3IsDayNighter(currentRace))
@@ -17838,6 +17870,8 @@ function runOmakaseGeneration(){
   // ★デイ・ナイターはセル判定を使わない（2026-08-02）。三分戦は手前でミッドロジックへ分岐済み。
   if(typeof mid3IsMidnightRace === 'function' && mid3IsMidnightRace(race))
     return {target:false, reason:'ミッドナイトはミッド脳で生成します'};
+  if(typeof mid3IsMorningRace === 'function' && mid3IsMorningRace(race))
+    return {target:false, reason:'モーニングは朝脳で生成します'};
   /* ★2026-08-07：デイ・ナイターの二分戦を条件付きで復活させる（ボンバイエ指示）。
    *   2026-08-02 に三分戦ミッドロジックへ一本化した際、二分戦もまとめて見送りにした。
    *   復活させるのは【二分戦かつ Lv2/Lv3/全 かつ split=B】の25セルのみ。
@@ -18131,6 +18165,14 @@ function omkSetBar(bar,pct){
   bar.style.background=g; bar.style.backgroundSize='200% 100%';
 }
 async function runOmakaseTransition(){
+  // ★モーニングは Brain 本体では生成しない（朝脳専用・2026-09-23）
+  try{
+    const _r = CURRENT_VENUE_RACES[CURRENT_RACE_INDEX];
+    if (_r && typeof mid3IsMorningRace === 'function' && mid3IsMorningRace(_r)) {
+      if (typeof showToast === 'function') showToast('モーニングは朝脳で生成できます', true);
+      return;
+    }
+  }catch(_e){}
   if(omkTransitioning) return; omkTransitioning=true;
   const t=document.getElementById('omkTrans');
   const think=document.getElementById('omkThinking');
@@ -21620,6 +21662,7 @@ function glCanGenerate(race) {
         && race.players && race.lineup
         && window.BrainEngine && window.BRAIN_MODEL && window.BRAIN_CELLMAP
         && !(typeof mid3IsMidnightRace === 'function' && mid3IsMidnightRace(race))
+          && !(typeof mid3IsMorningRace === 'function' && mid3IsMorningRace(race))   // ★朝脳専用
         && !(typeof isGradeRace === 'function' && isGradeRace(race))
         && (!(typeof mid3IsDayNighter === 'function' && mid3IsDayNighter(race))
             || (typeof dn2CellAllowed === 'function' && dn2CellAllowed(race)))) {
@@ -24523,6 +24566,13 @@ function mid3IsMidnightRace(race, ctxTimeSlot){
   return mid3TimeSlotOf(race, ctxTimeSlot) === 'midnight';
 }
 
+/* ★2026-09-23 ボンバイエ指示：モーニングは Brain 本体では生成しない（朝脳 /asanou 専用）。
+ *   ミッドナイトと同じ扱い。BRAIN_MORNING_GENERATE を true に戻せば従来どおり生成する。 */
+var BRAIN_MORNING_GENERATE = false;
+function mid3IsMorningRace(race, ctxTimeSlot){
+  return !BRAIN_MORNING_GENERATE && mid3TimeSlotOf(race, ctxTimeSlot) === 'morning';
+}
+
 /* デイ・ナイターか（＝セル判定を止めて三分戦のみ生成する対象） */
 function mid3IsDayNighter(race, ctxTimeSlot){
   var ts = mid3TimeSlotOf(race, ctxTimeSlot);
@@ -24559,6 +24609,8 @@ function mid3LampGeneratable(race){
     if(!race || !race.players || !race.lineup) return false;
     // ★ミッドナイトは app/result では生成しない（midrace.html 専用）2026-08-02
     if(mid3IsMidnightRace(race)) return false;
+    // ★モーニングも生成しない（朝脳専用・2026-09-23）
+    if(mid3IsMorningRace(race)) return false;
     // ★G戦は 2車以上ライン3本＋単騎0〜2 が対象（2026-08-02）
     var _isG = (typeof isGradeRace === 'function') && isGradeRace(race);
     if(_isG){
@@ -24591,6 +24643,8 @@ async function runMid3BunsenGeneration(race, ctx){
   if(!race || !race.players || !race.lineup) return null;
   // ★ミッドナイトは app/result では生成しない（midrace.html 専用）2026-08-02
   if(typeof mid3IsMidnightRace === 'function' && mid3IsMidnightRace(race, ctx && ctx.timeSlot)) return null;
+  // ★モーニングも Brain 本体では生成しない（朝脳専用・2026-09-23）
+  if(typeof mid3IsMorningRace === 'function' && mid3IsMorningRace(race, ctx && ctx.timeSlot)) return null;
   // ★G戦は 2車以上ライン3本＋単騎0〜2 が対象。それ以外は従来の三分戦判定（2026-08-02）
   var _isGrade = (typeof isGradeRace === 'function') && isGradeRace(race);
   if(_isGrade){
@@ -25598,6 +25652,71 @@ const TL_WINDOW_OVERRIDE = {
     items.forEach(function(el){ io.observe(el); });
   }
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+})();
+</script>
+
+<!-- ===== モーニング・ミッドナイトの開催カードを押したときの案内（2026-09-23 ボンバイエ指示） ===== -->
+<div id="slotGuide" role="dialog" aria-modal="true" aria-labelledby="sgTitle">
+  <div class="sg-card">
+    <img class="sg-thumb" id="sgThumb" src="" alt="">
+    <div class="sg-body">
+      <div class="sg-lead" id="sgLead"></div>
+      <div class="sg-title" id="sgTitle"></div>
+      <a class="sg-go" id="sgGo" href="#"></a>
+      <button type="button" class="sg-stay" id="sgStay">このままBrainで出走表を見る</button>
+    </div>
+  </div>
+</div>
+<script>
+/* ===================================================================
+ * モーニング・ミッドナイトの開催カードを押したときに、専用ページへの移動を案内する（2026-09-23）
+ *   ・「専用ページへ移動する」 … /asanou または /midnight へ（どちらも公開ページ）
+ *   ・「このままBrainで出走表を見る」 … そのままカードの処理へ進む（未認証ならコード入力を挟む）
+ *   ★コード入力の仕組み（下の script）より【先に】クリックを受ける必要があるため、この位置に置く。
+ * =================================================================== */
+(function(){
+  var SLOT = {
+    morning:  { thumb:'/asanou-ogp.jpg',   ratio:'1672 / 941', lead:'モーニング競輪専用',   title:'「朝脳」へ移動しますか？',
+                go:'モーニング専用ページへ移動する',   href:'/asanou',   cls:'morning' },
+    midnight: { thumb:'/midnight-ogp.jpg', ratio:'1200 / 630', lead:'ミッドナイト競輪専用', title:'「ミッド脳」へ移動しますか？',
+                go:'ミッドナイト専用ページへ移動する', href:'/midnight', cls:'midnight' }
+  };
+  var bypassCard = null;   // 「このまま見る」を選んだカード（次の1回だけ素通し）
+
+  function $(id){ return document.getElementById(id); }
+  function open(conf, card){
+    var g = $('slotGuide'); if(!g) return;
+    $('sgThumb').src = conf.thumb; $('sgThumb').alt = conf.title;
+    $('sgThumb').style.aspectRatio = conf.ratio;   // サムネイルごとの縦横比（切れないように）
+    $('sgLead').textContent = conf.lead; $('sgTitle').textContent = conf.title;
+    var go = $('sgGo'); go.textContent = conf.go; go.href = conf.href; go.className = 'sg-go ' + conf.cls;
+    $('sgStay').onclick = function(){
+      close();
+      bypassCard = card;
+      setTimeout(function(){ card.click(); }, 180);   // この先はコード入力（未認証時）→ 通常の出走表
+    };
+    g.classList.add('show');
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){ g.classList.add('in'); }); });
+  }
+  function close(){
+    var g = $('slotGuide'); if(!g) return;
+    g.classList.remove('in');
+    setTimeout(function(){ g.classList.remove('show'); }, 260);
+  }
+  // 背景を押したら閉じる
+  document.addEventListener('click', function(e){ if (e.target && e.target.id === 'slotGuide') close(); });
+
+  document.addEventListener('click', function(e){
+    var card = e.target && e.target.closest ? e.target.closest('#raceCards .venue-card, #tomorrowRaceCards .venue-card') : null;
+    if (!card) return;
+    if (bypassCard === card){ bypassCard = null; return; }   // 「このまま見る」後の1回は通す
+    var idx = Number(card.dataset.venueIdx);
+    var v = (typeof VENUES !== 'undefined' && VENUES) ? VENUES[idx] : null;
+    var conf = v ? SLOT[v.timeSlot] : null;
+    if (!conf) return;                                        // デイ・ナイターは従来どおり
+    e.preventDefault(); e.stopPropagation(); if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+    open(conf, card);
+  }, true);
 })();
 </script>
 

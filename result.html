@@ -2031,6 +2031,8 @@ document.getElementById('toTop').addEventListener('click', ()=>{
          *   ここも「デイナイターのみ」ではなく、フラグが false ならセル経路を一切通さない形に揃える。
          *   （モーニングはエンジン内部が dn!==true で見送りになるため、実挙動は変わらない） */
         if(typeof OMAKASE_CELL_ENABLED !== 'undefined' && !OMAKASE_CELL_ENABLED) continue;
+        // ★モーニングは Brain 本体では生成しない（朝脳専用・2026-09-23）。app.html と同じ扱い
+        if(typeof mid3IsMorningRace === 'function' && mid3IsMorningRace(race, v.timeSlot)) continue;
         let _dn2 = false;
         if(typeof mid3IsDayNighter==='function' && mid3IsDayNighter(race, v.timeSlot)){
           // ★判定は app.html と共通の dn2CellAllowed に寄せる（2026-08-07）
@@ -6389,6 +6391,12 @@ function mid3IsMidnightRace(race, ctxTimeSlot){
   return mid3TimeSlotOf(race, ctxTimeSlot) === 'midnight';
 }
 
+/* ★2026-09-23 ボンバイエ指示：モーニングは Brain 本体では生成しない（朝脳専用）。app.html と同期。 */
+var BRAIN_MORNING_GENERATE = false;
+function mid3IsMorningRace(race, ctxTimeSlot){
+  return !BRAIN_MORNING_GENERATE && mid3TimeSlotOf(race, ctxTimeSlot) === 'morning';
+}
+
 function mid3IsDayNighter(race, ctxTimeSlot){
   var ts = mid3TimeSlotOf(race, ctxTimeSlot);
   return ts === 'day' || ts === 'nighter';
@@ -6515,6 +6523,8 @@ async function runMid3BunsenGeneration(race, ctx){
   if(!race || !race.players || !race.lineup) return null;
   // ★ミッドナイトは app/result では生成しない（midrace.html 専用）2026-08-02
   if(typeof mid3IsMidnightRace === 'function' && mid3IsMidnightRace(race, ctx && ctx.timeSlot)) return null;
+  // ★モーニングも Brain 本体では生成しない（朝脳専用・2026-09-23）
+  if(typeof mid3IsMorningRace === 'function' && mid3IsMorningRace(race, ctx && ctx.timeSlot)) return null;
   // ★G戦は 2車以上ライン3本＋単騎0〜2 が対象。それ以外は従来の三分戦判定（2026-08-02）
   var _isGrade = (typeof isGradeRace === 'function') && isGradeRace(race);
   if(_isGrade){
