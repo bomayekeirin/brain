@@ -38,7 +38,17 @@ const ASANOU_V1 = {
   W_LINE_POS:  1.00,   // (2 - ライン位置)  前方=2 / 中団=1 / 後方=0
   W_LINE_SIZE: 1.26,   // ライン人数
   W_PT:        0.149,  // 競走得点（ライン先頭の選手）
-  ADD_ANA_A1:  true    // A-1 の穴目「三頭-軸頭-軸番」を出すか
+  ADD_ANA_A1:  true,   // A-1 の穴目「三頭-軸頭-軸番」を出すか
+  /* ★2026-09-24 ボンバイエ指示（朝脳 v2）
+   *   C1_ENABLED   : C-1（三分戦＋単騎）を生成するか。false の間は対象外（ランプ・生成ボタンなし）
+   *   A1_ROWS_V2   : A-1 の段の組み方。true＝v2（下記）／false＝v1（分析チャット原案）
+   *     v1  1段目 [軸頭,軸番]-[軸頭,軸番]-[軸3,対頭,対番] 6点 ／ 穴 三頭-軸頭-軸番 1点
+   *     v2  1段目 [軸頭,軸番]-[軸頭,軸番]-[軸3,対頭]      4点
+   *         2段目 対頭-対番-[軸頭,三頭]                    2点
+   *         3段目 三頭-軸頭-軸番（ADD_ANA_A1）             1点   計7点 */
+  C1_ENABLED:  false,
+  A1_ROWS_V2:  true,
+  ENGINE:      'asanou-v2'   // 記録の版名（v1 の成績と分けるため）
 };
 
 function asanouGenerate(lineup, players) {
@@ -79,11 +89,22 @@ function asanouGenerate(lineup, players) {
 
   // ④ パターン
   const pattern = tanki.length ? 'C-1' : (A3 ? 'A-1' : 'A-2');
+  // ★2026-09-24：C-1 は生成停止中（C1_ENABLED を true に戻せば従来どおり）
+  if (pattern === 'C-1' && W.C1_ENABLED === false) {
+    return { status: 'skip', reason: 'C-1は現在生成を停止しています', pattern: 'C-1',
+             roles: { axis: AX, axisBante: AB, axis3rd: A3, taisho: TA, taishoBante: TB,
+                      line3Head: SH, tanki: tanki[0] || null, axisLineIndex: ai, taishoLineIndex: ti },
+             axisScores };
+  }
 
   // ⑤ 買い目（各行が「1段」。表示もこの2行）
   const rows = [];
-  if (pattern === 'A-1') {
-    rows.push([[AX, AB], [AX, AB], [A3, TA, TB]]);      // 段1 6点
+  if (pattern === 'A-1' && W.A1_ROWS_V2) {
+    rows.push([[AX, AB], [AX, AB], [A3, TA]]);         // 1段目 4点（v2：3着から対番を外した）
+    rows.push([[TA], [TB], [AX, SH]]);                 // 2段目 2点（v2：対頭-対番-[軸頭,三頭]）
+    if (W.ADD_ANA_A1) rows.push([[SH], [AX], [AB]]);   // 3段目 1点（三頭-軸頭-軸番）
+  } else if (pattern === 'A-1') {
+    rows.push([[AX, AB], [AX, AB], [A3, TA, TB]]);      // 段1 6点（v1）
     if (W.ADD_ANA_A1) rows.push([[SH], [AX], [AB]]);   // 穴  1点
   } else if (pattern === 'A-2') {
     rows.push([[AX, AB], [AX, AB], [TA, TB]]);         // 段1 4点
@@ -23470,7 +23491,7 @@ function attachTextsToBets(stage4, texts) {
     if(res.status !== 'ok'){
       // ★対象外。空白のままだと不具合に見えるため理由を出す（指示書 4-5）
       var skipOut = { error: 'このレースは朝脳の対象外です（' + res.reason + '）',
-                      engine: 'asanou-v1', skip: true, skipReason: res.reason };
+                      engine: (ASANOU_V1.ENGINE || 'asanou-v1'), skip: true, skipReason: res.reason };
       window.__AXIS_V3_LAST = { race: race, out: skipOut, arePct: arePct, highlights: [], ex: ex };
       try{
         if(window.BRAIN_LOG && window.BRAIN_LOG.recordSkip){
@@ -23482,7 +23503,7 @@ function attachTextsToBets(stage4, texts) {
     }
 
     var out = {
-      engine: 'asanou-v1',
+      engine: (ASANOU_V1.ENGINE || 'asanou-v1'),
       bets: res.bets.slice(),
       compressed: res.compressed.slice(),
       compressedDisplay: res.compressed.slice(),   // 1要素＝1段。関数が返す順のまま表示（指示書 4-2）
@@ -23509,7 +23530,7 @@ function attachTextsToBets(stage4, texts) {
     try{
       if(window.BRAIN_LOG){
         window.BRAIN_LOG.record({
-          diag:{ cars:{}, race:[ '朝脳 v1 ' + res.pattern + ' ' + res.points + '点（点数はパターンで固定）' ],
+          diag:{ cars:{}, race:[ '朝脳 ' + String(ASANOU_V1.ENGINE || 'asanou-v1').replace('asanou-','') + ' ' + res.pattern + ' ' + res.points + '点（点数はパターンで固定）' ],
                  lineHold:null, classAdj:null },
           constraints:{}, bets: out.bets.map(function(c){ return { combo:c, p:null }; }),
           compressed: out.compressed.map(function(t){ return { text:t, n:0 }; }),
@@ -23527,7 +23548,7 @@ function attachTextsToBets(stage4, texts) {
   /* 記録の文脈（成功・対象外で共通）。レース時点の全選手データをそのまま渡す（第12章 12-5） */
   function asanouLogCtx(race, venue, lineup, arePct, ex, bankKey, agari, res, skipReason){
     return {
-      engine: 'asanou-v1',
+      engine: (ASANOU_V1.ENGINE || 'asanou-v1'),
       venue: venue ? venue.venue : '', venueId: venue ? venue.venueId : '',
       raceCode: venue ? venue.raceCode : '', dayNum: venue ? String(venue.dayNum||'') : '',
       raceNum: race.raceNum, cls: race.cls||'', grade: race.grade || (venue && venue.grade) || '',
