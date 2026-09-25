@@ -573,6 +573,39 @@
 .venue-finished{
   font-size:13px;font-weight:600;color:rgba(255,255,255,.45);
 }
+
+  /* ===== 無料枠とメンバーシップの案内（2026-09-24・朝脳と同じ構成をミッド脳の紫で） ===== */
+  .mid-promo{padding:14px 20px 52px;text-align:center;background:var(--bg);}
+  .mid-promo-h{margin:34px 0 14px;font-size:23px;font-weight:700;letter-spacing:.06em;color:#f2f3f5;}
+  .mid-promo-h span{position:relative;display:inline-block;padding:0 4px 2px;z-index:0;}
+  .mid-promo-h span::after{
+    content:'';position:absolute;left:0;right:0;bottom:3px;height:.26em;border-radius:3px;z-index:-1;
+    background:linear-gradient(90deg,#2a1642 0%,#46256e 55%,#5f3596 100%);box-shadow:0 0 10px rgba(70,37,110,.45);
+  }
+  .mid-promo-lead{font-size:14px;line-height:1.9;color:rgba(255,255,255,.66);font-weight:500;}
+  .mid-promo-body{font-size:14px;line-height:1.9;color:rgba(255,255,255,.86);margin-top:6px;}
+  .mid-promo-body strong{color:#c9a3f0;font-weight:700;}
+  .mid-promo-list{list-style:none;margin:10px auto 8px;padding:0;max-width:330px;text-align:left;}
+  .mid-promo-list li{
+    font-size:13.5px;line-height:1.5;color:rgba(255,255,255,.88);padding:10px 14px;margin:0 0 7px;border-radius:12px;
+    background:linear-gradient(160deg,rgba(38,34,50,.75) 0%,rgba(30,26,42,.75) 45%,rgba(54,32,88,.6) 100%);
+    border:1px solid rgba(168,130,220,.2);box-shadow:inset 0 1px 0 rgba(180,140,230,.12),0 4px 12px rgba(0,0,0,.35);
+  }
+  .mid-promo-note{margin-top:8px;font-size:11.5px;color:rgba(255,255,255,.4);}
+  .mid-promo-img{display:block;max-width:360px;margin:22px auto 0;border-radius:16px;overflow:hidden;
+    border:1px solid rgba(168,130,220,.25);box-shadow:0 16px 36px -16px rgba(0,0,0,.8),0 0 24px -10px rgba(123,79,176,.6);}
+  .mid-promo-img img{display:block;width:100%;height:auto;}
+  .mid-promo-cta{
+    display:block;max-width:360px;margin:16px auto 0;padding:15px 16px;border-radius:14px;
+    background:linear-gradient(160deg,#9b6fd6 0%,#7b4fb0 50%,#5a3590 100%);color:#fff;text-decoration:none;
+    font-size:15px;font-weight:700;letter-spacing:.1em;border:1px solid rgba(214,190,255,.3);
+    box-shadow:0 1px 0 rgba(255,255,255,.2) inset,0 14px 30px -12px rgba(123,79,176,.85),0 0 22px -8px rgba(180,126,224,.6);
+  }
+  .mid-promo-cta:active{transform:scale(.99);}
+  /* 開催カードの後に、案内1 → 案内2 の順で表示 */
+  .mid-promo-part{opacity:0;transform:translateY(20px);transition:opacity .65s ease,transform .65s cubic-bezier(.22,1,.36,1);}
+  .mid-promo-part.in{opacity:1;transform:none;}
+  @media (prefers-reduced-motion:reduce){ .mid-promo-part{opacity:1;transform:none;transition:none;} }
 </style>
 </head>
 <body>
@@ -603,6 +636,34 @@
     <section class="mid-race-section">
       <div id="midRaceCards">
         <div class="mid-loading"><span class="mid-spinner"></span>開催情報を取得中…</div>
+      </div>
+    </section>
+
+    <!-- ===== 無料枠とメンバーシップの案内（2026-09-24 ボンバイエ指示：朝脳と同じ内容をミッド脳の紫で） ===== -->
+    <section class="mid-promo" aria-label="ご利用案内">
+      <div class="mid-promo-part" id="midPromo1">
+      <h2 class="mid-promo-h"><span>毎日1~3Rが無料</span></h2>
+      <p class="mid-promo-lead">4~7Rの買い目生成は<br>メンバーシップ会員限定となります<br>メンバーの方は掲示板固定投稿に記載の<br>入場コードを入力して出走表画面から<br>買い目を生成してください</p>
+      </div>
+
+      <div class="mid-promo-part" id="midPromo2">
+      <h2 class="mid-promo-h"><span>Brainメンバーシップ</span></h2>
+      <p class="mid-promo-body">Brainメンバーシップ会員は、</p>
+      <ul class="mid-promo-list">
+        <li>【競輪レースの荒れ予報指数】</li>
+        <li>【モーニング競輪専用　朝脳】</li>
+        <li>【デイナイター買い目生成】</li>
+        <li>【ミッドナイト競輪専用　ミッド脳】</li>
+        <li>【軸指定･点数指定での買い目生成】</li>
+        <li>【出走表・レース情報のテキスト生成】</li>
+      </ul>
+      <p class="mid-promo-body">等のコンテンツが全て<br><strong>月額390円のみ</strong>でご利用いただけます</p>
+      <p class="mid-promo-note">※利用できるコンテンツは随時拡張予定です</p>
+
+      <a class="mid-promo-img" href="https://note.com/brainkeirin/membership/join" target="_blank" rel="noopener">
+        <img src="/membership-card.jpg" alt="Brain メンバーシップ" loading="lazy" width="900" height="471">
+      </a>
+      <a class="mid-promo-cta" href="https://note.com/brainkeirin/membership/join" target="_blank" rel="noopener">メンバーシップへ入会する</a>
       </div>
     </section>
   </main>
@@ -798,6 +859,7 @@ function parseWinticketRaceUrl(link){
     const container = document.getElementById('midRaceCards');
     if(!venues.length){
       container.innerHTML = '<div class="venue-empty">本日のミッドナイト開催はありません</div>';
+      if(MID_REVEALED) midRevealPromo(300);
       return;
     }
     container.innerHTML = venues.map((v, idx)=>{
@@ -865,7 +927,26 @@ function parseWinticketRaceUrl(link){
       if(card.classList.contains('show')) return;
       setTimeout(()=>card.classList.add('show'), (startDelay || 0) + 90 * i);
     });
+    // ★2026-09-24：開催カードが出終わってから、下の案内を順に出す（朝脳と同じ）。
+    //   まだ一覧を取得中（カードも「開催なし」表示も無い）のときは出さない（案内が先に出てしまうため）。
+    if (cards.length) {
+      midRevealPromo((startDelay || 0) + 90 * (cards.length - 1) + 600);
+    } else if (document.querySelector('#midRaceCards .venue-empty')) {
+      midRevealPromo((startDelay || 0) + 300);
+    }
   }
+
+  /* 下の案内の時間差表示。案内1（毎日1~3Rが無料）→ 案内2（Brainメンバーシップ）。1回だけ。 */
+  let midPromoRevealed = false;
+  function midRevealPromo(delay){
+    if(midPromoRevealed || !MID_REVEALED) return;
+    midPromoRevealed = true;
+    const p1 = document.getElementById('midPromo1'), p2 = document.getElementById('midPromo2');
+    setTimeout(()=>{ if(p1) p1.classList.add('in'); }, Math.max(0, delay));
+    setTimeout(()=>{ if(p2) p2.classList.add('in'); }, Math.max(0, delay) + 700);
+  }
+  // 開催が無い日・取得に失敗した日でも案内は出す（カードの表示を待たない保険）
+  setTimeout(()=>{ if(MID_REVEALED) midRevealPromo(0); }, 7000);
 
   // 開催カードのトグル：下方向に伸びてレースセレクターを表示
   const MID_RACES_CACHE = {};   // idx → races[]
@@ -954,7 +1035,8 @@ function parseWinticketRaceUrl(link){
     }).join('');
   }
 
-  // レース番号タップ → 出走表ページ（/midrace）へ遷移。※ここでmid入場コードが要求される
+  // レース番号タップ → 出走表ページ（/midrace）へ遷移。
+  //   ★2026-09-24：/midrace は公開。1〜3Rは誰でも、4R以降は出走表画面でコード入力（朝脳と同じ）
   function midSelectRace(idx, raceNum, event){
     event.stopPropagation();
     const btn = event.currentTarget;

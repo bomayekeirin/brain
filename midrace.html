@@ -18,6 +18,77 @@
 <title>Brain</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+JP:wght@400;500;700;900&family=Oswald:wght@300;400;500&family=Outfit:wght@300;400;500&family=Roboto+Condensed:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+<script>
+/* ===================================================================
+ * ミッド脳：無料枠とメンバー判定（2026-09-24・朝脳と同じ仕様）
+ *   1〜3R  … 誰でも出走表を見て生成できる
+ *   4R以降 … Brain会員（brain_session）またはミッド脳のコード（mid_session）が要る
+ *   認証は Worker が持っている。Cookie は HttpOnly でページから読めないため、
+ *   /auth-status?realm=mid に尋ねて状態を受け取る（Brain にログイン済みなら Worker 側で通る）。
+ * =================================================================== */
+const MID_GATE = {
+  FREE_MAX_RACE: 3,                                     // ここまでは無料
+  MEMBERSHIP_URL: 'https://note.com/brainkeirin/membership/join',
+  MEMBERSHIP_IMG: '/membership-card.jpg',
+  MEMBERSHIP_NOTE: '月額390円でBrainの全機能が利用可能（モーニング･デイナイター･ミッドナイトのおまかせ生成含む）',
+};
+let MID_MEMBER = false;          // 認証済みか（/auth-status の結果）
+let MID_MEMBER_CHECKED = false;  // 一度でも確認できたか
+
+async function midCheckMember(){
+  try{
+    const r = await fetch('/auth-status?realm=mid', { credentials: 'same-origin', cache: 'no-store' });
+    if (!r.ok) return MID_MEMBER;
+    const j = await r.json();
+    MID_MEMBER = !!j.authed;
+    MID_MEMBER_CHECKED = true;
+  }catch(e){ /* 取得できないときは未認証のまま（無料枠だけ使える） */ }
+  return MID_MEMBER;
+}
+/* そのレースが会員限定か */
+function midRaceLocked(race){
+  if (MID_MEMBER) return false;
+  const n = Number(race && (race.raceNum != null ? race.raceNum : race));
+  return !!n && n > MID_GATE.FREE_MAX_RACE;
+}
+/* 認証が通ったあとの画面の作り直し */
+function midApplyMemberState(){
+  try{ if (typeof renderRaceSelector === 'function') renderRaceSelector(); }catch(e){}
+  try{ if (typeof updateGenerateZone === 'function') updateGenerateZone(); }catch(e){}
+}
+/* 管理画面の保護（/midrace を公開ページにしたため）。
+ *   Brain のセッションが無ければ、その場で Brain の入場コードを求める（朝脳と同じ）。 */
+async function midGuardAdmin(){
+  try{
+    const r = await fetch('/auth-status?realm=brain', { credentials:'same-origin', cache:'no-store' });
+    if (r.ok){
+      const j = await r.json();
+      if (j && j.authed) return true;
+    }
+  }catch(e){
+    return true;   // 状態を確認できないとき（ローカル検証など）は従来どおり
+  }
+  const openAdminGate = function(){
+    window.__MID_GATE_REALM  = 'brain';
+    window.__MID_GATE_AFTER  = function(){ location.reload(); };
+    window.__MID_GATE_CANCEL = function(){ location.href = '/midnight'; };
+    if (typeof midOpenGate === 'function') {
+      midOpenGate(null);
+      const sub = document.querySelector('#midGate .mid-gate-sub');
+      const ttl = document.querySelector('#midGate .mid-gate-title');
+      if (ttl) ttl.textContent = '管理画面';
+      if (sub) sub.innerHTML = '管理画面を開くには<br>Brainの入場コードを入力してください';
+      const ms = document.querySelector('#midGate .ms-wrap');
+      if (ms) ms.style.display = 'none';
+    } else {
+      location.href = '/midnight';
+    }
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', openAdminGate);
+  else openAdminGate();
+  return false;
+}
+</script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;-ms-overflow-style:none;scrollbar-width:none;}
 *::-webkit-scrollbar{display:none;}
@@ -6977,6 +7048,74 @@ body.omk-shake{animation:omkShake .42s linear;}
 }
 
 </style>
+<style id="mid-gate-css">
+
+/* ===================================================================
+ * ミッド脳：会員限定レースの表示とコード入力（2026-09-24・朝脳と同じ仕様をミッドの紫で）
+ * =================================================================== */
+#screen-racetable .rt-race-btn.mid-locked{opacity:.5 !important;filter:saturate(.35);}
+#screen-racetable .rt-race-btn > .mid-lock-mark{
+  position:absolute !important;top:6px !important;left:7px !important;right:auto !important;
+  color:rgba(215,195,245,.85);z-index:3;line-height:0;   /* 左上（右上は生成可能ランプの位置） */
+}
+#midLockBar{
+  position:fixed;left:0;right:0;bottom:0;z-index:600;display:none;
+  padding:12px 16px calc(12px + env(safe-area-inset-bottom));
+  background:rgba(12,10,18,.86);
+  -webkit-backdrop-filter:saturate(1.3) blur(16px);backdrop-filter:saturate(1.3) blur(16px);
+  border-top:1px solid rgba(180,126,224,.2);box-shadow:0 -10px 26px -18px rgba(123,79,176,.7);
+}
+#midLockBar.show{display:block;}
+#midLockBar .mid-lock-msg{text-align:center;font-size:11.5px;color:rgba(255,255,255,.62);letter-spacing:.02em;margin-bottom:9px;}
+#midLockBtn{
+  width:100%;padding:15px 16px;border:1px solid rgba(214,190,255,.35);border-radius:14px;
+  background:linear-gradient(160deg,#9b6fd6 0%,#7b4fb0 50%,#5a3590 100%);
+  color:#fff;font-family:inherit;font-size:15px;font-weight:700;letter-spacing:.1em;cursor:pointer;
+  box-shadow:0 1px 0 rgba(255,255,255,.2) inset,0 14px 30px -12px rgba(123,79,176,.85),0 0 22px -8px rgba(180,126,224,.6);
+}
+#midLockBtn:active{transform:scale(.99);}
+#midGate{
+  position:fixed;inset:0;z-index:12000;display:none;
+  background:rgba(8,6,14,.95);
+  -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+  overflow-y:auto;-webkit-overflow-scrolling:touch;color:rgba(255,255,255,.92);
+}
+#midGate.show{display:block;}
+.mid-gate-inner{
+  min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:calc(28px + env(safe-area-inset-top, 0px)) 20px calc(28px + env(safe-area-inset-bottom, 0px));
+}
+.mid-gate-close{
+  position:absolute;top:calc(10px + env(safe-area-inset-top, 0px));right:12px;
+  width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,255,255,.16);
+  background:rgba(255,255,255,.07);color:rgba(255,255,255,.8);font-size:20px;line-height:1;cursor:pointer;
+}
+.mid-gate-title{font-size:17px;font-weight:700;color:#fff;letter-spacing:.06em;}
+.mid-gate-sub{margin-top:10px;font-size:12px;line-height:1.8;color:rgba(255,255,255,.62);text-align:center;}
+.mid-pin{display:flex;gap:11px;margin-top:24px;}
+.mid-pin input{
+  width:52px;height:62px;text-align:center;font-family:inherit;font-size:26px;font-weight:700;
+  color:#fff;caret-color:#b47ee0;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);border-radius:13px;outline:none;
+}
+.mid-pin input:focus{border-color:#b47ee0;box-shadow:0 0 0 3px rgba(142,95,192,.25),0 0 22px rgba(180,126,224,.35);}
+.mid-pin.error{animation:midShakeX .42s ease;}
+@keyframes midShakeX{0%,100%{transform:translateX(0);}18%{transform:translateX(-9px);}38%{transform:translateX(9px);}58%{transform:translateX(-6px);}78%{transform:translateX(6px);}}
+.mid-gate-err{height:18px;margin-top:14px;font-size:12px;color:#e0738f;opacity:0;transition:opacity .2s;}
+.mid-gate-err.show{opacity:1;}
+#midGate .ms-wrap{width:100%;max-width:330px;margin:14px auto 0;text-align:center;}
+#midGate .ms-toggle{background:none;border:none;padding:6px 4px;cursor:pointer;font-family:inherit;
+  font-size:12px;letter-spacing:.04em;color:rgba(255,255,255,.62);text-decoration:underline;text-underline-offset:4px;}
+#midGate .ms-panel{max-height:0;overflow:hidden;opacity:0;transition:max-height .42s cubic-bezier(.22,1,.36,1),opacity .3s ease;}
+#midGate .ms-wrap.open .ms-panel{max-height:560px;opacity:1;}
+#midGate .ms-inner{padding:14px 0 4px;}
+#midGate .ms-img{display:block;border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,.12);box-shadow:0 10px 26px rgba(0,0,0,.45);}
+#midGate .ms-img img{display:block;width:100%;height:auto;}
+#midGate .ms-note{margin-top:12px;font-size:11.5px;line-height:1.75;color:rgba(255,255,255,.66);text-align:left;}
+#midGate .ms-cta{display:block;margin-top:14px;padding:13px 16px;border-radius:12px;color:#fff;text-decoration:none;
+  font-size:14px;font-weight:600;letter-spacing:.06em;background:linear-gradient(135deg,#8e5fc0,#b47ee0);box-shadow:0 10px 26px rgba(0,0,0,.45);}
+@media (prefers-reduced-motion:reduce){ #midGate .ms-panel{transition:none;} .mid-pin.error{animation:none;} }
+
+</style>
 </head>
 <body>
 
@@ -10505,8 +10644,12 @@ function renderRaceSelector() {
       }
     }
     
+    // ★ミッド脳：4R以降は未認証だと選べない（グレーアウト）2026-09-24
+    const midLocked = (typeof midRaceLocked === 'function') ? midRaceLocked(race) : false;
+
     return `
-      <button class="rt-race-btn ${isActive ? 'active' : ''}" data-race-idx="${idx}">
+      <button class="rt-race-btn ${isActive ? 'active' : ''}${midLocked ? ' mid-locked' : ''}" data-race-idx="${idx}"${midLocked ? ' data-locked="1" aria-disabled="true"' : ''}>
+        ${midLocked ? '<span class="mid-lock-mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10.5" width="15" height="9.5" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg></span>' : ''}
         ${deadlineClass !== 'ended' && (typeof isV3Generatable==='function' ? isV3Generatable(race) : false) ? '<span class="rt-race-lamp"></span>' : ''}
         <span class="rt-race-btn-num">${race.raceNum}R</span>
         <span class="rt-race-btn-deadline ${deadlineClass}">${deadlineText}</span>
@@ -10519,6 +10662,8 @@ function renderRaceSelector() {
   container.querySelectorAll('.rt-race-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const idx = parseInt(btn.dataset.raceIdx);
+      // ★ミッド脳：会員限定のレースは開かず、コード入力を出す
+      if (btn.dataset.locked === '1') { midOpenGate(CURRENT_VENUE_RACES[idx]); return; }
       if (idx !== CURRENT_RACE_INDEX) {
         CURRENT_RACE_INDEX = idx;
         // オッズキャッシュをクリア
@@ -14952,6 +15097,8 @@ async function startBootTransition() {
       if (bo) { bo.classList.remove('show'); bo.style.display = 'none'; }
       const lo = document.getElementById('loadingOverlay');
       if (lo) lo.classList.add('hidden');
+      // ★2026-09-24：/midrace は公開ページになったので、管理画面は Brain のセッションがある人だけに出す
+      midGuardAdmin();
       const boot = function(){
         if (window.ADMIN && typeof window.ADMIN.open === 'function') window.ADMIN.open();
         else setTimeout(boot, 120);
@@ -15000,6 +15147,7 @@ async function midBootFromParams(){
   //   開催一覧が空・壊れているときに復旧手段まで失わないための導線。
   if (p.get('admin') === '1') {
     document.getElementById('loadingOverlay')?.classList.add('hidden');
+    midGuardAdmin();   // ★2026-09-24：Brain のセッションが無ければ Brain の入場コードを求める
     const boot = function(){
       if (window.ADMIN && typeof window.ADMIN.open === 'function') window.ADMIN.open();
       else setTimeout(boot, 120);
@@ -15034,6 +15182,22 @@ async function midBootFromParams(){
 
   try{
     await fetchVenueRaces(venue, raceNum);
+    // ★ミッド脳：会員限定のレースを直接開いた場合は、無料枠の先頭に寄せてコード入力を出す（2026-09-24）
+    try{
+      await midCheckMember();
+      const _cur = CURRENT_VENUE_RACES[CURRENT_RACE_INDEX];
+      if (_cur && midRaceLocked(_cur)) {
+        const free = CURRENT_VENUE_RACES.findIndex(r => !midRaceLocked(r));
+        if (free >= 0) {
+          CURRENT_RACE_INDEX = free;
+          showRaceTable(CURRENT_VENUE_RACES[free], true);
+        }
+        midApplyMemberState();
+        midOpenGate(_cur);
+      } else {
+        midApplyMemberState();
+      }
+    }catch(e){}
   }catch(e){
     console.error('midBootFromParams error:', e);
   }finally{
@@ -15265,6 +15429,15 @@ function updateGenerateZone(){
   // TENKAI展開エンジンは二分戦・細切れ・単騎混在も扱えるため三分戦制限は課さない。
   // 選手2名以上＋ライン配列ありで生成可（データ不足のみガード）。
   // v3（軸指定）は三分戦・単騎含む三分戦のみ対応。生成対象レースだけボタンを出す。
+  // ★ミッド脳：4R以降で未認証なら、生成ボタンの代わりに解放の案内を出す（2026-09-24）
+  if (typeof midRaceLocked === 'function' && midRaceLocked(currentRace)) {
+    midShowLockBar(true);
+    if(screen){ screen.classList.add('has-fixed-genbar'); }
+    hideFixed();
+    return;
+  }
+  midShowLockBar(false);
+
   const ok = (typeof isV3Generatable==='function' ? isV3Generatable(currentRace) : false) && !isRaceFinished;
 
   if (ok) {
@@ -25740,6 +25913,146 @@ body.tk-lock{ overflow:hidden; }
   window.TENKAI_RENDER = { open: open, openV2: openV2, openV3: openV3, close: close, frameColor: frameColor };
 })();
 
+</script>
+
+<!-- ===== ミッド脳：会員限定の案内バー（生成ボタンの位置）2026-09-24 ===== -->
+<div id="midLockBar">
+  <div class="mid-lock-msg">4R以降はメンバー限定です（1〜3Rは無料でご利用いただけます）</div>
+  <button type="button" id="midLockBtn">コードを入力して解放する</button>
+</div>
+
+<!-- ===== ミッド脳：コード入力 ===== -->
+<div id="midGate" role="dialog" aria-modal="true" aria-label="コード入力">
+  <button type="button" class="mid-gate-close" id="midGateClose" aria-label="閉じる">×</button>
+  <div class="mid-gate-inner">
+    <div class="mid-gate-title">4R以降はメンバー限定</div>
+    <div class="mid-gate-sub">4R以降はメンバー限定です<br>メンバーシップに記載の入場コードを<br>入力してください<br>ミッド脳は1~3Rのみ無料でご利用頂けます</div>
+    <div class="mid-pin" id="midPin">
+      <input type="tel" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="コード1桁目">
+      <input type="tel" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="コード2桁目">
+      <input type="tel" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="コード3桁目">
+      <input type="tel" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="コード4桁目">
+    </div>
+    <div class="mid-gate-err" id="midGateErr">コードが違います</div>
+    <div class="ms-wrap">
+      <button type="button" class="ms-toggle" id="midMsToggle" aria-expanded="false">※コードをお持ちでない方はコチラ</button>
+      <div class="ms-panel">
+        <div class="ms-inner">
+          <a class="ms-img" id="midMsImg" href="#" target="_blank" rel="noopener"><img id="midMsImgSrc" alt="Brain メンバーシップ" loading="lazy"></a>
+          <div class="ms-note" id="midMsNote"></div>
+          <a class="ms-cta" id="midMsCta" href="#" target="_blank" rel="noopener">メンバーシップに入会する</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===================================================================
+ * ミッド脳：会員限定レースのコード入力（2026-09-24・朝脳と同じ動き）
+ *   Worker の /auth（realm:'mid'）に4桁を送り、通れば Cookie が発行される。
+ *   Brainの本線コード・ミッドの旧本線コード（今月まで）・ミッドのワンデーコードのどれでも通る（判定はWorker側）。
+ * =================================================================== */
+(function(){
+  function $(id){ return document.getElementById(id); }
+  var gate, pinWrap, inputs = [], errEl, checking = false;
+
+  function fillMembership(){
+    var img = $('midMsImgSrc'), a1 = $('midMsImg'), a2 = $('midMsCta'), note = $('midMsNote');
+    if (img && !img.getAttribute('src')) img.setAttribute('src', MID_GATE.MEMBERSHIP_IMG);
+    if (a1) a1.href = MID_GATE.MEMBERSHIP_URL;
+    if (a2) a2.href = MID_GATE.MEMBERSHIP_URL;
+    if (note) note.textContent = MID_GATE.MEMBERSHIP_NOTE;
+  }
+
+  window.midOpenGate = function(race){
+    gate = $('midGate'); if(!gate) return;
+    fillMembership();
+    var sub = gate.querySelector('.mid-gate-sub');
+    if (sub && race && race.raceNum) {
+      sub.innerHTML = String(race.raceNum) + 'R はメンバー限定です<br>メンバーシップに記載の入場コードを<br>入力してください<br>ミッド脳は1~' + MID_GATE.FREE_MAX_RACE + 'Rのみ無料でご利用頂けます';
+    }
+    inputs.forEach(function(i){ i.value=''; });
+    if (errEl) errEl.classList.remove('show');
+    gate.classList.add('show');
+    setTimeout(function(){ if (inputs[0]) inputs[0].focus(); }, 180);
+  };
+  window.midCloseGate = function(){ if(gate) gate.classList.remove('show'); };
+
+  window.midShowLockBar = function(on){
+    var bar = $('midLockBar'); if(!bar) return;
+    bar.classList.toggle('show', !!on);
+    var screen = $('screen-racetable');
+    if (screen && on) { requestAnimationFrame(function(){ screen.style.paddingBottom = ((bar.offsetHeight||0) + 14) + 'px'; }); }
+  };
+
+  function codeStr(){ return inputs.map(function(i){ return i.value; }).join(''); }
+  function allFilled(){ return inputs.every(function(i){ return i.value !== ''; }); }
+
+  function onError(){
+    errEl.classList.add('show');
+    pinWrap.classList.remove('error'); void pinWrap.offsetWidth; pinWrap.classList.add('error');
+    setTimeout(function(){ inputs.forEach(function(i){ i.value=''; }); inputs[0].focus(); }, 420);
+  }
+
+  async function verify(){
+    if (checking) return;
+    checking = true;
+    try{
+      var r = await fetch('/auth', {
+        method:'POST', credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ code: codeStr(), realm: (window.__MID_GATE_REALM || 'mid') })
+      });
+      if (r.ok){
+        if (typeof window.__MID_GATE_AFTER === 'function') { checking = false; window.__MID_GATE_AFTER(); return; }
+        MID_MEMBER = true; MID_MEMBER_CHECKED = true;
+        window.midCloseGate();
+        midApplyMemberState();
+        if (typeof showToast === 'function') showToast('解放しました。4R以降もご利用いただけます');
+        checking = false;
+        return;
+      }
+    }catch(e){}
+    onError();
+    checking = false;
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    gate = $('midGate'); pinWrap = $('midPin'); errEl = $('midGateErr');
+    if(!gate || !pinWrap) return;
+    inputs = Array.prototype.slice.call(pinWrap.querySelectorAll('input'));
+    inputs.forEach(function(inp, idx){
+      inp.addEventListener('input', function(){
+        inp.value = inp.value.replace(/[^0-9]/g,'').slice(0,1);
+        errEl.classList.remove('show');
+        if (inp.value && idx < inputs.length-1) inputs[idx+1].focus();
+        if (allFilled()) verify();
+      });
+      inp.addEventListener('keydown', function(e){
+        if (e.key === 'Backspace' && !inp.value && idx > 0){ inputs[idx-1].focus(); inputs[idx-1].value=''; }
+        if (e.key === 'Enter' && allFilled()) verify();
+      });
+    });
+    var close = $('midGateClose');
+    if (close) close.addEventListener('click', function(){
+      if (typeof window.__MID_GATE_CANCEL === 'function') { window.__MID_GATE_CANCEL(); return; }
+      window.midCloseGate();
+    });
+    var lockBtn = $('midLockBtn');
+    if (lockBtn) lockBtn.addEventListener('click', function(){
+      var r = (typeof CURRENT_VENUE_RACES !== 'undefined') ? CURRENT_VENUE_RACES[CURRENT_RACE_INDEX] : null;
+      window.midOpenGate(r);
+    });
+    var msT = $('midMsToggle');
+    if (msT) msT.addEventListener('click', function(){
+      var w = msT.closest('.ms-wrap');
+      var open = w.classList.toggle('open');
+      msT.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open) setTimeout(function(){ w.scrollIntoView({behavior:'smooth', block:'nearest'}); }, 260);
+    });
+  });
+})();
 </script>
 </body>
 </html>
