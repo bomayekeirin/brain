@@ -7053,7 +7053,13 @@ body.omk-shake{animation:omkShake .42s linear;}
 /* ===================================================================
  * ミッド脳：会員限定レースの表示とコード入力（2026-09-24・朝脳と同じ仕様をミッドの紫で）
  * =================================================================== */
-#screen-racetable .rt-race-btn.mid-locked{opacity:.5 !important;filter:saturate(.35);}
+/* ★2026-09-25：ボタン全体を薄くすると緑ランプまで霞むため、薄くするのは「中身の文字」と「地」だけにする。
+ *   緑ランプ（.rt-race-lamp）と鍵マークは対象外＝いつもどおり明るく点滅する。 */
+#screen-racetable .rt-race-btn.mid-locked{
+  background:linear-gradient(160deg,rgba(28,26,34,.85) 0%,rgba(22,20,28,.85) 100%) !important;
+  border-color:rgba(255,255,255,.08) !important;box-shadow:0 2px 6px rgba(0,0,0,.45) !important;
+}
+#screen-racetable .rt-race-btn.mid-locked > *:not(.rt-race-lamp):not(.mid-lock-mark){opacity:.45;filter:saturate(.35);}
 #screen-racetable .rt-race-btn > .mid-lock-mark{
   position:absolute !important;top:6px !important;left:7px !important;right:auto !important;
   color:rgba(215,195,245,.85);z-index:3;line-height:0;   /* 左上（右上は生成可能ランプの位置） */
