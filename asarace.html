@@ -20,16 +20,21 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
 <script>
 /* ===================================================================
- * 朝脳 v1 ロジック（分析チャット 2026-09-21・asanou_logic.js をそのまま貼付）
+ * 朝脳ロジック v1.2（分析チャット 2026-09-25・asanou_logic.js v1.2 を貼付）
+ *   原本からの変更は「本番スイッチ」（C1_ENABLED・A1_ROWS_V2・ENGINE と、それを使う2か所）と module.exports の削除のみ。
  * =================================================================== */
 /* =====================================================================
- * 朝脳（モーニング）買い目生成ロジック v1  ― 2026-09-21 分析チャット
+ * 朝脳（モーニング）買い目生成ロジック v1.2  ― 2026-09-25 分析チャット
+ * ---------------------------------------------------------------------
+ * v1.1 変更点：A-2 を v2（10点・3行表示）に変更。A-1 / C-1 は v1 のまま
+ * v1.2 変更点：E-1（ライン構成 3=2=1=1・8点）を新設。A-1 / A-2 / C-1 は v1.1 のまま
  * ---------------------------------------------------------------------
  * 入力  lineup  : 並び。ライン単位の配列（前→後の順）。車番は文字列でも数値でも可
  *                 例 [["1","4","6"],["5","2"],["7","3"]]
  *       players : [{ car, pt }]  pt = 競走得点
- * 出力  { status, pattern, points, bets, compressed, roles, axisScores, reason }
- *       status : 'ok' | 'skip'（生成対象外）
+ * 出力  { status, pattern, points, bets, compressed, display, roles, axisScores, reason }
+ *       compressed : 買い目のデータ（1要素＝1矩形。"-" 区切りのみ）… オッズ・購入・ログ用
+ *       display    : 画面表示用（[{ label, items[] }]）… 同じ行の items は " / " でつないで表示
  * ---------------------------------------------------------------------
  * 使わないもの：荒れ指数・AI印・決まり手・EX・柔軟枠（すべて不要）
  * ===================================================================== */
@@ -39,16 +44,17 @@ const ASANOU_V1 = {
   W_LINE_SIZE: 1.26,   // ライン人数
   W_PT:        0.149,  // 競走得点（ライン先頭の選手）
   ADD_ANA_A1:  true,   // A-1 の穴目「三頭-軸頭-軸番」を出すか
-  /* ★2026-09-24 ボンバイエ指示（朝脳 v2）
-   *   C1_ENABLED   : C-1（三分戦＋単騎）を生成するか。false の間は対象外（ランプ・生成ボタンなし）
-   *   A1_ROWS_V2   : A-1 の段の組み方。true＝v2（下記）／false＝v1（分析チャット原案）
-   *     v1  1段目 [軸頭,軸番]-[軸頭,軸番]-[軸3,対頭,対番] 6点 ／ 穴 三頭-軸頭-軸番 1点
-   *     v2  1段目 [軸頭,軸番]-[軸頭,軸番]-[軸3,対頭]      4点
-   *         2段目 対頭-対番-[軸頭,三頭]                    2点
-   *         3段目 三頭-軸頭-軸番（ADD_ANA_A1）             1点   計7点 */
+  A2_V2:       true,   // ★v1.1 追加：A-2 を v2（10点）にする。false で v1（8点）に戻る
+  E1:          true,   // ★v1.2 追加：E-1（3=2=1=1）を出す。false で従来どおり skip
+  /* ===== ここから Brain 本番側で重ねたスイッチ（分析チャット原本には無い）=====
+   * 2026-09-24 ボンバイエ指示（朝脳 v2・STATUS 6-4）で本番に入っていた判断を、v1.2 の上に残す。
+   *   C1_ENABLED : false の間は C-1 を生成しない（対象外）。true で分析原本どおり
+   *   A1_ROWS_V2 : true で A-1 を「1段目[軸頭,軸番]-[軸頭,軸番]-[軸3,対頭] 4点／2段目 対頭-対番-[軸頭,三頭] 2点
+   *                ／3段目 三頭-軸頭-軸番 1点」の7点にする。false で分析原本（v1）どおり
+   * 両方を分析原本の値（C1_ENABLED:true・A1_ROWS_V2:false）にすると、asanou_logic.js v1.2 と完全に同じ出力になる。 */
   C1_ENABLED:  false,
   A1_ROWS_V2:  true,
-  ENGINE:      'asanou-v2'   // 記録の版名（v1 の成績と分けるため）
+  ENGINE:      'asanou-v1.2'   // 記録の版名（指示書 8-2）。スイッチの状態は記録の engineFlags に残す
 };
 
 function asanouGenerate(lineup, players) {
@@ -56,6 +62,16 @@ function asanouGenerate(lineup, players) {
   const lines = (lineup || []).map(g => g.map(S));
   const big   = lines.filter(g => g.length >= 2);      // 2車以上ライン（前→後）
   const tanki = lines.filter(g => g.length === 1).map(g => g[0]);
+
+  // ⓪ E-1：ライン構成 3=2=1=1（7車・3車ライン1本・2車ライン1本・単騎2人）
+  //    並び順は問わない。競走得点は使わない（欠損でも skip しない）
+  if (ASANOU_V1.E1) {
+    const nCar = lines.reduce((a, g) => a + g.length, 0);
+    const L3c = big.filter(g => g.length === 3), L2c = big.filter(g => g.length === 2);
+    if (nCar === 7 && big.length === 2 && L3c.length === 1 && L2c.length === 1 && tanki.length === 2) {
+      return asanouE1(lines, big, L3c[0], L2c[0], tanki);
+    }
+  }
 
   // ① 対象判定：2車以上ラインが3本（三分戦）のみ生成
   if (big.length !== 3) {
@@ -76,65 +92,134 @@ function asanouGenerate(lineup, players) {
     score: (2 - Math.min(i, 2)) * W.W_LINE_POS + g.length * W.W_LINE_SIZE + ptOf[g[0]] * W.W_PT
   }));
   let ai = 0;
-  for (let i = 1; i < 3; i++) if (axisScores[i].score > axisScores[ai].score) ai = i;   // 厳密に大きい時のみ更新＝同点は前
+  for (let i = 1; i < 3; i++) if (axisScores[i].score > axisScores[ai].score) ai = i;   // 厳密に大きい時のみ更新＝同点は前（丸めない）
 
-  // ③ 対抗：残りのうち並びが前のライン。三頭ライン：残り1本
+  // ③ 対抗：残りのうち並びが前のライン。第3ライン：残り1本
   const rest = [0, 1, 2].filter(i => i !== ai);
   const ti = rest[0], si = rest[1];
   const L1 = big[ai], L2 = big[ti], L3 = big[si];
 
   const AX = L1[0], AB = L1[1], A3 = L1[2] || null;    // 軸頭・軸番・軸3
   const TA = L2[0], TB = L2[1];                         // 対頭・対番
-  const SH = L3[0];                                     // 三頭（第3ラインの先頭）
+  const SH = L3[0], SB = L3[1];                         // 三頭・三番（第3ラインは必ず2車以上）
 
   // ④ パターン
   const pattern = tanki.length ? 'C-1' : (A3 ? 'A-1' : 'A-2');
-  // ★2026-09-24：C-1 は生成停止中（C1_ENABLED を true に戻せば従来どおり）
+
+  // ★本番スイッチ：C-1 の生成停止（2026-09-24）
   if (pattern === 'C-1' && W.C1_ENABLED === false) {
     return { status: 'skip', reason: 'C-1は現在生成を停止しています', pattern: 'C-1',
              roles: { axis: AX, axisBante: AB, axis3rd: A3, taisho: TA, taishoBante: TB,
-                      line3Head: SH, tanki: tanki[0] || null, axisLineIndex: ai, taishoLineIndex: ti },
+                      line3Head: SH, line3Bante: SB, tanki: tanki[0] || null,
+                      axisLineIndex: ai, taishoLineIndex: ti },
              axisScores };
   }
 
-  // ⑤ 買い目（各行が「1段」。表示もこの2行）
-  const rows = [];
-  if (pattern === 'A-1' && W.A1_ROWS_V2) {
-    rows.push([[AX, AB], [AX, AB], [A3, TA]]);         // 1段目 4点（v2：3着から対番を外した）
-    rows.push([[TA], [TB], [AX, SH]]);                 // 2段目 2点（v2：対頭-対番-[軸頭,三頭]）
-    if (W.ADD_ANA_A1) rows.push([[SH], [AX], [AB]]);   // 3段目 1点（三頭-軸頭-軸番）
+  // ⑤ 買い目：行（label）ごとに矩形（[1着群, 2着群, 3着群]）を並べる
+  let groups;
+  if (pattern === 'A-1' && W.A1_ROWS_V2) {                             // ★本番スイッチ：A-1 の段組み（朝脳 v2）
+    groups = [
+      { label: null, boxes: [[[AX, AB], [AX, AB], [A3, TA]]] },        //   1段目 4点
+      { label: null, boxes: [[[TA], [TB], [AX, SH]]] },                //   2段目 2点
+    ];
+    if (W.ADD_ANA_A1) groups.push({ label: null, boxes: [[[SH], [AX], [AB]]] });   // 3段目 1点
   } else if (pattern === 'A-1') {
-    rows.push([[AX, AB], [AX, AB], [A3, TA, TB]]);      // 段1 6点（v1）
-    if (W.ADD_ANA_A1) rows.push([[SH], [AX], [AB]]);   // 穴  1点
+    groups = [
+      { label: null, boxes: [[[AX, AB], [AX, AB], [A3, TA, TB]]] },     // 6点
+    ];
+    if (W.ADD_ANA_A1) groups.push({ label: null, boxes: [[[SH], [AX], [AB]]] });   // 穴 1点
   } else if (pattern === 'A-2') {
-    rows.push([[AX, AB], [AX, AB], [TA, TB]]);         // 段1 4点
-    rows.push([[TA], [AX, AB], [AX, AB, TB]]);         // 段2 4点
-  } else {                                              // C-1
-    rows.push([[AX, AB], [AX, AB], [TA, TB]]);         // 段1 4点
-    rows.push([[TA], [AX], [AB, TB]]);                 // 段2 2点
+    if (W.A2_V2) {
+      groups = [                                                        // ★A-2 v2（10点）
+        { label: '軸',   boxes: [[[AX], [AB], [TA, SH, SB]],             //   3点
+                                 [[AB], [AX], [TB, SH]]] },              //   2点
+        { label: '対抗', boxes: [[[TA], [AX, AB], [AX, AB, TB]]] },      //   4点
+        { label: '穴',   boxes: [[[SH], [SB], [AX]]] },                  //   1点
+      ];
+    } else {
+      groups = [                                                        // A-2 v1（8点）
+        { label: null, boxes: [[[AX, AB], [AX, AB], [TA, TB]]] },
+        { label: null, boxes: [[[TA], [AX, AB], [AX, AB, TB]]] },
+      ];
+    }
+  } else {                                                              // C-1（6点）
+    groups = [
+      { label: null, boxes: [[[AX, AB], [AX, AB], [TA, TB]]] },
+      { label: null, boxes: [[[TA], [AX], [AB, TB]]] },
+    ];
   }
 
   const bets = [], seen = new Set();
-  for (const [A, B, C] of rows)
-    for (const a of A) for (const b of B) for (const c of C) {
-      if (!a || !b || !c || a === b || a === c || b === c) continue;
-      const k = `${a}-${b}-${c}`;
-      if (!seen.has(k)) { seen.add(k); bets.push(k); }
-    }
-
   const srt = arr => [...new Set(arr.filter(Boolean))].sort((x, y) => Number(x) - Number(y)).join('');
-  const compressed = rows.map(([A, B, C]) => `${srt(A)}-${srt(B)}-${srt(C)}`);
+  const compressed = [], display = [];
+  for (const g of groups) {
+    const items = [];
+    for (const [A, B, C] of g.boxes) {
+      for (const a of A) for (const b of B) for (const c of C) {
+        if (!a || !b || !c || a === b || a === c || b === c) continue;
+        const k = `${a}-${b}-${c}`;
+        if (!seen.has(k)) { seen.add(k); bets.push(k); }
+      }
+      const box = `${srt(A)}-${srt(B)}-${srt(C)}`;
+      compressed.push(box);       // データ：1要素＝1矩形
+      items.push(box);
+    }
+    display.push({ label: g.label, items });   // 表示：items を " / " でつなぐ
+  }
 
   return {
-    status: 'ok', pattern, points: bets.length, bets, compressed,
+    status: 'ok', pattern, points: bets.length, bets, compressed, display,
     roles: { axis: AX, axisBante: AB, axis3rd: A3, taisho: TA, taishoBante: TB,
-             line3Head: SH, tanki: tanki[0] || null,
+             line3Head: SH, line3Bante: SB, tanki: tanki[0] || null,
              axisLineIndex: ai, taishoLineIndex: ti },
     axisScores
   };
 }
 
-/* 圧縮形 → 買い目（検算用）。"-" 区切りのみ。"=" は使わない */
+
+/* ---------------------------------------------------------------------
+ * E-1（v1.2 新設）
+ *   軸   ＝3車ライン（無条件。得点・位置では選ばない）
+ *   対抗 ＝2車ライン（無条件）
+ *   単前・単後 ＝単騎2人のうち並びで前／後ろ（入れ替えない）
+ *   段1  軸頭-軸番-[軸三,対頭,対番,単前,単後]      5点
+ *   段2  軸番-軸頭-軸三 ／ 軸番-軸三-軸頭          2点（表示は同じ段）
+ *   段3  単前-軸頭-対頭                          1点
+ * --------------------------------------------------------------------- */
+function asanouE1(lines, big, L3, L2, tanki) {
+  const flat = lines.flat();
+  const [SZ, SK] = [...tanki].sort((a, b) => flat.indexOf(a) - flat.indexOf(b));   // 単前・単後
+  const [AX, AB, A3] = L3, [TA, TB] = L2;
+  const asc = arr => [...arr].sort((x, y) => Number(x) - Number(y));
+  const groups = [
+    { label: null, boxes: [[[AX], [AB], asc([A3, TA, TB, SZ, SK])]] },   // 段1 5点
+    { label: null, boxes: [[[AB], [AX], [A3]],                          // 段2 2点（1矩形ずつ）
+                           [[AB], [A3], [AX]]] },
+    { label: null, boxes: [[[SZ], [AX], [TA]]] },                        // 段3 1点
+  ];
+  const bets = [], compressed = [], display = [];
+  for (const g of groups) {
+    const items = [];
+    for (const [A, B, C] of g.boxes) {
+      for (const a of A) for (const b of B) for (const c of C) {
+        if (a === b || a === c || b === c) continue;
+        bets.push(`${a}-${b}-${c}`);
+      }
+      const box = `${A.join('')}-${B.join('')}-${C.join('')}`;
+      compressed.push(box); items.push(box);
+    }
+    display.push({ label: g.label, items });
+  }
+  return {
+    status: 'ok', pattern: 'E-1', points: bets.length, bets, compressed, display,
+    roles: { axis: AX, axisBante: AB, axis3rd: A3, taisho: TA, taishoBante: TB,
+             senzen: SZ, sengo: SK, line3Head: null, line3Bante: null, tanki: null,
+             axisLineIndex: big.indexOf(L3), taishoLineIndex: big.indexOf(L2) },
+    axisScores: null
+  };
+}
+
+/* 圧縮形 → 買い目（検算用）。"-" 区切りのみ。" / " も "=" も使わない */
 function asanouExpand(compressed) {
   const out = new Set();
   for (const row of compressed) {
@@ -143,6 +228,11 @@ function asanouExpand(compressed) {
       if (a !== b && a !== c && b !== c) out.add(`${a}-${b}-${c}`);
   }
   return [...out];
+}
+
+/* 表示用の文字列（参考実装） */
+function asanouDisplayText(display) {
+  return display.map(r => (r.label ? `${r.label}　` : '') + r.items.join(' / '));
 }
 
 /* （Node 用の module.exports はページでは不要なので外した） */
@@ -23506,7 +23596,10 @@ function attachTextsToBets(stage4, texts) {
       engine: (ASANOU_V1.ENGINE || 'asanou-v1'),
       bets: res.bets.slice(),
       compressed: res.compressed.slice(),
-      compressedDisplay: res.compressed.slice(),   // 1要素＝1段。関数が返す順のまま表示（指示書 4-2）
+      // ★v1.2（指示書 第2章）：表示は display から組む。同じ段の矩形は " / " でつなぎ、A-2 は「軸／対抗／穴」の見出し付き。
+      //   " / " を含むのは表示用の compressedDisplay だけ。オッズ・購入・記録・結果照合は compressed／bets を使う。
+      //   ★2026-09-25 ボンバイエ指示：見出し（軸／対抗／穴）は出さない。これまでどおり買い目だけを表示する。
+      compressedDisplay: (res.display && res.display.length) ? res.display.map(function(r){ return r.items.join(' / '); }) : res.compressed.slice(),
       betCount: res.points,                        // 必ず points を表示（指示書 4-3）
       patternCheck: { pattern: res.pattern },
       roles: res.roles,
@@ -23549,6 +23642,8 @@ function attachTextsToBets(stage4, texts) {
   function asanouLogCtx(race, venue, lineup, arePct, ex, bankKey, agari, res, skipReason){
     return {
       engine: (ASANOU_V1.ENGINE || 'asanou-v1'),
+      engineFlags: { A2_V2: !!ASANOU_V1.A2_V2, E1: !!ASANOU_V1.E1, C1_ENABLED: ASANOU_V1.C1_ENABLED !== false,
+                     A1_ROWS_V2: !!ASANOU_V1.A1_ROWS_V2, ADD_ANA_A1: !!ASANOU_V1.ADD_ANA_A1 },
       venue: venue ? venue.venue : '', venueId: venue ? venue.venueId : '',
       raceCode: venue ? venue.raceCode : '', dayNum: venue ? String(venue.dayNum||'') : '',
       raceNum: race.raceNum, cls: race.cls||'', grade: race.grade || (venue && venue.grade) || '',
@@ -23963,7 +24058,8 @@ document.addEventListener('click', function(e){
     var rec = {
       key: key,
       ts: nowISO(),
-      engine: ctx.engine || 'v2',     // ★朝脳は 'asanou-v1'
+      engine: ctx.engine || 'v2',     // ★朝脳は ASANOU_V1.ENGINE（2026-09-25 から 'asanou-v1.2'）
+      engineFlags: ctx.engineFlags || null,   // ★朝脳：どのスイッチの状態で動いたか
       race: {
         venue: ctx.venue || '', venueId: ctx.venueId || '',
         raceCode: ctx.raceCode || '', dayNum: ctx.dayNum || '',
@@ -24117,7 +24213,7 @@ document.addEventListener('click', function(e){
     var key = raceKey(ctx.venue, ctx.raceNum, ctx.dateStr);
     var arr = loadSkip();
     var rec = {
-      key: key, ts: nowISO(), engine: ctx.engine || 'asanou-v1', skipReason: ctx.skipReason || '',
+      key: key, ts: nowISO(), engine: ctx.engine || 'asanou-v1', engineFlags: ctx.engineFlags || null, skipReason: ctx.skipReason || '',
       race: { venue: ctx.venue || '', venueId: ctx.venueId || '', raceCode: ctx.raceCode || '',
               dayNum: ctx.dayNum || '', raceNum: ctx.raceNum, date: ctx.dateStr || ymd(),
               cls: ctx.cls || '', grade: ctx.grade || '', deadline: ctx.deadline || '',
