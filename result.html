@@ -2061,6 +2061,9 @@ document.getElementById('toTop').addEventListener('click', ()=>{
           cc: er.car_count,
           marks: res.marks ? Object.keys(res.marks).sort((a,b)=>a-b).map(c=>c+res.marks[c]).join(' ') : ''
         };
+        /* ★2026-09-29：デイナイター全生成の1着↔2着入れ替え（app.html runOmakaseGeneration と同期） */
+        const _swapC = (typeof dnSwap12AllOn === 'function') && dnSwap12AllOn(race, v.timeSlot);
+        const _fStr = (res.formation&&res.formation.str)||null;
         cards.push({
           venue: race.venue, raceNum: race.raceNum,
           start: fmtStartJst(race.startAtV3) || race.start || '',
@@ -2069,8 +2072,8 @@ document.getElementById('toTop').addEventListener('click', ()=>{
           cls: race.cls || '',
           code: res.cell || '',
           pts: res.betCount,
-          buys: res.buys.map(c=>c.join('-')),
-          formationStr: (res.formation&&res.formation.str)||null,
+          buys: _swapC ? res.buys.map(c=>dnSwap12Str(c.join('-'))) : res.buys.map(c=>c.join('-')),
+          formationStr: (_swapC && _fStr) ? dnSwap12Str(_fStr) : _fStr,
           result: null, payout: null,
           venueId: v.venueId, raceCode: v.raceCode, dayNum: v.dayNum,
           _dbg
@@ -6424,8 +6427,53 @@ function swap12Trio(str){
   return (g.length === 3) ? (g[1] + '-' + g[0] + '-' + g[2]) : str;
 }
 
+/* ===== デイナイター全生成の1着↔2着入れ替え（2026-09-29・ボンバイエ指示） =====
+ * 対象：デイ・ナイターのおまかせ生成で出る買い目すべて。
+ *   三分戦ミッドロジック（A-1/A-2/A-3/C-1/C-2・G戦を含む）と、二分戦のセル生成の両方。
+ *   パターン・荒れ指数・G戦かどうかによる条件は付けない。
+ * 対象外：軸指定タブ（generateBetsCustom）・自分で予想・荒れ予報（カレッタ）・Lab。
+ *   これらは生成の出口（runMid3BunsenGeneration / runOmakaseGeneration / result の一覧）を通らない。
+ * 方式：生成が完全に終わった出口で、bets・compressed・expanded の3つを同時に入れ替える。
+ *   generateBets 本体・テンプレート・圧縮関数には一切触れない。
+ *   1着群と2着群の入れ替えは組を1対1で写すので点数は必ず保存される。
+ *   圧縮形は " / " で区切られた各項ごとに入れ替える（項＝1着群-2着群-3着群の矩形）。
+ * ★旧 SWAP12（A-2/A-3/C-1/C-2・荒れ30.1%超）とは別物。二重に入れ替えると元に戻るため、
+ *   このスイッチがオンの間は shouldSwap12 が常に false を返す。
+ * ★ミッドナイト（midrace.html）・モーニング（朝脳）は対象外（時間帯で判定）。
+ * ENABLED:false で 2026-09-29 以前と完全に同じ出力に戻る。 */
+const DN_SWAP12_ALL = { ENABLED: true };
+
+function dnSwap12Str(line){
+  return String(line).split(' / ').map(function(t){
+    var g = t.split('-');
+    return (g.length === 3) ? (g[1] + '-' + g[0] + '-' + g[2]) : t;
+  }).join(' / ');
+}
+
+/* 入れ替える対象か：スイッチがオン かつ デイ・ナイター */
+function dnSwap12AllOn(race, ctxTimeSlot){
+  if (typeof DN_SWAP12_ALL === 'undefined' || !DN_SWAP12_ALL.ENABLED) return false;
+  return (typeof mid3IsDayNighter === 'function') && mid3IsDayNighter(race, ctxTimeSlot);
+}
+
+/* 生成結果（target:true）の bets / compressed / expanded を同時に入れ替える */
+function dnSwap12ApplyOut(o){
+  if (!o || !o.target) return o;
+  o.bets = (o.bets || []).map(dnSwap12Str);
+  o.compressed = (o.compressed || []).map(dnSwap12Str);
+  o.expanded = (o.expanded || []).map(function(e){
+    var c = (e && e.combo) ? e.combo.slice() : [];
+    if (c.length === 3) { var t = c[0]; c[0] = c[1]; c[1] = t; }
+    return { combo: c, odds: (e && e.odds != null) ? e.odds : null };
+  });
+  o.swap12All = true;
+  return o;
+}
+
 function shouldSwap12(pattern, arePct){
   if (!SWAP12_ENABLED) return false;   // ★2026-08-09 無効化
+  // ★2026-09-29：出口での全入れ替え（DN_SWAP12_ALL）がオンなら二重に入れ替えない
+  if (typeof DN_SWAP12_ALL !== 'undefined' && DN_SWAP12_ALL.ENABLED) return false;
   if (SWAP12_PATTERNS.indexOf(pattern) < 0) return false;
   const v = Number(arePct);
   if (arePct == null || isNaN(v)) return false;
@@ -6613,7 +6661,7 @@ async function runMid3BunsenGeneration(race, ctx){
     return { combo: String(c).split('-').map(Number), odds: null };
   });
 
-  return {
+  var _res = {
     target: true,
     mid3: true,
     pattern: out.pattern || '',
@@ -6646,6 +6694,10 @@ async function runMid3BunsenGeneration(race, ctx){
     compressed: compressed,
     expanded: expanded
   };
+  /* ★2026-09-29：デイナイター全生成の1着↔2着入れ替え（app.html と同期） */
+  _res.swap12All = false;
+  if (dnSwap12AllOn(race, ctx.timeSlot)) dnSwap12ApplyOut(_res);
+  return _res;
 }
 </script>
 </body>
