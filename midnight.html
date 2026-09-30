@@ -75,6 +75,45 @@
     .mid-statusbar{ height:max(env(safe-area-inset-top, 0px), 20px); }
   }
 
+
+  /* ===== 電光掲示板（2026-09-30・Brain本体 app.html と同じ要領） =====
+     ステータスバー領域（.mid-statusbar・#000）とヘッダー画像の間の帯。帯の色は最上部と同じ #000。
+     ★最上部（.mid-statusbar・theme-color・html背景）には触れていない。
+     ★帯はヘッダー画像の直前の通常要素。家ボタンはヘッダー画像の中なので、画像に対する位置は変わらない。 */
+  .brtk{
+    position:relative;height:24px;background:#000;overflow:hidden;
+    -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 14px,#000 calc(100% - 14px),transparent 100%);
+            mask-image:linear-gradient(90deg,transparent 0,#000 14px,#000 calc(100% - 14px),transparent 100%);
+    -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
+    opacity:0;                                   /* 起動演出の解除と一緒にふわっと出す */
+  }
+  .reveal .brtk{animation:brtkFade .5s ease 0s forwards;}
+  @keyframes brtkFade{from{opacity:0;}to{opacity:1;}}
+  .brtk-track{position:absolute;top:0;left:0;height:100%;display:flex;align-items:center;white-space:nowrap;will-change:transform;backface-visibility:hidden;}
+  .brtk-item{
+    display:inline-block;margin-right:64px;
+    font-family:-apple-system,BlinkMacSystemFont,'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;
+    font-size:12px;font-weight:700;line-height:24px;letter-spacing:.04em;
+    color:#f4f4f2;text-shadow:0 0 5px rgba(255,255,255,.22);
+    font-variant-numeric:tabular-nums;backface-visibility:hidden;
+    cursor:pointer;transition:filter .15s ease;
+  }
+  .brtk-item[data-kind="pr"]{cursor:default;}
+  .brtk-item[data-kind="dbg"]{cursor:default;color:#d8c24a;text-shadow:none;font-weight:500;}
+  .brtk-min{font-style:normal;color:#e03040;text-shadow:0 0 6px rgba(224,48,64,.45);}
+  .brtk-hl{color:#4fdc78;text-shadow:0 0 6px rgba(79,220,120,.5);}
+  /* 1〜3R の「無料」バッジ：白地・角丸・テーマ紫の文字 */
+  .brtk-free{
+    display:inline-block;vertical-align:1px;margin-right:7px;padding:0 5px;
+    background:#fff;color:var(--mid);border-radius:4px;
+    font-size:10px;font-weight:800;line-height:15px;letter-spacing:.06em;text-shadow:none;
+  }
+  .brtk-item.tapped{filter:brightness(1.7);}
+  @media (prefers-reduced-motion: reduce){
+    .brtk{overflow-x:auto;-webkit-mask-image:none;mask-image:none;}
+    .brtk-track{position:static;transform:none !important;padding:0 12px;}
+  }
+
   /* ===== 登場アニメ（ローディング解除後：ヘッダー→見出し→バー→カード1,2,3…）===== */
   .mid-hero, .mid-heading-wrap{
     opacity:0;
@@ -617,6 +656,9 @@
     <img src="midnight-logo.png" alt="" class="mn-boot-logo" id="mnBootLogo">
   </div>
 
+  <!-- ★2026-09-30：電光掲示板。中身は末尾の「電光掲示板」スクリプトが入れる -->
+  <div class="brtk" id="brTicker" aria-label="お知らせ"><div class="brtk-track" id="brTickerTrack"></div></div>
+
   <!-- ヘッダー画像 -->
   <div class="mid-hero">
     <img src="midnight-header.jpg" alt="ミッド脳" width="1200" height="688">
@@ -1062,6 +1104,335 @@ function parseWinticketRaceUrl(link){
     midFetchVenueList();
   }
 
+</script>
+
+
+<script>
+/* ===================================================================
+ * ミッド脳トップ 電光掲示板（2026-09-30・ボンバイエ指示。Brain本体 app.html と同じ要領）
+ *
+ * ■表示
+ *   ・ミッドナイトの「おまかせ生成可能」レース（ミッド脳出走表の緑ランプと同じ判定）を、
+ *     締切の早い順に流す。まず2件（MIN_ITEMS）、読み込みを続けて締切60分以内（WITHIN_MIN）は全て。
+ *     文言：「松山7R A級一般 締切22:25 (5分前) おまかせ生成可能」
+ *     ( ) は締切20分以内のときだけ、括弧の中だけ赤。文字は白、「おまかせ生成」だけ緑。
+ *   ・1〜3R（無料）は先頭に「無料」バッジ（白地・角丸・テーマ紫の文字）。
+ *   ・該当なしのときは帯だけ（BRTK.PR_TEXT を入れるとその文言を流す）。
+ *   ・流している最中は組み替えず、一周して右端へ戻る瞬間にだけ最新の並びへ組み替える（ガタつき防止）。
+ *
+ * ■判定（midrace.html の isV3Generatable の複製）
+ *   ・並びが「三分戦（2/2/3）」または「単騎を含む三分戦（2/2/2/1、ただし単騎が先頭は除く）」。
+ *   ・midrace は「選手2人以上」も見ているが、ここでは並びの人数で代用（extractPlayers は移植しない）。
+ *   ★midrace.html の緑ランプ条件（isV3Generatable / is3BunsenFormation / isCBunsenFormation / extractLineup）
+ *     を変えたときは、ここも同期すること。
+ *
+ * ■データ
+ *   ・開催ごとに cups API（midFetchRaces と同じ）で全レースの締切（closeAt）と種別を取得し、締切順に並べる。
+ *   ・近い順に出走表（winticket racecard）を取得して並びを判定し、条件を満たしたら打ち切る（Brain本体の案C）。
+ *   ・取得には時間制限あり。失敗は2分空けて最大3回まで。
+ *   ・?brtk=debug を付けたときだけ、帯の末尾に診断表示。
+ *
+ * ■タップ
+ *   ・流れている文字のレースの出走表（/midrace?…）へ。URL の組み立ては midSelectRace と同じ。
+ *     4R以降のコード入力は出走表側の既存処理。空白は無反応。
+ * =================================================================== */
+(function(){
+  var BRTK = {
+    MIN_ITEMS: 2,
+    WITHIN_MIN: 60,
+    SOON_MIN: 20,
+    FREE_MAX_RACE: 3,           // この番号までのレースに「無料」バッジ
+    SPEED: 46,
+    TICK_MS: 15000,
+    CONCURRENCY: 3,
+    FAIL_WAIT_MS: 120000,
+    FAIL_MAX: 3,
+    FETCH_TIMEOUT_MS: 10000,
+    INFO_TIMEOUT_MS: 8000,
+    RACE_SUFFIX_HL: 'おまかせ生成',
+    RACE_SUFFIX_REST: '可能',
+    PR_TEXT: ''
+  };
+  window.BRTK_CONFIG = BRTK;
+
+  var evalCache = {};   // key -> { status:'ok'|'fail', gen, tries, at }
+  var cupCache = {};    // raceCode|day -> { status:'ok'|'fail', races:[{n,closeAt,cls}], tries, at }
+  var cupPending = {};
+  var scanning = false, lastSig = null, band = null, track = null, x = 0, lastTs = 0;
+  var reduceMotion = false;
+  try { reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch(e){}
+  var DEBUG = /(?:^|[?&])brtk=debug(?:&|$)/.test(location.search || '');
+  var dbg = { ticks: 0, scans: 0, fetched: 0, ok: 0, fail: 0, timeout: 0, cupOk: 0, cupFail: 0, lastErr: '' };
+
+  function nowSec(){ return Math.floor(Date.now() / 1000); }
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function venuesList(){ try { return (typeof MID_VENUES !== 'undefined' && MID_VENUES) ? MID_VENUES : []; } catch(e){ return []; } }
+  function pageVisible(){ return !document.visibilityState || document.visibilityState === 'visible'; }
+  function withTimeout(promise, ms, label){
+    var t;
+    return Promise.race([
+      promise,
+      new Promise(function(_, rej){ t = setTimeout(function(){ dbg.timeout++; rej(new Error('timeout:' + label)); }, ms); })
+    ]).finally(function(){ clearTimeout(t); });
+  }
+  function proxy(u){ return PROXY_URL + '?url=' + encodeURIComponent(u); }
+  function hhmm(sec){ var d = new Date((sec + 9*3600) * 1000); return String(d.getUTCHours()).padStart(2,'0') + ':' + String(d.getUTCMinutes()).padStart(2,'0'); }
+  /* レース種別の短縮（midRenderRaceSelector と同じ置換） */
+  function shortCls(c){
+    return String(c || '').replace(/チャレンジ/g,'チ').replace(/ガールズケイリン|ガールズ/g,'L級')
+      .replace(/初日特選/g,'初特選').replace(/一次予選/g,'一予選').replace(/二次予選/g,'二予選');
+  }
+
+  /* ---- 緑ランプの判定（midrace.html から複製） ---- */
+  function extractLineup(doc){
+    var sec = doc.querySelector('[class*="LinePrediction"]');
+    if (!sec) return null;
+    var lineup = [], cur = [];
+    sec.querySelectorAll('[class*="Bib___Wrapper"], [class*="Chain___Wrapper"]').forEach(function(item){
+      var cn = item.className || '';
+      if (cn.indexOf('Chain') >= 0) { if (cur.length) { lineup.push(cur); cur = []; } }
+      else if (cn.indexOf('Bib') >= 0) { var n = parseInt(item.textContent.trim()); if (!isNaN(n)) cur.push(n); }
+    });
+    if (cur.length) lineup.push(cur);
+    return lineup.length ? lineup : null;
+  }
+  function is3Bunsen(lu){
+    if (!lu || lu.length !== 3) return false;
+    var s = lu.map(function(g){ return g.length; }).sort(function(a,b){ return a-b; });
+    return s[0] === 2 && s[1] === 2 && s[2] === 3;
+  }
+  function isCBunsen(lu){
+    if (!lu || lu.length !== 4) return false;
+    var sizes = lu.map(function(g){ return g.length; });
+    var s = sizes.slice().sort(function(a,b){ return a-b; });
+    if (s[0] !== 1 || s[1] !== 2 || s[2] !== 2 || s[3] !== 2) return false;
+    if (sizes[0] === 1) return false;   // 単騎前受けは除外
+    return true;
+  }
+  function isGeneratable(lineup){
+    if (!lineup || !lineup.length) return false;
+    var cars = lineup.reduce(function(a, g){ return a + g.length; }, 0);
+    if (cars < 2) return false;         // midrace の「選手2人以上」の代用
+    var lu = lineup.map(function(g){ return g.map(Number); });
+    return !!(is3Bunsen(lu) || isCBunsen(lu));
+  }
+
+  /* ---- 開催ごとのレース一覧（cups API） ---- */
+  function cupKey(v){ return v.raceCode + '|' + (v.dayNum || 1); }
+  function loadCup(v){
+    var k = cupKey(v), e = cupCache[k];
+    if (e && e.status === 'ok') return Promise.resolve();
+    if (e && e.status === 'fail' && (e.tries >= BRTK.FAIL_MAX || Date.now() - e.at < BRTK.FAIL_WAIT_MS)) return Promise.resolve();
+    if (cupPending[k]) return cupPending[k];
+    cupPending[k] = withTimeout(fetch(proxy('https://api.winticket.jp/v1/keirin/cups/' + v.raceCode + '?pfm=web')).then(function(r){ return r.text(); }), BRTK.INFO_TIMEOUT_MS, 'cup')
+      .then(function(txt){
+        var j = JSON.parse(txt);
+        var sch = (j.schedules || []).find(function(s){ return String(s.day) === String(v.dayNum); });
+        if (!sch) throw new Error('no-schedule');
+        var races = (j.races || []).filter(function(r){ return r.scheduleId === sch.id; })
+          .map(function(r){ return { n: r.number, closeAt: (typeof r.closeAt === 'number' ? r.closeAt : null), cls: shortCls(r.raceType3 || r.raceType || '') }; })
+          .sort(function(a, b){ return a.n - b.n; });
+        cupCache[k] = { status: 'ok', races: races };
+        dbg.cupOk++;
+      })
+      .catch(function(err){
+        dbg.cupFail++; dbg.lastErr = String(err && err.message || err);
+        cupCache[k] = { status: 'fail', tries: ((e && e.tries) || 0) + 1, at: Date.now() };
+      })
+      .finally(function(){ delete cupPending[k]; });
+    return cupPending[k];
+  }
+
+  function activeVenues(){ return venuesList().filter(function(v){ return v && v.linkType !== 'raceresult' && v.raceCode; }); }
+
+  /* 候補：締切前のレースを締切順に */
+  function candidates(){
+    var ns = nowSec(), list = [];
+    activeVenues().forEach(function(v){
+      var c = cupCache[cupKey(v)];
+      if (!c || c.status !== 'ok') return;
+      c.races.forEach(function(r){
+        if (r.closeAt === null || r.closeAt <= ns) return;
+        list.push({ v: v, r: r, t: r.closeAt, key: v.venueId + '|' + v.raceCode + '|' + (v.dayNum || 1) + '|' + r.n });
+      });
+    });
+    list.sort(function(a, b){
+      if (a.t !== b.t) return a.t - b.t;
+      if (a.v.venue !== b.v.venue) return String(a.v.venue).localeCompare(String(b.v.venue), 'ja');
+      return a.r.n - b.r.n;
+    });
+    return list;
+  }
+
+  async function evalOne(c){
+    var prev = evalCache[c.key];
+    try {
+      dbg.fetched++;
+      var url = 'https://www.winticket.jp/keirin/' + c.v.venueId + '/racecard/' + c.v.raceCode + '/' + (c.v.dayNum || '1') + '/' + c.r.n;
+      var html = await withTimeout(fetch(proxy(url)).then(function(r){ return r.text(); }), BRTK.FETCH_TIMEOUT_MS, 'race');
+      if (!html) throw new Error('fetch-empty');
+      var doc = new DOMParser().parseFromString(html, 'text/html');
+      evalCache[c.key] = { status: 'ok', gen: isGeneratable(extractLineup(doc)) };
+      dbg.ok++;
+    } catch(e) {
+      dbg.fail++; dbg.lastErr = String(e && e.message || e);
+      evalCache[c.key] = { status: 'fail', tries: ((prev && prev.tries) || 0) + 1, at: Date.now() };
+    }
+  }
+  function failSkippable(e){ return e && e.status === 'fail' && (e.tries >= BRTK.FAIL_MAX || (Date.now() - e.at) < BRTK.FAIL_WAIT_MS); }
+
+  async function scan(){
+    if (scanning) return;
+    scanning = true; dbg.scans++;
+    try {
+      await Promise.all(activeVenues().map(loadCup));
+      render();
+      for (var guard = 0; guard < 200; guard++) {
+        if (!pageVisible()) break;
+        var list = candidates(), need = [], gens = 0, ns = nowSec();
+        for (var i = 0; i < list.length; i++) {
+          var c = list[i], e = evalCache[c.key];
+          if (gens >= BRTK.MIN_ITEMS && c.t > ns + BRTK.WITHIN_MIN * 60) break;
+          if (e && e.status === 'ok') { if (e.gen) gens++; continue; }
+          if (failSkippable(e)) continue;
+          need.push(c);
+          if (need.length >= BRTK.CONCURRENCY) break;
+        }
+        if (!need.length) break;
+        await Promise.all(need.map(evalOne));
+        render();
+      }
+    } catch(e) { console.log('電光掲示板：判定エラー', e); }
+    scanning = false;
+    render();
+  }
+
+  function buildItems(){
+    var items = [], list = candidates(), ns = nowSec();
+    for (var i = 0; i < list.length; i++) {
+      var c = list[i], e = evalCache[c.key];
+      if (items.length >= BRTK.MIN_ITEMS && c.t > ns + BRTK.WITHIN_MIN * 60) break;
+      if (!e) break;                              // 手前が未判定なら順序が確定しないので止める
+      if (e.status !== 'ok') { if (failSkippable(e)) continue; break; }
+      if (!e.gen) continue;
+      items.push({ kind: 'race', key: c.key, vIdx: venuesList().indexOf(c.v), raceNum: c.r.n, venue: c.v.venue,
+                   cls: c.r.cls, deadline: hhmm(c.r.closeAt), remain: Math.floor((c.r.closeAt - ns) / 60) });
+    }
+    if (!items.length && BRTK.PR_TEXT) items.push({ kind: 'pr', text: BRTK.PR_TEXT });
+    if (DEBUG) items.push({ kind: 'dbg', text: debugText() });
+    return items;
+  }
+
+  function debugText(){
+    var vs = venuesList(), act = activeVenues().length, co = 0, cf = 0;
+    Object.keys(cupCache).forEach(function(k){ if (cupCache[k].status === 'ok') co++; else cf++; });
+    var ec = 0, eok = 0, egen = 0, efail = 0;
+    Object.keys(evalCache).forEach(function(k){ var e = evalCache[k]; ec++; if (e.status === 'ok') { eok++; if (e.gen) egen++; } else efail++; });
+    var d = new Date(), hh = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0') + ':' + String(d.getSeconds()).padStart(2,'0');
+    return '[診断 ' + hh + '] 開催' + vs.length + '(開催中' + act + ') cup成功' + co + '/失敗' + cf
+         + ' 候補' + candidates().length + ' 判定' + eok + '/' + ec + ' 可' + egen + ' 失敗' + efail
+         + ' 取得' + dbg.fetched + ' 超過' + dbg.timeout + ' tick' + dbg.ticks + ' scan' + dbg.scans + (scanning ? '(中)' : '')
+         + (dbg.lastErr ? ' 最終エラー:' + dbg.lastErr.slice(0, 60) : '');
+  }
+
+  function soonHTML(remain){ return (remain > 0 && remain <= BRTK.SOON_MIN) ? ' (<em class="brtk-min">' + remain + '分前</em>)' : ''; }
+  function itemHTML(it){
+    if (it.kind !== 'race') return esc(it.text);
+    return (it.raceNum <= BRTK.FREE_MAX_RACE ? '<span class="brtk-free">無料</span>' : '')
+         + esc(it.venue + it.raceNum + 'R') + (it.cls ? ' ' + esc(it.cls) : '') + ' 締切' + esc(it.deadline)
+         + '<span class="brtk-soon">' + soonHTML(it.remain) + '</span> '
+         + '<span class="brtk-hl">' + esc(BRTK.RACE_SUFFIX_HL) + '</span>' + esc(BRTK.RACE_SUFFIX_REST);
+  }
+  function sigOf(items){
+    return items.map(function(it){ return it.kind === 'dbg' ? 'dbg' : (it.kind + ':' + (it.key || it.text) + ':' + (it.cls || '') + ':' + (it.deadline || '') + ':' + soonHTML(it.remain)); }).join('|');
+  }
+  function hasContent(){ return !!(track && track.querySelector('.brtk-item:not([data-kind="dbg"])')); }
+  function updateDbg(items){
+    var dnode = track.querySelector('.brtk-item[data-kind="dbg"]');
+    var dit = items.filter(function(it){ return it.kind === 'dbg'; })[0];
+    if (dnode && dit) dnode.textContent = dit.text;
+  }
+  /* 流している最中は組み替えない。組み替えは (1) 何も流れていないとき (2) 周回の頭（frame）だけ */
+  function render(){
+    if (!track) return;
+    var items = buildItems();
+    if (!reduceMotion && hasContent()) { updateDbg(items); return; }
+    var raceN = items.filter(function(it){ return it.kind === 'race'; }).length;
+    if (scanning && raceN > 0 && raceN < BRTK.MIN_ITEMS) { updateDbg(items); return; }
+    var sig = sigOf(items);
+    if (sig === lastSig) { updateDbg(items); return; }
+    applyItems(items, sig);
+  }
+  function applyItems(items, sig){
+    lastSig = sig;
+    track.innerHTML = '';
+    items.forEach(function(it){
+      var el = document.createElement('span');
+      el.className = 'brtk-item';
+      el.setAttribute('data-kind', it.kind);
+      el.innerHTML = itemHTML(it);
+      if (it.kind === 'race') {
+        el.setAttribute('data-venue-idx', String(it.vIdx));
+        el.setAttribute('data-race-num', String(it.raceNum));
+        el.addEventListener('click', onRaceTap);
+      }
+      track.appendChild(el);
+    });
+    x = reduceMotion ? 0 : (band ? band.clientWidth : 0);
+    track.style.transform = 'translate3d(' + x + 'px,0,0)';
+  }
+
+  /* レース → 出走表（midSelectRace と同じ URL） */
+  function onRaceTap(e){
+    var el = e.currentTarget;
+    var v = venuesList()[Number(el.getAttribute('data-venue-idx'))];
+    var raceNum = Number(el.getAttribute('data-race-num'));
+    if (!v) return;
+    el.classList.add('tapped');
+    var q = new URLSearchParams({
+      venue: v.venueId || '', name: v.venue || '', code: v.raceCode || '', day: String(v.dayNum || 1),
+      race: String(raceNum), grade: v.grade || 'F2', dayLabel: v.day || ''
+    });
+    setTimeout(function(){ location.href = '/midrace?' + q.toString(); }, 140);
+  }
+
+  var visCache = true, visAt = 0;
+  function frame(ts){
+    requestAnimationFrame(frame);
+    if (!track || reduceMotion) { lastTs = ts; return; }
+    if (ts - visAt > 500) { visCache = pageVisible(); visAt = ts; }
+    if (!track.firstChild || !visCache) { lastTs = ts; return; }
+    var dt = lastTs ? Math.min(ts - lastTs, 100) : 0;
+    lastTs = ts;
+    x -= BRTK.SPEED * dt / 1000;
+    if (x < -track.scrollWidth) { var items = buildItems(); applyItems(items, sigOf(items)); return; }
+    track.style.transform = 'translate3d(' + x + 'px,0,0)';
+  }
+
+  function tick(){
+    dbg.ticks++;
+    try { render(); if (pageVisible() && venuesList().length) scan(); } catch(e) { console.log('電光掲示板：tick エラー', e); }
+  }
+
+  function init(){
+    band = document.getElementById('brTicker');
+    track = document.getElementById('brTickerTrack');
+    if (!band || !track) return;
+    render();
+    requestAnimationFrame(frame);
+    var waited = 0;
+    var w = setInterval(function(){
+      waited++;
+      if (venuesList().length || waited > 90) { clearInterval(w); tick(); }
+    }, 1000);
+    setInterval(tick, BRTK.TICK_MS);
+    if (DEBUG) setInterval(function(){ try { render(); } catch(e){} }, 2000);
+    document.addEventListener('visibilitychange', function(){ if (pageVisible()) tick(); });
+  }
+  window.BRTK_DEBUG = { dbg: dbg, debugText: function(){ return debugText(); }, evalCache: evalCache, cupCache: cupCache,
+                        render: function(){ lastSig = null; render(); }, scan: scan, buildItems: buildItems, setX: function(v){ x = v; } };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
 </script>
 
 <!-- 管理コード入力（→ /midrace?admin=1 へ遷移） -->
