@@ -1123,10 +1123,13 @@ function parseWinticketRaceUrl(link){
  *   ・流している最中は組み替えず、一周して右端へ戻る瞬間にだけ最新の並びへ組み替える（ガタつき防止）。
  *
  * ■判定（midrace.html の isV3Generatable の複製）
- *   ・並びが「三分戦（2/2/3）」または「単騎を含む三分戦（2/2/2/1、ただし単騎が先頭は除く）」。
- *   ・midrace は「選手2人以上」も見ているが、ここでは並びの人数で代用（extractPlayers は移植しない）。
- *   ★midrace.html の緑ランプ条件（isV3Generatable / is3BunsenFormation / isCBunsenFormation / extractLineup）
- *     を変えたときは、ここも同期すること。
+ *   ・並びが「三分戦（2/2/3）」または「単騎を含む三分戦（2/2/2/1、ただし単騎が先頭は除く）」、選手2人以上。
+ *   ・★2026-09-30 初日特例（midrace の MID_DAY1_ARE と同じ）：初日（dayNum===1）は荒れ指数30.0%以上のみ。
+ *     荒れ指数が出ないレースは対象外。そのため extractPlayers・calcAreScore・isAreRaceFormation・asymmetricSigmoid を
+ *     midrace.html から「そのまま」複製した（初版の「選手2人以上を並びの人数で代用」は廃止）。
+ *   ★midrace.html の緑ランプ条件（isV3Generatable / is3BunsenFormation / isCBunsenFormation / extractLineup）、
+ *     初日特例（MID_DAY1_ARE / midDay1AreBlocked）、荒れ指数（calcAreScore とその依存・extractPlayers）を
+ *     変えたときは、ここも同期すること。
  *
  * ■データ
  *   ・開催ごとに cups API（midFetchRaces と同じ）で全レースの締切（closeAt）と種別を取得し、締切順に並べる。
@@ -1185,6 +1188,371 @@ function parseWinticketRaceUrl(link){
       .replace(/初日特選/g,'初特選').replace(/一次予選/g,'一予選').replace(/二次予選/g,'二予選');
   }
 
+  /* ---- 初日特例（midrace.html の MID_DAY1_ARE / midDay1AreBlocked と同じ） ---- */
+  var MID_DAY1_ARE = { ENABLED: true, MIN: 30.0 };
+  function day1AreBlocked(arePct, dayNum){
+    if (!MID_DAY1_ARE.ENABLED) return false;
+    if (Number(dayNum || 0) !== 1) return false;
+    if (arePct === null || arePct === undefined || isNaN(Number(arePct))) return true;
+    return Number(arePct) < MID_DAY1_ARE.MIN;
+  }
+
+  /* ---- 以下4関数は midrace.html からそのまま複製（2026-09-30）。変更禁止・midrace 側と同期すること ---- */
+function extractPlayers(doc) {
+  const tables = doc.querySelectorAll('table');
+  if (tables.length < 2) return [];
+  
+  const table = tables[1]; // 2つ目のテーブル
+  const rows = table.querySelectorAll('tbody tr');
+  const players = [];
+  
+  let currentWaku = 1;
+  
+  rows.forEach((row, idx) => {
+    const cells = row.querySelectorAll('td');
+    if (cells.length < 5) return;
+    
+    // 車番を探す
+    const bibEl = row.querySelector('[class*="Bib___Wrapper"]');
+    const num = bibEl ? parseInt(bibEl.textContent.trim()) : null;
+    if (!num) return;
+    
+    // 枠番（rowspanで複数行にまたがる場合がある）
+    const wakuCell = row.querySelector('td[rowspan]');
+    if (wakuCell) {
+      currentWaku = parseInt(wakuCell.textContent.trim()) || currentWaku;
+    }
+    
+    // 選手情報
+    const playerInfo = row.querySelector('[class*="PlayerInfo"]');
+    const nameEl = playerInfo?.querySelector('a');
+    
+    const name = nameEl?.textContent?.trim() || '';
+    
+    // 選手情報は名前(a)の親spanの次の兄弟span
+    // "岡山 A1 54歳 67期" をパース
+    let pref = '', cls = '', age = null, ki = null;
+    const allSpans = playerInfo?.querySelectorAll('span[class*="Text___Text"]');
+    if (allSpans) {
+      for (const span of allSpans) {
+        const txt = span.textContent?.trim() || '';
+        // 名前と同じでなく、県名+クラス+年齢+期のパターンを含むものを探す
+        if (txt !== name && txt.includes('歳') && txt.includes('期')) {
+          const infoParts = txt.split(/\s+/);
+          pref = infoParts[0] || '';
+          cls = infoParts[1] || '';
+          age = parseInt(infoParts[2]) || null;
+          ki = parseInt(infoParts[3]) || null;
+          break;
+        }
+      }
+    }
+    
+    // AI予想（複数の方法で取得を試みる）
+    let aiPred = '';
+    // 方法1: PredictionIconのsvg titleから
+    const aiEl = row.querySelector('[class*="PredictionIcon"] svg title');
+    if (aiEl) {
+      aiPred = aiEl.textContent || '';
+    }
+    // 方法2: セルから直接「本命」「対抗」「単穴」「連下」を探す
+    if (!aiPred) {
+      for (const cell of cells) {
+        const txt = cell.textContent.trim();
+        if (['本命', '対抗', '単穴', '連下'].includes(txt)) {
+          aiPred = txt;
+          break;
+        }
+      }
+    }
+    
+    // 各セルの値を取得（spanの入れ子構造からテキストを抽出）
+    const cellValues = Array.from(cells).map(cell => {
+      // コメントセルは特別扱い
+      const commentEl = cell.querySelector('[class*="Comment"]');
+      if (commentEl) return { type: 'comment', value: commentEl.textContent.trim() };
+      
+      // ギヤ倍率
+      const gearEl = cell.querySelector('[class*="GearRatio"]');
+      if (gearEl) return { type: 'gear', value: parseFloat(gearEl.textContent.trim()) || null };
+      
+      // 通常のセル
+      const text = cell.textContent.trim();
+      return { type: 'normal', value: text };
+    });
+    
+    // セルインデックスを計算（枠番セルの有無で調整）
+    const hasWakuCell = wakuCell !== null;
+    const baseOffset = hasWakuCell ? 0 : -1;
+    
+    // 各データのインデックス（0-indexed）
+    // 枠, 車, 名前, AI, 得点, S, B, 脚, 逃, 捲, 差, マ, 1着, 2着, 3着, 着外, 勝率, 2連, 3連, ギヤ, コメント
+    const getVal = (idx) => {
+      const adjusted = idx + baseOffset;
+      if (adjusted < 0 || adjusted >= cellValues.length) return null;
+      const v = cellValues[adjusted].value;
+      return v === '' || v === '-' ? null : v;
+    };
+    
+    const getNumVal = (idx) => {
+      const v = getVal(idx);
+      if (v === null) return null;
+      const n = parseFloat(v);
+      return isNaN(n) ? null : n;
+    };
+    
+    // 競走得点（セル4, 0-indexed）
+    const pt = getNumVal(4);
+    
+    // S, B
+    const S = getNumVal(5);
+    const H = getNumVal(6);  // 新規追加
+    const B = getNumVal(7);
+    
+    // 脚質
+    const style = getVal(8) || '';
+    
+    // 決まり手
+    const nige = getNumVal(9);
+    const maki = getNumVal(10);
+    const sashi = getNumVal(11);
+    const mark = getNumVal(12);
+    
+    // 着数
+    const w1 = getNumVal(13);
+    const w2 = getNumVal(14);
+    const w3 = getNumVal(15);
+    const wout = getNumVal(16);
+    
+    // 勝率、連対率
+    const win = getNumVal(17);
+    const r2 = getNumVal(18);
+    const r3 = getNumVal(19);
+    
+    // ギヤ倍率
+    const gearCell = cellValues.find(c => c.type === 'gear');
+    const gear = gearCell?.value || null;
+    
+    // コメント
+    const commentCell = cellValues.find(c => c.type === 'comment');
+    const comment = commentCell?.value || '';
+    
+    players.push({
+      car: num,  // brainlogic用
+      n: num,    // テーブル表示用（互換性維持）
+      waku: currentWaku,
+      name,
+      pref,
+      cls,
+      age,
+      ki,
+      ai: aiPred,  // AI予想（本命/対抗/単穴/連下）
+      pt,
+      style,
+      S,
+      H,  // 新規追加
+      B,
+      nige,
+      makuri: maki,  // brainlogic用
+      maki,          // テーブル表示用（互換性維持）
+      sashi,
+      mark,
+      w1,
+      w2,
+      w3,
+      wout,
+      win,
+      r2,
+      rentai3: r3,  // brainlogic用
+      r3,           // テーブル表示用（互換性維持）
+      gear,
+      comment
+    });
+  });
+  
+  return players;
+}
+function asymmetricSigmoid(x) {
+  return 100 / (1 + Math.exp(-0.1 * (x - 15)));
+}
+function isAreRaceFormation(lineup) {
+  if (!lineup || lineup.length < 3) return false;
+  const sizes = lineup.map(g => g.length).sort((a, b) => a - b);
+  // 3分戦: 2-2-3
+  if (sizes.length === 3 && sizes[0] === 2 && sizes[1] === 2 && sizes[2] === 3) return '3bunsen';
+  // 3分戦+単騎: 1-2-2-2
+  if (sizes.length === 4 && sizes[0] === 1 && sizes[1] === 2 && sizes[2] === 2 && sizes[3] === 2) return 'tanki';
+  return false;
+}
+function calcAreScore(race) {
+  if (!race || !race.players || !race.lineup) return null;
+  
+  const formationType = isAreRaceFormation(race.lineup);
+  if (!formationType) return null;
+  
+  const players = race.players;
+  const lineup = race.lineup;
+  const isTanki = formationType === 'tanki';
+  
+  const honmei = players.find(p => p.ai === '本命');
+  const taishoP = players.find(p => p.ai === '対抗');
+  if (!honmei || !taishoP) return null;
+  
+  const hCar = String(honmei.car || honmei.n);
+  const tCar = String(taishoP.car || taishoP.n);
+  
+  function findLineIdx(car) {
+    for (let i = 0; i < lineup.length; i++) {
+      if (lineup[i].map(String).includes(String(car))) return i;
+    }
+    return -1;
+  }
+  function lInfo(idx) {
+    const m = lineup[idx].map(String);
+    return { head: m[0], bante: m[1]||null, third: m[2]||null, size: m.length, members: m };
+  }
+  function gp(car) { return players.find(p => String(p.car||p.n) === String(car)); }
+  function isDbl(p) {
+    if (!p) return false;
+    const s = Number(p.sashi)||0, m = Number(p.mark)||0;
+    return m > 0 && s >= m * 2;
+  }
+  function aiOf(car) { const p = gp(car); return p ? (p.ai||'') : ''; }
+  
+  const hLineIdx = findLineIdx(hCar);
+  const tLineIdx = findLineIdx(tCar);
+  
+  // 3車ラインのインデックス（tanki形式では存在しない）
+  let threeIdx = -1;
+  if (!isTanki) {
+    for (let i = 0; i < lineup.length; i++) { if (lineup[i].length === 3) { threeIdx = i; break; } }
+  }
+  
+  const sameLine = hLineIdx === tLineIdx;
+  const plus = [], minus = [];
+  
+  // 1: 唯一の3車ライン番手ダブルスコア（3分戦のみ）
+  if (threeIdx >= 0) {
+    const li = lInfo(threeIdx);
+    if (li.bante && isDbl(gp(li.bante))) plus.push({ id:1, score:5 });
+  }
+  // 2: ◎が2車ラインの先頭
+  if (hLineIdx >= 0) {
+    const li = lInfo(hLineIdx);
+    if (li.size === 2 && li.head === hCar) plus.push({ id:2, score:7 });
+  }
+  // 3: 3車先頭逃げ>捲り + 3番手ダブルスコア（3分戦のみ）
+  if (threeIdx >= 0) {
+    const li = lInfo(threeIdx);
+    const hp = gp(li.head);
+    if (hp && li.third) {
+      const n = Number(hp.nige)||0, m = Number(hp.makuri)||0;
+      if (n > m && isDbl(gp(li.third))) plus.push({ id:3, score:6 });
+    }
+  }
+  // 4: 3ライン以上にAI印あり
+  let markedLineCount = 0;
+  for (let i = 0; i < lineup.length; i++) {
+    if (lineup[i].map(String).some(c => aiOf(c) !== '')) markedLineCount++;
+  }
+  if (markedLineCount >= 3) plus.push({ id:4, score:8 });
+  
+  // 5: 唯一の3車ラインにAI印ゼロ（3分戦のみ）
+  if (threeIdx >= 0 && !lineup[threeIdx].map(String).some(c => aiOf(c) !== '')) {
+    plus.push({ id:5, score:7 });
+  }
+  // 6: ◎○が別ライン
+  if (!sameLine) plus.push({ id:6, score:8 });
+  // 7: ◎○が同じライン
+  if (sameLine) minus.push({ id:7, score:-5 });
+  
+  // 8a/8b/11: ◎○同じライン sub-conditions
+  if (sameLine && hLineIdx >= 0) {
+    const li = lInfo(hLineIdx);
+    if (li.head === hCar && li.bante === tCar) {
+      const hN = Number(honmei.nige)||0, hM = Number(honmei.makuri)||0;
+      const tS = Number(taishoP.sashi)||0;
+      if (hN > hM && tS === 0) minus.push({ id:'8a', score:-2 });
+      if (hM > hN && tS === 0) plus.push({ id:'8b', score:5 });
+      if (hM > hN) plus.push({ id:11, score:4 });
+    }
+  }
+  // 9: 全員印なしラインがある（単騎は対象外）
+  for (let i = 0; i < lineup.length; i++) {
+    if (isTanki && lineup[i].length === 1) continue;
+    if (lineup[i].map(String).every(c => aiOf(c) === '')) {
+      minus.push({ id:9, score:-5 }); break;
+    }
+  }
+  // 新12: ライン先頭の印評価（単騎は対象外）
+  for (let i = 0; i < lineup.length; i++) {
+    if (isTanki && lineup[i].length === 1) continue;
+    const members = lineup[i].map(String);
+    const lineHasMark = members.some(c => aiOf(c) !== '');
+    if (!lineHasMark) continue;
+    const hd = members[0];
+    const mk = aiOf(hd);
+    if (mk === '') {
+      plus.push({ id:'12a', score:8 });
+    }
+    else if (mk === '単穴' || mk === '連下') {
+      const hasHonmeiOrTaisho = members.some(c => {
+        const a = aiOf(c);
+        return a === '本命' || a === '対抗';
+      });
+      if (hasHonmeiOrTaisho) plus.push({ id:'12b', score:6 });
+    }
+  }
+  
+  // 集計
+  const plusTotal = plus.reduce((s,i) => s + i.score, 0);
+  const minusTotal = minus.reduce((s,i) => s + i.score, 0);
+  const pc = plus.length;
+  
+  // 重複ボーナス
+  const has4 = plus.some(i => i.id === 4);
+  const has6 = plus.some(i => i.id === 6);
+  const has12a = plus.some(i => i.id === '12a');
+  const isSpecial = has4 && (has6 || has12a);
+  
+  let mult = 1.0;
+  if (isSpecial) {
+    mult = 1.25; // 特殊コンボ優先、重複ボーナス適用しない
+  } else {
+    if (pc >= 5) mult = 1.2;
+    else if (pc === 4) mult = 1.15;
+    else if (pc === 3) mult = 1.1;
+    else if (pc === 2) mult = 1.05;
+  }
+  
+  const raw = plusTotal * mult + minusTotal;
+  let pct = Math.round(asymmetricSigmoid(raw) * 10) / 10;
+  // 荒れ予報数値補正（2026-06-28）：70%以上の帯のみ10ポイント下げる（99→89 / 80→70 / 70→60）
+  if (pct >= 70) pct = Math.round((pct - 10) * 10) / 10;
+
+  // ===== 追加特例（2026-07-14）：◎○別ライン時、◎がライン先頭でなく、
+  //       他ラインの先頭に○△×のいずれかが付いていれば +10%（最終パーセントに直接加算） =====
+  let bonus10 = false;
+  if (!sameLine && hLineIdx >= 0) {
+    const hLine = lInfo(hLineIdx);
+    if (hLine.head !== hCar) {
+      for (let i = 0; i < lineup.length; i++) {
+        if (i === hLineIdx) continue;
+        const li = lInfo(i);
+        if (!li.head) continue;
+        const a = aiOf(li.head);
+        if (a === '対抗' || a === '単穴' || a === '連下') { bonus10 = true; break; }
+      }
+    }
+  }
+  if (bonus10) {
+    pct = Math.round(Math.min(99, pct + 10) * 10) / 10;
+    plus.push({ id: '13', score: 0, note: '◎非先頭×他ライン先頭に○△× → +10%' });
+  }
+
+  return { score: raw, percentage: pct, plusItems: plus, minusItems: minus, multiplier: mult, formationType, bonus10 };
+}
+
   /* ---- 緑ランプの判定（midrace.html から複製） ---- */
   function extractLineup(doc){
     var sec = doc.querySelector('[class*="LinePrediction"]');
@@ -1211,10 +1579,9 @@ function parseWinticketRaceUrl(link){
     if (sizes[0] === 1) return false;   // 単騎前受けは除外
     return true;
   }
-  function isGeneratable(lineup){
+  function isGeneratable(lineup, players){
+    if (!players || players.length < 2) return false;   // midrace isV3Generatable と同じ
     if (!lineup || !lineup.length) return false;
-    var cars = lineup.reduce(function(a, g){ return a + g.length; }, 0);
-    if (cars < 2) return false;         // midrace の「選手2人以上」の代用
     var lu = lineup.map(function(g){ return g.map(Number); });
     return !!(is3Bunsen(lu) || isCBunsen(lu));
   }
@@ -1274,7 +1641,15 @@ function parseWinticketRaceUrl(link){
       var html = await withTimeout(fetch(proxy(url)).then(function(r){ return r.text(); }), BRTK.FETCH_TIMEOUT_MS, 'race');
       if (!html) throw new Error('fetch-empty');
       var doc = new DOMParser().parseFromString(html, 'text/html');
-      evalCache[c.key] = { status: 'ok', gen: isGeneratable(extractLineup(doc)) };
+      var players = extractPlayers(doc), lineup = extractLineup(doc);
+      var gen = isGeneratable(lineup, players), arePct = null;
+      if (gen && Number(c.v.dayNum || 0) === 1 && MID_DAY1_ARE.ENABLED) {
+        /* 初日特例：荒れ指数30%以上のみ（midrace と同じく calcAreScore の percentage） */
+        var ar = calcAreScore({ players: players, lineup: lineup });
+        arePct = ar ? ar.percentage : null;
+        if (day1AreBlocked(arePct, c.v.dayNum)) gen = false;
+      }
+      evalCache[c.key] = { status: 'ok', gen: gen, arePct: arePct };
       dbg.ok++;
     } catch(e) {
       dbg.fail++; dbg.lastErr = String(e && e.message || e);

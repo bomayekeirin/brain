@@ -22420,6 +22420,11 @@ function attachTextsToBets(stage4, texts) {
     if(!race.players || race.players.length < 2 || !lineup.length){
       if(typeof showToast==='function') showToast('選手/ラインデータが不足', true); return null;
     }
+    // ★2026-09-30 初日特例：初日は荒れ指数30%以上のみ生成（一括生成はここを直接呼ぶため、ここでも止める）
+    if(midDay1AreBlocked(race, (typeof CURRENT_VENUE !== 'undefined') ? CURRENT_VENUE : null)){
+      var _a1 = (race.arePct != null) ? Number(race.arePct).toFixed(1) + '%' : '算出不可';
+      return { error: '初日の荒れ指数' + _a1 + '（' + MID_DAY1_ARE.MIN + '%未満）のため生成対象外' };
+    }
 
     // ① 荒れ指数（0〜100%を全域で使う）
     var arePct = (race.arePct != null) ? Number(race.arePct) : null;
@@ -24279,8 +24284,29 @@ function selectFlexPlayersV3(allPlayers, assignedCars, lineup, hasAxis3rd, ex, i
 }
 
 /* ---------- 荒れ指数 → 点数 ---------- */
+/* ===== 初日特例：荒れ指数30%以上のレースのみ生成対象（2026-09-30・ボンバイエ指示） =====
+ * ・初日（開催の dayNum === 1。2日間開催の1日目も含む）は、荒れ指数（race.arePct）が 30.0% 以上のレースだけを生成対象にする。
+ *   30.0% ちょうどは対象。荒れ指数が計算できないレース（null）は対象外。
+ * ・2日目以降は従来どおり（荒れ指数で見送らない）。日目が分からないときも従来どおり。
+ * ・効く場所：isV3Generatable（緑ランプ・生成ボタン）と runAxisV3Generation（一括生成が直接呼ぶため）。
+ *   荒れ買い目（カレッタ）・Lab は generateBets を直接呼ぶので対象外。
+ * ・race.arePct は fetchVenueRaces で全レースに付与済み（renderRaceSelector より前）。
+ * ★midnight.html の電光掲示板も同じ判定を複製している（MID_DAY1_ARE・calcAreScore）。変えたら同期すること。
+ * ・ENABLED:false で 2026-09-30 以前と完全に同じ。 */
+const MID_DAY1_ARE = { ENABLED: true, MIN: 30.0 };
+function midDay1AreBlocked(race, venue){
+  if (!MID_DAY1_ARE.ENABLED) return false;
+  var dayNum = Number((venue && venue.dayNum) || (race && race.dayNum) || 0);
+  if (dayNum !== 1) return false;
+  var a = (race && race.arePct != null) ? Number(race.arePct) : null;
+  if (a === null || isNaN(a)) return true;
+  return a < MID_DAY1_ARE.MIN;
+}
+if (typeof window !== 'undefined') window.midDay1AreBlocked = midDay1AreBlocked;
+
 /* ===== 生成対象レースの判定（ランプ・生成ボタン共通） =====
- * v3（軸指定）は 三分戦 or 単騎含む三分戦 のみ対応。 */
+ * v3（軸指定）は 三分戦 or 単騎含む三分戦 のみ対応。
+ * ★2026-09-30：初日は荒れ指数30%以上のみ（MID_DAY1_ARE）。 */
 function isV3Generatable(race){
   try{
     if(!race) return false;
@@ -24288,7 +24314,10 @@ function isV3Generatable(race){
     if(!race.lineup || !race.lineup.length) return false;
     var lu = race.lineup.map(function(g){ return g.map(Number); });
     if(typeof is3BunsenFormation !== 'function' || typeof isCBunsenFormation !== 'function') return false;
-    return !!(is3BunsenFormation(lu) || isCBunsenFormation(lu));
+    if(!(is3BunsenFormation(lu) || isCBunsenFormation(lu))) return false;
+    // ★2026-09-30 初日特例
+    if(midDay1AreBlocked(race, (typeof CURRENT_VENUE !== 'undefined') ? CURRENT_VENUE : null)) return false;
+    return true;
   }catch(e){ return false; }
 }
 if (typeof window !== 'undefined') window.isV3Generatable = isV3Generatable;
