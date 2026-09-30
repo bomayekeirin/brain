@@ -290,6 +290,7 @@ body::before{
   cursor:pointer;transition:filter .15s ease;
 }
 .brtk-item[data-kind="pr"]{cursor:default;}
+.brtk-item[data-kind="dbg"]{cursor:default;color:#d8c24a;text-shadow:none;font-weight:500;}   /* ★2026-09-30 診断表示（?brtk=debug のときだけ） */
 .brtk-min{font-style:normal;color:#e03040;text-shadow:0 0 6px rgba(224,48,64,.45);}
 .brtk-item.tapped{filter:brightness(1.7);}
 @media (prefers-reduced-motion: reduce){
@@ -25846,6 +25847,8 @@ const TL_WINDOW_OVERRIDE = {
     CONCURRENCY: 3,           // 同時に取得する出走表の数
     FAIL_WAIT_MS: 120000,     // 取得失敗から引き直すまでの間隔
     FAIL_MAX: 3,              // 取得失敗の引き直し上限
+    FETCH_TIMEOUT_MS: 10000,  // ★2026-09-30 対策B：出走表1件の取得上限（超えたら失敗扱いで次へ）
+    INFO_TIMEOUT_MS: 8000,    // ★2026-09-30 対策B：開催情報・オッズパーク種別の取得上限（超えたら無しで判定）
     MORNING:  [7*60+30, 10*60+30],   // 7:30〜10:30（終わりは含まない）
     MIDNIGHT: [20*60+30, 23*60+30],  // 20:30〜23:30（終わりは含まない）
     MORNING_TEXT:  '現在の時間帯はモーニング競輪専用ページ「朝脳」で買い目が生成可能です',
@@ -25858,7 +25861,11 @@ const TL_WINDOW_OVERRIDE = {
   window.BRTK_CONFIG = BRTK;
 
   var evalCache = {};   // key -> { status:'ok'|'fail', gen, cls, tries, at }
-  var v3Cache = {};     // raceCode|day -> v3 cup info（null＝取得失敗）
+  var v3Cache = {};     // raceCode|day -> Promise<v3 cup info | null>
+  var opCache = {};     // venueId -> Promise<オッズパーク種別 | null>
+  /* ★2026-09-30 対策A：診断表示（URL に ?brtk=debug を付けたときだけ帯に出す） */
+  var DEBUG = /(?:^|[?&])brtk=debug(?:&|$)/.test(location.search || '');
+  var dbg = { ticks: 0, scans: 0, fetched: 0, ok: 0, fail: 0, timeout: 0, lastErr: '', scanAt: null };
   var scanning = false;
   var lastSig = null;
   var band = null, track = null;
@@ -25873,6 +25880,13 @@ const TL_WINDOW_OVERRIDE = {
     return (isNaN(h) || isNaN(m)) ? null : h*60 + m;
   }
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function withTimeout(promise, ms, label){
+    var t;
+    return Promise.race([
+      promise,
+      new Promise(function(_, rej){ t = setTimeout(function(){ dbg.timeout++; rej(new Error('timeout:' + label)); }, ms); })
+    ]).finally(function(){ clearTimeout(t); });
+  }
   function venuesList(){ try { return (typeof VENUES !== 'undefined' && VENUES) ? VENUES : []; } catch(e){ return []; } }
 
   /* ホームが見えているか（見えていなければ取得もアニメーションもしない） */
@@ -25906,9 +25920,15 @@ const TL_WINDOW_OVERRIDE = {
       if (!v || v.linkType === 'raceresult') return;
       if (v.timeSlot !== 'day' && v.timeSlot !== 'nighter') return;
       (v.races || []).forEach(function(r){
-        var m = hm(r.deadline);
+        /* ★2026-09-30 対策C：締切が無ければ発走時刻で並べる（生成可能レース一覧 glLoad と同じ考え方）。
+           出走表を取得した後は、その締切（取れれば）で並べ直す。 */
+        var key = v.venueId + '|' + v.raceCode + '|' + (v.dayNum || 1) + '|' + r.raceNum;
+        var e = evalCache[key];
+        var dl = r.deadline || (e && e.deadline) || '';
+        var m = hm(dl);
+        if (m === null) m = hm(r.start);
         if (m === null || m <= n) return;
-        list.push({ v: v, r: r, m: m, key: v.venueId + '|' + v.raceCode + '|' + (v.dayNum || 1) + '|' + r.raceNum });
+        list.push({ v: v, r: r, m: m, dl: dl, key: key });
       });
     });
     list.sort(function(a, b){
@@ -25919,13 +25939,21 @@ const TL_WINDOW_OVERRIDE = {
     return list;
   }
 
-  async function getV3(v){
+  function getV3(v){
     var k = v.raceCode + '|' + (v.dayNum || 1);
-    if (k in v3Cache) return v3Cache[k];
-    var r = null;
-    try { r = await fetchV3CupInfo(v.raceCode, String(v.dayNum || 1)); } catch(e){ r = null; }
-    v3Cache[k] = r;
-    return r;
+    if (!v3Cache[k]) {
+      v3Cache[k] = withTimeout(Promise.resolve().then(function(){ return fetchV3CupInfo(v.raceCode, String(v.dayNum || 1)); }), BRTK.INFO_TIMEOUT_MS, 'v3')
+        .catch(function(e){ dbg.lastErr = String(e && e.message || e); delete v3Cache[k]; return null; });
+    }
+    return v3Cache[k];
+  }
+  function getOp(v){
+    var k = v.venueId;
+    if (!opCache[k]) {
+      opCache[k] = withTimeout(Promise.resolve().then(function(){ return (typeof fetchOddsparkRaceTypes === 'function') ? fetchOddsparkRaceTypes(v.venueId) : null; }), BRTK.INFO_TIMEOUT_MS, 'op')
+        .catch(function(e){ dbg.lastErr = String(e && e.message || e); delete opCache[k]; return null; });
+    }
+    return opCache[k];
   }
 
   /* 1レースを取得して判定する（fetchVenueRaces と同じ出どころで前提を載せる） */
@@ -25934,11 +25962,11 @@ const TL_WINDOW_OVERRIDE = {
     var prev = evalCache[c.key];
     try {
       if (typeof glFetchRace !== 'function' || typeof glCanGenerate !== 'function') throw new Error('deps');
-      var race = await glFetchRace(v, n);
-      if (!race || race.error || !race.players || !race.lineup) throw new Error('fetch');
+      dbg.fetched++;
+      var race = await withTimeout(glFetchRace(v, n), BRTK.FETCH_TIMEOUT_MS, 'race');
+      if (!race || race.error || !race.players || !race.lineup) throw new Error('fetch-empty');
       var v3 = await getV3(v);
-      var op = null;
-      try { op = (typeof fetchOddsparkRaceTypes === 'function') ? await fetchOddsparkRaceTypes(v.venueId) : null; } catch(e){ op = null; }
+      var op = await getOp(v);
       var bi = v3 && v3.byNum ? v3.byNum[n] : null;
       race.venue = v.venue;
       race.timeSlot = v.timeSlot;
@@ -25950,8 +25978,10 @@ const TL_WINDOW_OVERRIDE = {
       race.deadline = c.r.deadline || race.deadline || '';
       var cls = (op && op.types && op.types[n]) || race.cls || c.r.cls || '';
       race.cls = cls;
-      evalCache[c.key] = { status: 'ok', gen: !!glCanGenerate(race), cls: cls };
+      evalCache[c.key] = { status: 'ok', gen: !!glCanGenerate(race), cls: cls, deadline: race.deadline || '', start: race.start || '' };
+      dbg.ok++;
     } catch(e) {
+      dbg.fail++; dbg.lastErr = String(e && e.message || e);
       evalCache[c.key] = { status: 'fail', tries: ((prev && prev.tries) || 0) + 1, at: Date.now() };
     }
   }
@@ -25963,6 +25993,7 @@ const TL_WINDOW_OVERRIDE = {
     if (scanning) return;
     if (windowMode()) return;
     scanning = true;
+    dbg.scans++; dbg.scanAt = Date.now();
     try {
       for (var guard = 0; guard < 200; guard++) {
         if (!homeVisible()) break;
@@ -25994,27 +26025,52 @@ const TL_WINDOW_OVERRIDE = {
       if (!e) break;                              // 手前が未判定なら順序が確定しないので、そこまでで止める
       if (e.status !== 'ok') { if (failSkippable(e)) continue; break; }
       if (!e.gen) continue;
+      var _dl = c.r.deadline || e.deadline || '';
       items.push({ kind:'race', key: c.key, venueId: c.v.venueId, raceCode: c.v.raceCode, raceNum: c.r.raceNum,
-                   venue: c.v.venue, cls: shortCls(e.cls), deadline: c.r.deadline, remain: c.m - n });
+                   venue: c.v.venue, cls: shortCls(e.cls), deadline: _dl, start: (_dl ? '' : (c.r.start || e.start || '')),
+                   remain: c.m - n });
     }
     if (!items.length && BRTK.PR_TEXT) items.push({ kind:'pr', text: BRTK.PR_TEXT });
+    if (DEBUG) items.push({ kind:'dbg', text: debugText() });
     return items;
   }
 
+  function debugText(){
+    var vs = venuesList(), dn = 0, noRaces = 0, noTime = 0, raceTotal = 0;
+    vs.forEach(function(v){
+      if (!v || v.linkType === 'raceresult' || (v.timeSlot !== 'day' && v.timeSlot !== 'nighter')) return;
+      dn++;
+      if (!v.races || !v.races.length) { noRaces++; return; }
+      v.races.forEach(function(r){ raceTotal++; if (hm(r.deadline) === null && hm(r.start) === null) noTime++; });
+    });
+    var ec = 0, eok = 0, egen = 0, efail = 0;
+    Object.keys(evalCache).forEach(function(k){ var e = evalCache[k]; ec++; if (e.status === 'ok') { eok++; if (e.gen) egen++; } else efail++; });
+    var d = new Date(), hh = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0') + ':' + String(d.getSeconds()).padStart(2,'0');
+    return '[診断 ' + hh + '] 開催' + vs.length + '(DN' + dn + '・R無' + noRaces + ') R' + raceTotal + '(時刻無' + noTime + ')'
+         + ' 候補' + candidates().length + ' 判定' + eok + '/' + ec + ' 可' + egen + ' 失敗' + efail
+         + ' 取得' + dbg.fetched + ' 超過' + dbg.timeout + ' tick' + dbg.ticks + ' scan' + dbg.scans + (scanning ? '(中)' : '')
+         + ' 表示' + (homeVisible() ? '○' : '×') + ' 時間帯' + (windowMode() || 'DN')
+         + ' 関数' + (typeof glFetchRace === 'function' ? '○' : '×') + (typeof glCanGenerate === 'function' ? '○' : '×')
+         + (dbg.lastErr ? ' 最終エラー:' + dbg.lastErr.slice(0, 60) : '');
+  }
   function soonHTML(remain){
     return (remain > 0 && remain <= BRTK.SOON_MIN) ? ' (<em class="brtk-min">' + remain + '分前</em>)' : '';
   }
   function itemHTML(it){
     if (it.kind !== 'race') return esc(it.text);
-    return esc(it.venue + it.raceNum + 'R') + (it.cls ? ' ' + esc(it.cls) : '') + ' 締切' + esc(it.deadline)
+    return esc(it.venue + it.raceNum + 'R') + (it.cls ? ' ' + esc(it.cls) : '')
+         + (it.deadline ? ' 締切' + esc(it.deadline) : (it.start ? ' 発走' + esc(it.start) : ''))
          + '<span class="brtk-soon">' + soonHTML(it.remain) + '</span> ' + esc(BRTK.RACE_SUFFIX);
   }
 
   function render(){
     if (!track) return;
     var items = buildItems();
-    var sig = items.map(function(it){ return it.kind + ':' + (it.key || it.text) + ':' + (it.cls || ''); }).join('|');
+    var sig = items.map(function(it){ return it.kind === 'dbg' ? 'dbg' : (it.kind + ':' + (it.key || it.text) + ':' + (it.cls || '') + ':' + (it.deadline || it.start || '')); }).join('|');
     if (sig === lastSig) {
+      var dnode = track.querySelector('.brtk-item[data-kind="dbg"]');
+      var dit = items.filter(function(it){ return it.kind === 'dbg'; })[0];
+      if (dnode && dit) dnode.textContent = dit.text;
       /* 同じ並び：カウントダウンだけ書き換える（アニメーションを止めない） */
       var nodes = track.querySelectorAll('.brtk-item[data-kind="race"]');
       items.forEach(function(it, i){
@@ -26093,6 +26149,7 @@ const TL_WINDOW_OVERRIDE = {
   }
 
   function tick(){
+    dbg.ticks++;
     try {
       render();
       if (!windowMode() && homeVisible() && venuesList().length) scan();
@@ -26112,9 +26169,10 @@ const TL_WINDOW_OVERRIDE = {
       if (venuesList().length || waited > 90) { clearInterval(w); tick(); }
     }, 1000);
     setInterval(tick, BRTK.TICK_MS);
+    if (DEBUG) setInterval(function(){ try { render(); } catch(e){} }, 2000);
     document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'visible') tick(); });
   }
-  window.BRTK_DEBUG = { evalCache: evalCache, render: function(){ lastSig = null; render(); }, scan: scan, buildItems: buildItems, setX: function(v){ x = v; } };
+  window.BRTK_DEBUG = { dbg: dbg, debugText: function(){ return debugText(); }, evalCache: evalCache, render: function(){ lastSig = null; render(); }, scan: scan, buildItems: buildItems, setX: function(v){ x = v; } };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
 </script>
