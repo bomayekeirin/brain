@@ -38,7 +38,7 @@
 
 <style>
   :root{
-    --bg:#060607;
+    --bg:#000;                           /* ★2026-09-30 #060607→#000（ボンバイエ指示：ステータスバー・読み込み画面と真っ黒で揃える） */
     --line:rgba(255,255,255,.08);
     /* ミッドナイト＝紫グラデーション */
     --mid-deep:#4a2a6a;
@@ -283,7 +283,7 @@
   /* ===== 遷移画面（app起動トランジション流用・ロゴのみ差し替え） ===== */
   .mn-boot{
     position:fixed;inset:0;
-    background:#0f0f0f;                 /* メイン読み込みと同じダークグレー */
+    background:#000;                    /* ★2026-09-30 #0f0f0f→#000（ホーム背景・ステータスバーと真っ黒で揃える） */
     display:flex;align-items:center;justify-content:center;
     z-index:2500;
     opacity:1;
