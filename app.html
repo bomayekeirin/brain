@@ -297,6 +297,7 @@ body::before{
 .brtk-item[data-kind="dbg"]{cursor:default;color:#d8c24a;text-shadow:none;font-weight:500;}   /* ★2026-09-30 診断表示（?brtk=debug のときだけ） */
 .brtk-min{font-style:normal;color:#e03040;text-shadow:0 0 6px rgba(224,48,64,.45);}
 .brtk-item.tapped{filter:brightness(1.7);}
+.brtk-are{color:#ffd23f;text-shadow:0 0 6px rgba(255,210,63,.45);}   /* ★2026-09-30「荒れ予報買い目あり」黄（ボンバイエ指示で青から変更） */
 @media (prefers-reduced-motion: reduce){
   .brtk{overflow-x:auto;-webkit-mask-image:none;mask-image:none;}
   .brtk-track{position:static;transform:none !important;padding:0 12px;}
@@ -19636,6 +19637,7 @@ async function loadAreRaceData() {
               dayNum: venue.dayNum || '1',
               players: race.players || [],
               lineup: race.lineup || [],
+              cls: race.cls || '',   /* ★2026-09-30 v2：印（calcAllMarks）の入力を荒れ買い目カードと揃える */
               ...areResult
             };
             results.push(entry);
@@ -19748,7 +19750,10 @@ function renderAreRaceCards(races) {
   
   // ★2026-08-09：荒れ予報カードの表示下限を 20% → 30% に引き上げ（ボンバイエ指示）
   //   ARE_CARD_MIN_PCT の1箇所で制御する。戻すときはこの定数だけ。
-  const filtered = races.filter(r => r.percentage !== null && r.percentage >= ARE_CARD_MIN_PCT && r.percentage <= 100);
+  /* ★2026-09-30 v2：一覧に載せるのは絶対条件を満たすレースのみ（荒れ指数は問わない）。並びは締切順（呼び出し元で整列済み） */
+  const filtered = areV2On()
+    ? races.filter(r => areV2EntryTarget(r))
+    : races.filter(r => r.percentage !== null && r.percentage >= ARE_CARD_MIN_PCT && r.percentage <= 100);
   
   let html = '<div style="padding:0 12px 24px;">';
   
@@ -19760,11 +19765,12 @@ function renderAreRaceCards(races) {
   } else {
     filtered.forEach((race, idx) => {
       const fin = race.noData || isFinished(race);
-      const hasPct = race.percentage !== null;
-      const fc = hasPct ? fireClass(race.percentage) : 'fire-grey';
+      const _dispPct = areV2On() ? areV2EntryPct(race) : race.percentage;   /* ★v2：60%未満は特例表示 */
+      const hasPct = _dispPct !== null && _dispPct !== undefined;
+      const fc = hasPct ? fireClass(_dispPct) : 'fire-grey';
       const deadlineStr = race.deadline ? `締切 ${race.deadline}` : (race.startTime ? `発走 ${race.startTime}` : '');
       const formLabel = race.formationType === 'tanki' ? '単騎含' : (race.formationType === '3bunsen' ? '3分戦' : '');
-      const pctDisplay = hasPct ? `${race.percentage}%` : '--';
+      const pctDisplay = hasPct ? `${_dispPct}%` : '--';
       
       html += `
         <div class="arerace-card${fin ? ' finished' : ''}" data-are-idx="${idx}" style="animation-delay:${idx * 0.06}s;">
@@ -20813,6 +20819,7 @@ async function fetchOddsDataFor(venue,race,type){
   }
 }
 async function buildCarettaForRace(race){
+  if(areV2On()) return buildCarettaForRaceV2(race);   /* ★2026-09-30 v2 */
   try{
     const venue=VENUES.find(v=>v.venueId===race.venueId);
     if(!venue) return null;
@@ -20831,6 +20838,218 @@ async function buildCarettaForRace(race){
     if(!A&&(!W||W.count===0)&&(!T||T.count===0)&&(!S||S.count===0)) return null;
     return {A,W,T,S};
   }catch(e){ console.error('buildCarettaForRace',e); return null; }
+}
+
+/* =====================================================================
+ * 荒れ買い目 v2（2026-09-30 実装・カレッタさん確認済み仕様）
+ * ---------------------------------------------------------------------
+ * ■スイッチ
+ *   ARE_V2.ENABLED      true=v2（v1 はコードを残してオフ） / false=v1 と完全に同じ動き
+ *   ARE_V2.TANKI_OK     true=単騎あり三分戦も対象（単騎はラインに数えない・先頭の並びも可）
+ *   ARE_V2.WIDE_SHOW    true=ワイドを表示（v2 のワイド＝2車単と同じ組み合わせ・同じ2車は1点）
+ *   ARE_V2.ODDS_CUT_2T  true=2車単を 12.0倍以上150.0倍未満に絞る（既存の帯）。既定オフ
+ *   ARE_V2.ODDS_CUT_3F  true=3連複を 10.0倍以上に絞る（既存の条件）。既定オフ
+ *   ARE_V2.PSEUDO_PCT   荒れ指数60%未満の対象レースに、荒れ予報画面の中だけ 70.1〜75.0% を表示する特例
+ * ■対象レース（絶対条件・全て満たす）
+ *   デイ・ナイター／7車立て／三分戦（2車以上のラインがちょうど3本。単騎は TANKI_OK のとき可）／
+ *   ライン①に◎と○が同居しない（◎○が無いレースは対象外）。荒れ指数は生成の可否に使わない。
+ * ■読み方：ライン番号は2車以上のラインを前から ①②③（単騎は数えない）。「ライン○内の」と前置きの無い車番は位置不問。
+ *   ✕＝AIの連下（コード上 '×'）、✖＝カレッタ印（'✖'）。条件が複数成立したら合算して重複を除く。
+ * ■2車単（成立しなければ「生成対象外」）
+ *   ①-① ライン①の1番か4番が○か× → 1-4,4-1
+ *   ①-② ライン①の4番が○ → 2-4,4-2
+ *   ①-③ ライン①の1番が◎、5番が○ → 1-5
+ *   ①-④ ライン①の4番が×、6番が✖ → 4-6,6-4
+ *   ①-⑤ ライン①の5番が×、1番が✖ → 5-1
+ *   ①-⑥ ライン①の3番が○、1番が◎△×● → 3-1,1-3
+ *   ①-⑦ ライン①の5番が○ → 2番・3番のうち◎△×●の車だけ 5-2／5-3
+ *   ②-① ライン②の◎と○がともに2・4・5番のいずれか → 5-2,5-4,4-2,7-2
+ *   ②-② ライン②に△か×の2番（4番）がいて、ライン②に相手（2・4・5・6・7番）が1車以上
+ *         → 2番に印：2-4,2-5,2-6,2-7 ／ 4番に印：4-2,4-5（両方なら合算）
+ *   ③-① ライン③の×が3番（4番）で、ライン①に1・4・5番（1・3・5番）が1車以上
+ *         → 3-1,3-4,3-5 ／ 4-1,4-3,4-5
+ *   ③-② ライン③に○と●（×と✖）が両方 → その2車の折り返し
+ * ■3連複（対象レースには必ず出す）：1着 ○× ｜ 2着 △● ｜ 3着 ◎⑳★☆▲。圧縮は carettaCompress3fFormation
+ * ===================================================================== */
+const ARE_V2 = {
+  ENABLED:     true,
+  TANKI_OK:    true,
+  WIDE_SHOW:   true,
+  ODDS_CUT_2T: false,
+  ODDS_CUT_3F: false,
+  PSEUDO_PCT:  { ENABLED: true, BELOW: 60, MIN: 70.1, MAX: 75.0 }
+};
+
+function areV2On(){ return !!(ARE_V2 && ARE_V2.ENABLED); }
+
+/* 印（calcAllMarks と同じ入力） */
+function areV2MarksOf(race){
+  if (!race) return {};
+  const lineupStr = race.lineupStr || (race.lineup ? race.lineup.map(g => g.join('')).join('-') : '');
+  try { return calcAllMarks(race.players || [], lineupStr, race.cls || ''); } catch(e){ return {}; }
+}
+function areV2Mark(markMap, car){ const i = markMap && markMap[String(car)]; return i ? i.mark : ''; }
+
+/* ライン（2車以上）と単騎に分ける。前から ①②③ */
+function areV2Lines(lineup){
+  const lines = [], tanki = [];
+  (lineup || []).forEach(g => {
+    const m = (g || []).map(Number);
+    if (m.length >= 2) lines.push(m); else if (m.length === 1) tanki.push(m[0]);
+  });
+  return { lines, tanki };
+}
+
+/* 絶対条件。{ ok, reason, lines, marks } */
+function areV2Target(race, markMap, timeSlot){
+  const res = { ok:false, reason:'', lines:null, marks:markMap || null };
+  if (!race || !race.lineup || !race.lineup.length) { res.reason = '並びなし'; return res; }
+  const ts = timeSlot || race.timeSlot || '';
+  if (ts && ts !== 'day' && ts !== 'nighter') { res.reason = 'デイナイター以外'; return res; }
+  const total = race.lineup.reduce((s, g) => s + ((g && g.length) || 0), 0);
+  if (total !== 7) { res.reason = '7車立てでない'; return res; }
+  const L = areV2Lines(race.lineup);
+  if (L.lines.length !== 3) { res.reason = '三分戦でない'; return res; }
+  if (L.tanki.length && !ARE_V2.TANKI_OK) { res.reason = '単騎あり（対象外設定）'; return res; }
+  const mk = markMap || areV2MarksOf(race);
+  res.marks = mk;
+  let hon = null, tai = null;
+  Object.keys(mk).forEach(c => { if (mk[c].type === 'ai' && mk[c].mark === '◎') hon = Number(c); if (mk[c].type === 'ai' && mk[c].mark === '○') tai = Number(c); });
+  if (hon == null || tai == null) { res.reason = '◎○なし'; return res; }
+  if (L.lines[0].includes(hon) && L.lines[0].includes(tai)) { res.reason = 'ライン①に◎○同居'; return res; }
+  res.ok = true; res.lines = L;
+  return res;
+}
+
+/* 2車単の組み合わせ（順序付き・重複除く）を返す。ルール名も返す（検証・記録用） */
+function areV2Combos2t(markMap, L){
+  const out = [], seen = new Set(), rules = [];
+  const add = (a, b, rule) => { const k = a + '-' + b; if (a === b || seen.has(k)) return; seen.add(k); out.push(k); if (rules.indexOf(rule) < 0) rules.push(rule); };
+  const mk = c => areV2Mark(markMap, c);
+  const L1 = L.lines[0], L2 = L.lines[1], L3 = L.lines[2];
+  const in1 = c => L1.includes(c), in2 = c => L2.includes(c), in3 = c => L3.includes(c);
+  const has = (c, arr) => arr.indexOf(mk(c)) >= 0;
+  // ライン①
+  if ((in1(1) && has(1, ['○','×'])) || (in1(4) && has(4, ['○','×']))) { add(1,4,'①-①'); add(4,1,'①-①'); }
+  if (in1(4) && mk(4) === '○') { add(2,4,'①-②'); add(4,2,'①-②'); }
+  if (in1(1) && mk(1) === '◎' && mk(5) === '○') add(1,5,'①-③');
+  if (in1(4) && mk(4) === '×' && mk(6) === '✖') { add(4,6,'①-④'); add(6,4,'①-④'); }
+  if (in1(5) && mk(5) === '×' && mk(1) === '✖') add(5,1,'①-⑤');
+  if (in1(3) && mk(3) === '○' && has(1, ['◎','△','×','●'])) { add(3,1,'①-⑥'); add(1,3,'①-⑥'); }
+  if (in1(5) && mk(5) === '○') {
+    if (has(2, ['◎','△','×','●'])) add(5,2,'①-⑦');
+    if (has(3, ['◎','△','×','●'])) add(5,3,'①-⑦');
+  }
+  // ライン②
+  let hon = null, tai = null;
+  L2.forEach(c => { if (mk(c) === '◎') hon = c; if (mk(c) === '○') tai = c; });
+  if (hon != null && tai != null && [2,4,5].includes(hon) && [2,4,5].includes(tai)) {
+    add(5,2,'②-①'); add(5,4,'②-①'); add(4,2,'②-①'); add(7,2,'②-①');
+  }
+  const partner = self => L2.some(c => c !== self && [2,4,5,6,7].includes(c));
+  if (in2(2) && has(2, ['△','×']) && partner(2)) { add(2,4,'②-②'); add(2,5,'②-②'); add(2,6,'②-②'); add(2,7,'②-②'); }
+  if (in2(4) && has(4, ['△','×']) && partner(4)) { add(4,2,'②-②'); add(4,5,'②-②'); }
+  // ライン③
+  const bat3 = L3.filter(c => mk(c) === '×');
+  if (bat3.includes(3) && [1,4,5].some(in1)) { add(3,1,'③-①'); add(3,4,'③-①'); add(3,5,'③-①'); }
+  if (bat3.includes(4) && [1,3,5].some(in1)) { add(4,1,'③-①'); add(4,3,'③-①'); add(4,5,'③-①'); }
+  const pair = (m1, m2) => { const a = L3.find(c => mk(c) === m1), b = L3.find(c => mk(c) === m2); if (a != null && b != null) { add(a,b,'③-②'); add(b,a,'③-②'); } };
+  pair('○','●'); pair('×','✖');
+  return { combos: out, rules };
+}
+
+function areV2OddsOf(map, k, unordered){
+  if (!map) return null;
+  if (k in map) return carettaOddsVal(map[k]);
+  if (unordered) { const q = k.split('-'); const alt = q[1] + '-' + q[0]; if (alt in map) return carettaOddsVal(map[alt]); }
+  return null;
+}
+
+/* 2車単：生成対象外なら count 0（na:'生成対象外'） */
+function areV2A(markMap, T, odds2t){
+  const empty = { bets:[], count:0, range:null, gosei:null, compressed:[], rules:[], na:'生成対象外' };
+  if (!T || !T.ok) return empty;
+  const g = areV2Combos2t(markMap, T.lines);
+  let bets = g.combos.map(c => ({ combo:c, odds:areV2OddsOf(odds2t, c, false) }));
+  if (ARE_V2.ODDS_CUT_2T) bets = bets.filter(b => b.odds != null && b.odds >= 12.0 && b.odds < 150.0);
+  if (!bets.length) return empty;
+  const arr = bets.map(b => b.odds).filter(v => v != null);
+  return { bets, count:bets.length, range:arr.length ? carettaRange(arr) : null, gosei:arr.length ? carettaGosei(arr) : null,
+           compressed:carettaCompress2(bets.map(b => b.combo)), rules:g.rules };
+}
+
+/* ワイド：2車単と同じ組み合わせ（同じ2車は1点）。2車単が生成対象外ならワイドも出さない */
+function areV2Wide(A, oddsWide){
+  const empty = { bets:[], count:0, range:null, gosei:null, compressed:[], na:'生成対象外' };
+  if (!A || !A.count) return empty;
+  const set = new Set();
+  A.bets.forEach(b => { const q = b.combo.split('-').map(Number).sort((x, y) => x - y); set.add(q[0] + '-' + q[1]); });
+  const keys = [...set].sort((x, y) => { const a = x.split('-').map(Number), b = y.split('-').map(Number); return a[0] - b[0] || a[1] - b[1]; });
+  const bets = keys.map(k => ({ combo:k, odds:areV2OddsOf(oddsWide, k, true) }));
+  const arr = bets.map(b => b.odds).filter(v => v != null);
+  return { bets, count:bets.length, range:arr.length ? carettaRange(arr) : null, gosei:arr.length ? carettaGosei(arr) : null,
+           compressed:carettaCompressWide(keys) };
+}
+
+/* 3連複：1着 ○× ｜ 2着 △● ｜ 3着 ◎⑳★☆▲ */
+function areV2Trio(markMap, T, odds3f){
+  const empty = { bets:[], count:0, range:null, gosei:null, compressed:[] };
+  if (!T || !T.ok) return empty;
+  const carsOf = ms => Object.keys(markMap || {}).filter(c => ms.indexOf(markMap[c].mark) >= 0).map(Number);
+  const col1 = carsOf(['○','×']), col2 = carsOf(['△','●']), col3 = carsOf(['◎','⑳','★','☆','▲']);
+  if (!col1.length || !col2.length || !col3.length) return Object.assign(empty, { cols:{ col1, col2, col3 } });
+  const set = new Set();
+  col1.forEach(a => col2.forEach(b => { if (a === b) return; col3.forEach(c => { if (a === c || b === c) return; set.add([a,b,c].sort((x, y) => x - y).join('-')); }); }));
+  let bets = [...set].map(k => ({ combo:k, odds:areV2OddsOf(odds3f, k, false) }));
+  if (ARE_V2.ODDS_CUT_3F) bets = bets.filter(b => b.odds != null && b.odds >= 10.0);
+  bets.sort((x, y) => ((x.odds == null ? 1e9 : x.odds) - (y.odds == null ? 1e9 : y.odds)));
+  const arr = bets.map(b => b.odds).filter(v => v != null);
+  const compressed = carettaCompress3fFormation(bets.map(b => b.combo).slice().sort(), col1, col2, col3).map(c => c.replace(/-/g, '='));
+  return { bets, count:bets.length, range:arr.length ? carettaRange(arr) : null, gosei:arr.length ? carettaGosei(arr) : null,
+           compressed, cols:{ col1, col2, col3 } };
+}
+
+/* レース1つ分：{ T(絶対条件), A, W, Tr(3連複) } */
+function areV2Build(race, odds, timeSlot){
+  const mk = areV2MarksOf(race);
+  const T = areV2Target(race, mk, timeSlot);
+  const A = areV2A(mk, T, odds && odds['2t']);
+  const W = ARE_V2.WIDE_SHOW ? areV2Wide(A, odds && odds.wide) : null;
+  const Tr = areV2Trio(mk, T, odds && odds['3f']);
+  return { target:T, marks:mk, A, W, Tr };
+}
+
+/* 荒れ指数の表示（荒れ予報画面の中だけ）：v2 の対象レースで 60% 未満なら 70.1〜75.0 をレースごとに固定で割り当てる */
+function areV2PseudoPct(key){
+  const P = ARE_V2.PSEUDO_PCT;
+  let h = 2166136261;
+  const s = String(key);
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  const steps = Math.round((P.MAX - P.MIN) * 10);          // 49 → 70.1〜75.0 の50通り
+  return Math.round((P.MIN * 10) + (h % (steps + 1))) / 10;
+}
+function areV2DispPct(realPct, key, isTarget){
+  if (!areV2On() || !ARE_V2.PSEUDO_PCT.ENABLED || !isTarget) return realPct;
+  if (realPct == null || Number(realPct) < ARE_V2.PSEUDO_PCT.BELOW) return areV2PseudoPct(key);
+  return realPct;
+}
+function areV2KeyOf(r){ return [r.venueId, r.raceCode, (r.dayNum || '1'), r.raceNum].join('|'); }
+/* 一覧・結果・テキストのレース（loadAreRaceData のエントリ）用 */
+function areV2EntryTarget(r){ return areV2Target(r, null, r.timeSlot).ok; }
+function areV2EntryPct(r){ return areV2DispPct(r.percentage, areV2KeyOf(r), areV2EntryTarget(r)); }
+
+
+/* v2：{A,W,T,S:null,v2:true}。対象外なら null。T は3連複・A は2車単（生成対象外なら count 0）・W はワイド */
+async function buildCarettaForRaceV2(race){
+  try{
+    if(!areV2EntryTarget(race)) return null;
+    const venue=VENUES.find(v=>v.venueId===race.venueId);
+    if(!venue) return null;
+    const o={ '2t':await fetchOddsDataFor(venue,race,'2t'), wide:ARE_V2.WIDE_SHOW?await fetchOddsDataFor(venue,race,'wide'):null, '3f':await fetchOddsDataFor(venue,race,'3f') };
+    const R=areV2Build(race,o,race.timeSlot);
+    if(!R.target.ok) return null;
+    return { A:R.A, W:(ARE_V2.WIDE_SHOW?R.W:null), T:R.Tr, S:null, v2:true };
+  }catch(e){ console.error('buildCarettaForRaceV2',e); return null; }
 }
 
 /* ===== 荒れ予報 テキスト一覧（生成中演出をスキップして買い目を一覧表示・買い目は既存と完全一致）===== */
@@ -20884,8 +21103,9 @@ function areTextSegLabel(r){
 }
 // 1レース分のテキストカードHTML（買い目は{A,W,T,S}のcompressedを使用）
 function areTextCardHTML(r, caretta){
-  const _pctCol=(r.percentage!=null&&typeof getAreColor==='function')?getAreColor(r.percentage):null;
-  const pctTxt=(r.percentage!=null)?`<span class="aretext-pct"${_pctCol?` style="color:${_pctCol}"`:''}>${r.percentage}<span class="aretext-pct-unit">%</span></span>`:`<span class="aretext-pct" style="color:#b9bdca">-<span class="aretext-pct-unit">%</span></span>`;
+  const _tp=areV2On()?areV2EntryPct(r):r.percentage;   /* ★v2：60%未満は特例表示 */
+  const _pctCol=(_tp!=null&&typeof getAreColor==='function')?getAreColor(_tp):null;
+  const pctTxt=(_tp!=null)?`<span class="aretext-pct"${_pctCol?` style="color:${_pctCol}"`:''}>${_tp}<span class="aretext-pct-unit">%</span></span>`:`<span class="aretext-pct" style="color:#b9bdca">-<span class="aretext-pct-unit">%</span></span>`;
   const dl=r.deadline||r.startTime||'';
   let h=`<div class="aretext-card">
     <div class="aretext-card-head">
@@ -20908,12 +21128,16 @@ function areTextCardHTML(r, caretta){
     return `<div class="aretext-ticket"><div class="aretext-ticket-label">${label}${cntTxt}</div><div class="aretext-ticket-lines">${lines.join(' <span style="color:#c9ccd6">/</span> ')}</div></div>`;
   };
   const s=caretta||{};
-  const parts=[
+  const parts=(s.v2?[                        /* ★v2：3連単なし */
+    block('3連複', s.T),
+    block('2車単', s.A),
+    block('ワイド', s.W)
+  ]:[
     block('3連単', s.S),
     block('3連複', s.T),
     block('2車単', s.A),
     block('ワイド', s.W)
-  ].filter(Boolean);
+  ]).filter(Boolean);
   if(parts.length===0){ h+='<div class="aretext-empty">対象買い目なし</div>'; }
   else h+=parts.join('');
   h+='</div></div>';
@@ -20966,8 +21190,9 @@ async function loadAreTextData(){
     if(fill) fill.style.width=Math.max(4,Math.round(done/total*100))+'%';
     if(pct) pct.textContent=Math.round(done/total*100)+'%';
     if(msg) msg.textContent=`買い目生成中… ${done}/${total}`;
-    // 荒れ指数20.0%以上のみ対象（未満・指数なしはスキップ）
-    if(r.percentage==null || Number(r.percentage) < 20.0) continue;
+    // 荒れ指数20.0%以上のみ対象（未満・指数なしはスキップ）★v2：荒れ指数は問わず絶対条件を満たすレースのみ
+    if(areV2On()){ if(!areV2EntryTarget(r)) continue; }
+    else if(r.percentage==null || Number(r.percentage) < 20.0) continue;
     let caretta=null;
     try{ caretta=await buildCarettaForRace(r); }catch(e){ caretta=null; }
     // 全券種ゼロ（対象外）は載せない
@@ -21179,6 +21404,7 @@ function renderAreBuyCards(){
       window.AREBUY_MARKS=calcAllMarks(currentRace.players,lineupStr,currentRace.cls||'');
     }catch(e){ console.error('areBuy mark error',e); }
   }
+  if(areV2On()){ renderAreBuyCardsV2(container,currentRace,odds2t); return; }   /* ★2026-09-30 v2 */
   const _isG_areBuy=daiFromGrade(currentRace&&currentRace.grade)==='G';
   const A=generateCarettaA(odds2t,curLineup,window.AREBUY_MARKS||null,_isG_areBuy);
   const oddsWide=(window.ALL_ODDS_DATA&&window.ALL_ODDS_DATA['wide'])||null;
@@ -21211,6 +21437,53 @@ function renderAreBuyCards(){
   bindCrtRefresh(container);
   const cgen=document.getElementById('crtCGenBtn');
   if(cgen) cgen.onclick=startCarettaCGen;
+}
+/* ===== 荒れ買い目 v2 のカード（3連単・荒れ対応3連単・荒れ対応の生成ボタンは出さない） ===== */
+function areV2NaBlock(label,text){
+  return `<div class="crt-block-row"><span class="crt-block-title"><span class="crt-chip">${label}</span><span class="crt-pt">-<span class="crt-pt-unit">点</span></span></span></div><div class="crt-na">${text}</div>`;
+}
+function areV2CurTimeSlot(){ try{ return (typeof CURRENT_VENUE!=='undefined'&&CURRENT_VENUE&&CURRENT_VENUE.timeSlot)||''; }catch(e){ return ''; } }
+function areV2CurKey(race){
+  const v=(typeof CURRENT_VENUE!=='undefined')?CURRENT_VENUE:null;
+  return [v&&v.venueId, v&&v.raceCode, (v&&v.dayNum)||'1', race&&race.raceNum].join('|');
+}
+function renderAreBuyCardsV2(container,currentRace,odds2t){
+  const odds={ '2t':odds2t, wide:(window.ALL_ODDS_DATA&&window.ALL_ODDS_DATA['wide'])||null, '3f':(window.ALL_ODDS_DATA&&window.ALL_ODDS_DATA['3f'])||null };
+  const R=areV2Build(currentRace||{},odds,areV2CurTimeSlot());
+  window.AREBUY_V2=R;
+  let html='<div class="crt-section-head"><span class="crt-mk-red">カレッタ式</span> 荒れレース買い目</div>';
+  html+='<div class="crt-card crt-ab-card">';
+  if(!R.target.ok){
+    html+='<div class="crt-block">'+areV2NaBlock('3連複','対象外')+'</div>';
+    html+='<div class="crt-divider"></div><div class="crt-block">'+areV2NaBlock('2車単','生成対象外')+'</div>';
+    if(ARE_V2.WIDE_SHOW) html+='<div class="crt-divider"></div><div class="crt-block">'+areV2NaBlock('ワイド','生成対象外')+'</div>';
+  }else{
+    html+='<div class="crt-block">'+(R.Tr.count>0?crtBlockHTML('3連複',R.Tr,odds['3f'],'3f'):areV2NaBlock('3連複','該当する3連複買い目がありません。'))+'</div>';
+    html+='<div class="crt-divider"></div>';
+    html+='<div class="crt-block">'+(R.A.count>0?crtBlockHTML('2車単',R.A,odds['2t'],'2t'):areV2NaBlock('2車単','生成対象外'))+'</div>';
+    if(ARE_V2.WIDE_SHOW){
+      html+='<div class="crt-divider"></div>';
+      html+='<div class="crt-block">'+(R.W&&R.W.count>0?crtBlockHTML('ワイド',R.W,odds.wide,'wide'):areV2NaBlock('ワイド','生成対象外'))+'</div>';
+    }
+  }
+  html+='</div>';
+  container.innerHTML=html;
+  bindCrtExpand(container);
+  bindCrtRefresh(container);
+  /* 出走表上部の荒れ指数：荒れ買い目ページの中だけ、60%未満の対象レースは特例表示 */
+  try{
+    const real=(currentRace&&currentRace.arePct!=null)?currentRace.arePct:null;
+    const disp=areV2DispPct(real,areV2CurKey(currentRace),R.target.ok);
+    if(disp!==real&&disp!=null){
+      const col=getAreColor(disp);
+      document.querySelectorAll('#screen-racetable .js-are-inline').forEach(w=>{
+        const n=w.querySelector('.js-are-num'), u=w.querySelector('.js-are-unit');
+        if(n){ n.textContent=disp; if(col) n.style.color=col; }
+        if(u&&col) u.style.color=col;
+        w.classList.remove('hide');
+      });
+    }
+  }catch(e){}
 }
 function bindCrtRefresh(root){
   root.querySelectorAll('.crt-refresh-btn').forEach(btn=>{
@@ -21255,6 +21528,19 @@ async function crtRefreshOdds(btn){
   let res=null,oddsMap=null,label='3連単';
   const _refRace=CURRENT_VENUE_RACES[CURRENT_RACE_INDEX];
   const _refLineup=(_refRace&&_refRace.lineup)||null;
+  if(areV2On()&&(scope==='2t'||scope==='wide'||scope==='3f')){   /* ★2026-09-30 v2 */
+    const _o={ '2t':odds2t, wide:oddsWide, '3f':(window.ALL_ODDS_DATA&&window.ALL_ODDS_DATA['3f'])||null };
+    const _R=areV2Build(_refRace||{},_o,areV2CurTimeSlot());
+    if(scope==='2t'){ res=_R.A; oddsMap=odds2t; label='2車単'; }
+    else if(scope==='wide'){ res=_R.W; oddsMap=oddsWide; label='ワイド'; }
+    else { res=_R.Tr; oddsMap=_o['3f']; label='3連複'; }
+    if(block){
+      if(res&&res.count>0){ block.innerHTML=crtBlockHTML(label,res,oddsMap,scope); }
+      else{ block.innerHTML=areV2NaBlock(label, scope==='3f'?'該当する3連複買い目がありません。':'生成対象外'); }
+      bindCrtExpand(block); bindCrtRefresh(block);
+    }
+    return;
+  }
   if(scope==='2t'){ const _isG_ref=daiFromGrade(_refRace&&_refRace.grade)==='G'; res=generateCarettaA(odds2t,_refLineup,window.AREBUY_MARKS||null,_isG_ref); oddsMap=odds2t; label='2車単'; }
   else if(scope==='wide'){ res=generateCarettaWide(odds2t,oddsWide,window.AREBUY_MARKS||null,_refLineup); oddsMap=oddsWide; label='ワイド'; }
   else if(scope==='3t'){ res=computeCarettaB(); oddsMap=odds3t; }
@@ -21490,8 +21776,9 @@ async function loadAreResults() {
   let html = '';
   results.forEach((item, idx) => {
     const { race, isFinished, resultData, caretta } = item;
-    const hasPct = race.percentage !== null;
-    const pct = hasPct ? race.percentage : 0;
+    const _rp = areV2On() ? areV2EntryPct(race) : race.percentage;   /* ★v2：60%未満は特例表示 */
+    const hasPct = _rp !== null && _rp !== undefined;
+    const pct = hasPct ? _rp : 0;
     const color = pctColor(pct);
 
     // 的中判定 + カレッタ買い目HTML
@@ -21505,7 +21792,13 @@ async function loadAreResults() {
       top3 = t;   // 3連複/ワイドは順序不問なので上位3車（集合）でOK
     }
     let carettaHtml = '', tekichu = false;
-    if (caretta) {
+    if (caretta && caretta.v2) {   /* ★2026-09-30 v2：3連単なし。2車単・ワイドが生成対象外なら照合しない */
+      const tr = crtBlockResultHTML('3連複', caretta.T, top3, '3f');
+      const a2 = (caretta.A && caretta.A.count > 0) ? crtBlockResultHTML('2車単', caretta.A, win2, '2t') : { html: areV2NaBlock('2車単','生成対象外'), hit:false };
+      const wd = !ARE_V2.WIDE_SHOW ? null : ((caretta.W && caretta.W.count > 0) ? crtBlockResultHTML('ワイド', caretta.W, top3, 'wide') : { html: areV2NaBlock('ワイド','生成対象外'), hit:false });
+      if (tr.hit || a2.hit || (wd && wd.hit)) tekichu = true;
+      carettaHtml = `<div class="crt-result-embed">${tr.html}<div class="crt-divider"></div>${a2.html}${wd ? '<div class="crt-divider"></div>' + wd.html : ''}</div>`;
+    } else if (caretta) {
       const sa = crtBlockResultHTML('3連単', caretta.S, win3, '3t');
       const tr = crtBlockResultHTML('3連複', caretta.T, top3, '3f');
       const a2 = crtBlockResultHTML('2車単', caretta.A, win2, '2t');
@@ -25824,7 +26117,7 @@ const TL_WINDOW_OVERRIDE = {
  *   ・モーニング時間帯（7:30〜10:30）とミッドナイト時間帯（20:30〜23:30）は、
  *     レースの代わりに朝脳・ミッド脳への案内文を流す（タップで各トップへ。公開ページなのでコード入力なし）。
  *   ・該当が無いときは帯だけ（BRTK.PR_TEXT を入れるとその文言を流す。PR文言は後日指示で差し込む）。
- *   ・v2（荒れ買い目）切替時に「厳選2車単生成可能」を優先して先頭に入れる予定。今回は未実装。
+ *   ・★2026-09-30 v2 連動：荒れ買い目の対象レースも混ぜて締切順に流す（表記は青の「荒れ予報買い目あり」。両方なら並べる）。
  *
  * ■タップ
  *   ・流れている文字のレースの出走表へ移動（ホームで開催を選んだときと同じ fetchVenueRaces を使う）。
@@ -25864,6 +26157,12 @@ const TL_WINDOW_OVERRIDE = {
     MIDNIGHT_HREF: '/midnight',
     RACE_SUFFIX_HL: 'おまかせ生成',   // ★2026-09-30 緑で表示する部分
     RACE_SUFFIX_REST: '可能',         // 白のまま続く部分
+    /* ★2026-09-30 荒れ買い目 v2 連動（改）：荒れ買い目の対象レース（絶対条件を満たす＝3連複が出る）も流す。
+       おまかせと混ぜて締切順（60分以内は全て・最低 MIN_ITEMS 件）。両方に当てはまるレースは表記を並べ、
+       タップした表記で遷移先を切り替える（おまかせ生成可能→出走表／荒れ予報買い目あり→荒れ買い目ページ）。
+       V2_PRIORITY:false でおまかせのみ。v2 自体がオフ（ARE_V2.ENABLED:false）でも従来どおり */
+    V2_PRIORITY: true,
+    ARE_LABEL: '荒れ予報買い目あり',   // 黄文字（色は .brtk-are）
     PR_TEXT: ''               // 該当なしのときに流す文言。空なら帯だけ
   };
   window.BRTK_CONFIG = BRTK;
@@ -26003,7 +26302,14 @@ const TL_WINDOW_OVERRIDE = {
       race.deadline = c.r.deadline || race.deadline || '';
       var cls = (op && op.types && op.types[n]) || race.cls || c.r.cls || '';
       race.cls = cls;
-      evalCache[c.key] = { status: 'ok', gen: !!glCanGenerate(race), cls: cls, deadline: race.deadline || '', start: race.start || '' };
+      /* ★v2 連動：荒れ買い目の対象レース（絶対条件を満たす＝3連複が出る）。2車単の成立は問わない（ボンバイエ F-3） */
+      var v2 = false;
+      try {
+        if (typeof areV2On === 'function' && areV2On() && BRTK.V2_PRIORITY) {
+          v2 = !!areV2Target(race, areV2MarksOf(race), v.timeSlot).ok;
+        }
+      } catch(_e) { v2 = false; }
+      evalCache[c.key] = { status: 'ok', gen: !!glCanGenerate(race), v2: v2, cls: cls, deadline: race.deadline || '', start: race.start || '' };
       dbg.ok++;
     } catch(e) {
       dbg.fail++; dbg.lastErr = String(e && e.message || e);
@@ -26027,7 +26333,7 @@ const TL_WINDOW_OVERRIDE = {
         for (var i = 0; i < list.length; i++) {
           var c = list[i], e = evalCache[c.key];
           if (gens >= BRTK.MIN_ITEMS && c.m > nn + BRTK.WITHIN_MIN) break;
-          if (e && e.status === 'ok') { if (e.gen) gens++; continue; }
+          if (e && e.status === 'ok') { if (e.gen || e.v2) gens++; continue; }
           if (failSkippable(e)) continue;
           need.push(c);
           if (need.length >= BRTK.CONCURRENCY) break;
@@ -26047,17 +26353,25 @@ const TL_WINDOW_OVERRIDE = {
     if (mode === 'morning')  return [{ kind:'page', text: BRTK.MORNING_TEXT,  href: BRTK.MORNING_HREF }];
     if (mode === 'midnight') return [{ kind:'page', text: BRTK.MIDNIGHT_TEXT, href: BRTK.MIDNIGHT_HREF }];
     var items = [], list = candidates(), n = nowMin();
+    /* 判定済みの手前部分（順序が確定している範囲）だけを使う */
+    var ready = [];
     for (var i = 0; i < list.length; i++) {
       var c = list[i], e = evalCache[c.key];
-      if (items.length >= BRTK.MIN_ITEMS && c.m > n + BRTK.WITHIN_MIN) break;
       if (!e) break;                              // 手前が未判定なら順序が確定しないので、そこまでで止める
       if (e.status !== 'ok') { if (failSkippable(e)) continue; break; }
-      if (!e.gen) continue;
-      var _dl = c.r.deadline || e.deadline || '';
-      items.push({ kind:'race', key: c.key, venueId: c.v.venueId, raceCode: c.v.raceCode, raceNum: c.r.raceNum,
-                   venue: c.v.venue, cls: shortCls(e.cls), deadline: _dl, start: (_dl ? '' : (c.r.start || e.start || '')),
-                   remain: c.m - n });
+      if (e.gen || e.v2) ready.push({ c: c, e: e });
     }
+    var mkItem = function(c, e){
+      var _dl = c.r.deadline || e.deadline || '';
+      return { kind:'race', omk: !!e.gen, v2: !!e.v2, key: c.key, venueId: c.v.venueId, raceCode: c.v.raceCode, raceNum: c.r.raceNum,
+               venue: c.v.venue, cls: shortCls(e.cls), deadline: _dl, start: (_dl ? '' : (c.r.start || e.start || '')),
+               remain: c.m - n };
+    };
+    /* ★v2 連動（改）：おまかせと荒れ買い目を混ぜて締切順。60分以内は全て、少なくとも MIN_ITEMS 件 */
+    ready.forEach(function(x){
+      if (items.length >= BRTK.MIN_ITEMS && x.c.m > n + BRTK.WITHIN_MIN) return;
+      items.push(mkItem(x.c, x.e));
+    });
     if (!items.length && BRTK.PR_TEXT) items.push({ kind:'pr', text: BRTK.PR_TEXT });
     if (DEBUG) items.push({ kind:'dbg', text: debugText() });
     return items;
@@ -26072,10 +26386,11 @@ const TL_WINDOW_OVERRIDE = {
       v.races.forEach(function(r){ raceTotal++; if (hm(r.deadline) === null && hm(r.start) === null) noTime++; });
     });
     var ec = 0, eok = 0, egen = 0, efail = 0;
-    Object.keys(evalCache).forEach(function(k){ var e = evalCache[k]; ec++; if (e.status === 'ok') { eok++; if (e.gen) egen++; } else efail++; });
+    var ev2 = 0;
+    Object.keys(evalCache).forEach(function(k){ var e = evalCache[k]; ec++; if (e.status === 'ok') { eok++; if (e.gen) egen++; if (e.v2) ev2++; } else efail++; });
     var d = new Date(), hh = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0') + ':' + String(d.getSeconds()).padStart(2,'0');
     return '[診断 ' + hh + '] 開催' + vs.length + '(DN' + dn + '・R無' + noRaces + ') R' + raceTotal + '(時刻無' + noTime + ')'
-         + ' 候補' + candidates().length + ' 判定' + eok + '/' + ec + ' 可' + egen + ' 失敗' + efail
+         + ' 候補' + candidates().length + ' 判定' + eok + '/' + ec + ' 可' + egen + ' 荒れ' + ev2 + ' 失敗' + efail
          + ' 取得' + dbg.fetched + ' 超過' + dbg.timeout + ' tick' + dbg.ticks + ' scan' + dbg.scans + (scanning ? '(中)' : '')
          + ' 表示' + (homeVisible() ? '○' : '×') + ' 時間帯' + (windowMode() || 'DN')
          + ' 関数' + (typeof glFetchRace === 'function' ? '○' : '×') + (typeof glCanGenerate === 'function' ? '○' : '×')
@@ -26089,7 +26404,14 @@ const TL_WINDOW_OVERRIDE = {
     return esc(it.venue + it.raceNum + 'R') + (it.cls ? ' ' + esc(it.cls) : '')
          + (it.deadline ? ' 締切' + esc(it.deadline) : (it.start ? ' 発走' + esc(it.start) : ''))
          + '<span class="brtk-soon">' + soonHTML(it.remain) + '</span> '
-         + '<span class="brtk-hl">' + esc(BRTK.RACE_SUFFIX_HL) + '</span>' + esc(BRTK.RACE_SUFFIX_REST);
+         + labelsHTML(it);
+  }
+  /* おまかせ生成可能（緑＋白）／荒れ予報買い目あり（青）。両方なら「・」で並べ、表記ごとに遷移先を持たせる */
+  function labelsHTML(it){
+    var omk = '<span class="brtk-go" data-go="race"><span class="brtk-hl">' + esc(BRTK.RACE_SUFFIX_HL) + '</span>' + esc(BRTK.RACE_SUFFIX_REST) + '</span>';
+    var are = '<span class="brtk-go brtk-are" data-go="are">' + esc(BRTK.ARE_LABEL) + '</span>';
+    if (it.omk && it.v2) return omk + '・' + are;
+    return it.v2 ? are : omk;
   }
 
   /* ★2026-09-30改：ガタつき防止のため、流している最中は並び・文字を一切組み替えない。
@@ -26097,7 +26419,7 @@ const TL_WINDOW_OVERRIDE = {
      追加で読み込めたレース・締め切ったレース・カウントダウンは、次の周回の頭で反映される
      （反映の遅れは最大で1周ぶん）。診断表示だけは末尾にあるので、その場で書き換える。 */
   function sigOf(items){
-    return items.map(function(it){ return it.kind === 'dbg' ? 'dbg' : (it.kind + ':' + (it.key || it.text) + ':' + (it.cls || '') + ':' + (it.deadline || it.start || '') + ':' + soonHTML(it.remain)); }).join('|');
+    return items.map(function(it){ return it.kind === 'dbg' ? 'dbg' : (it.kind + ':' + (it.omk ? 'o' : '') + (it.v2 ? 'a' : '') + ':' + (it.key || it.text) + ':' + (it.cls || '') + ':' + (it.deadline || it.start || '') + ':' + soonHTML(it.remain)); }).join('|');
   }
   function hasContent(){ return !!(track && track.querySelector('.brtk-item:not([data-kind="dbg"])')); }
   function updateDbg(items){
@@ -26128,6 +26450,13 @@ const TL_WINDOW_OVERRIDE = {
         el.setAttribute('data-venue-id', it.venueId);
         el.setAttribute('data-race-code', it.raceCode);
         el.setAttribute('data-race-num', String(it.raceNum));
+        el.setAttribute('data-omk', it.omk ? '1' : '0');
+        el.setAttribute('data-v2', it.v2 ? '1' : '0');
+        /* どの表記を触ったかを先に覚える（未ログイン時はゲートがクリックを止め、通過後に項目そのものをクリックし直すため） */
+        el.addEventListener('pointerdown', function(ev){
+          var g = ev.target && ev.target.closest ? ev.target.closest('[data-go]') : null;
+          this.setAttribute('data-part', g ? g.getAttribute('data-go') : '');
+        });
         el.addEventListener('click', onRaceTap);
       } else if (it.kind === 'page') {
         el.setAttribute('data-href', it.href);
@@ -26154,6 +26483,11 @@ const TL_WINDOW_OVERRIDE = {
     var el = e.currentTarget;
     var venueId = el.getAttribute('data-venue-id'), raceCode = el.getAttribute('data-race-code');
     var raceNum = Number(el.getAttribute('data-race-num'));
+    /* 遷移先：触った表記 → 無ければ項目の種類（荒れ買い目だけのレースは荒れ買い目ページ、それ以外は出走表） */
+    var _g = e.target && e.target.closest ? e.target.closest('[data-go]') : null;
+    var part = (_g && _g.getAttribute('data-go')) || el.getAttribute('data-part') || '';
+    el.removeAttribute('data-part');
+    var isV2 = (part === 'are') || (part !== 'race' && el.getAttribute('data-v2') === '1' && el.getAttribute('data-omk') !== '1');
     try { if (typeof isTransitioning !== 'undefined' && isTransitioning) return; } catch(_e){}
     var venue = venuesList().find(function(v){ return v.venueId === venueId && v.raceCode === raceCode; });
     if (!venue) { if (typeof showToast === 'function') showToast('開催情報が見つかりませんでした', true); return; }
@@ -26165,7 +26499,21 @@ const TL_WINDOW_OVERRIDE = {
         CURRENT_VENUE = venue;
         document.getElementById('loadingOverlay').classList.remove('hidden');
         try { var rc = document.getElementById('rtRaceClass'); if (rc) rc.textContent = ''; renderRtConditions(null); } catch(_e){}
+        if (isV2) {
+          /* ★v2 連動：荒れ予報買い目あり → 荒れ買い目ページ（荒れ予報一覧のカードをタップしたときと同じ手順）。
+             戻るボタンはホームへ戻る（荒れ予報一覧は読み込んでいないため CAME_FROM_ARERACE は立てない） */
+          window.CAME_FROM_ARERACE = false;
+          window.ALL_ODDS_DATA = {}; window.CURRENT_ODDS_DATA = {};
+          try { allOddsCache = { '3t': null, '3f': null, '2t': null, 'wide': null, '2f': null }; currentOddsRaceKey = ''; } catch(_e){}
+        }
         await fetchVenueRaces(venue, raceNum);
+        if (isV2) {
+          var aro = document.getElementById('areLoadingOverlay');
+          enterAreBuyMode();
+          if (aro) aro.classList.add('show');
+          try { await Promise.all([fetchOddsData('2t'), fetchOddsData('3t'), fetchOddsData('wide'), fetchOddsData('3f')]); } catch(_e){}
+          try { renderAreBuyCards(); } finally { if (aro) aro.classList.remove('show'); revealAreBuyPage(); }
+        }
       } catch(err) {
         console.error('電光掲示板：出走表遷移エラー', err);
         try { isTransitioning = false; } catch(_e){}
