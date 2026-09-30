@@ -73,6 +73,8 @@
   /* standalone（ホーム画面から起動）時は確実に黒帯を出す */
   @media (display-mode:standalone){
     .mid-statusbar{ height:max(env(safe-area-inset-top, 0px), 20px); }
+    /* ★2026-09-30：上余白を黒帯と同じ高さにする（セーフエリア0の環境で、ページ先頭20pxが黒帯の下に隠れていた） */
+    #midnight{ padding-top:max(env(safe-area-inset-top, 0px), 20px); }
   }
 
 
