@@ -25919,6 +25919,23 @@ const TL_WINDOW_OVERRIDE = {
     venuesList().forEach(function(v){
       if (!v || v.linkType === 'raceresult') return;
       if (v.timeSlot !== 'day' && v.timeSlot !== 'nighter') return;
+      /* ★2026-09-30 対策D：開催一覧で races が取れなかった開催（詳細取得の失敗など）。
+         本番の診断表示で「DN1・R無1」＝デイナイター開催の races が空で候補0件だったため追加。
+         生成可能レース一覧（glLoad）は races に頼らず1〜12Rを直接取得するので、そちらには出ていた。
+         ここでは URL のレース番号（currentRaceNum）から12Rまでを候補にし、時刻は出走表を取得して得る。
+         未取得のレースは「同じ開催で手前のレースの時刻以上」なので、その値（無ければ現在時刻）を仮の時刻にして並べる。
+         出走表を取得したら、その締切（無ければ発走）で並べ直す。 */
+      if (!v.races || !v.races.length) {
+        var lb = n + 0.001;
+        for (var rn = (Number(v.currentRaceNum) || 1); rn <= 12; rn++) {
+          var k0 = v.venueId + '|' + v.raceCode + '|' + (v.dayNum || 1) + '|' + rn;
+          var e0 = evalCache[k0];
+          var t0 = e0 ? (hm(e0.deadline) !== null ? hm(e0.deadline) : hm(e0.start)) : null;
+          if (t0 !== null) { lb = Math.max(lb, t0); if (t0 <= n) continue; list.push({ v: v, r: { raceNum: rn, start: '', deadline: '' }, m: t0, dl: e0.deadline || '', key: k0 }); }
+          else { list.push({ v: v, r: { raceNum: rn, start: '', deadline: '' }, m: lb, dl: '', key: k0 }); }
+        }
+        return;
+      }
       (v.races || []).forEach(function(r){
         /* ★2026-09-30 対策C：締切が無ければ発走時刻で並べる（生成可能レース一覧 glLoad と同じ考え方）。
            出走表を取得した後は、その締切（取れれば）で並べ直す。 */
