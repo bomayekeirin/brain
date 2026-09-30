@@ -116,6 +116,17 @@
     .brtk-track{position:static;transform:none !important;padding:0 12px;}
   }
 
+
+  /* ===== レースセレクターの緑ランプ（2026-09-30・出走表の .rt-race-lamp と同じ見た目） =====
+     生成可能なレース（電光掲示板と同じ判定）のボタン右上で点滅。終了したレースには付けない。 */
+  .mid-race-btn > .mid-lamp{
+    position:absolute;top:5px;right:5px;z-index:2;
+    width:8px;height:8px;border-radius:50%;
+    background:#2a9d5c;box-shadow:0 0 5px rgba(42,157,92,.6);
+    animation:midLampBlink 2.5s ease-in-out infinite;
+    pointer-events:none;
+  }
+  @keyframes midLampBlink{ 0%,100%{opacity:1;} 50%{opacity:.2;} }
   /* ===== 登場アニメ（ローディング解除後：ヘッダー→見出し→バー→カード1,2,3…）===== */
   .mid-hero, .mid-heading-wrap{
     opacity:0;
@@ -1077,6 +1088,8 @@ function parseWinticketRaceUrl(link){
           <span class="mid-race-btn-class">${cls}</span>
         </button>`;
     }).join('');
+    // ★2026-09-30：生成可能レースに緑ランプ（判定は電光掲示板と共有）
+    try { if (window.BRTK_LAMP) window.BRTK_LAMP.apply(box, MID_VENUES[idx], races); } catch(e) {}
   }
 
   // レース番号タップ → 出走表ページ（/midrace）へ遷移。
@@ -1657,6 +1670,52 @@ function calcAreScore(race) {
     }
   }
   function failSkippable(e){ return e && e.status === 'fail' && (e.tries >= BRTK.FAIL_MAX || (Date.now() - e.at) < BRTK.FAIL_WAIT_MS); }
+
+  /* ===== レースセレクターの緑ランプ（2026-09-30・ボンバイエ指示） =====
+   * 開催カードを開いたときのレース番号ボタンに、生成可能なら緑ランプを点滅させる。
+   * ・判定は掲示板と同じ evalOne（出走表の緑ランプと同じ判定）。判定結果は掲示板と共有（同じレースは再取得しない）。
+   * ・終了したレースは判定もランプもしない。未判定のレースは同時 BRTK.CONCURRENCY 件ずつ取得し、結果が出た順に点ける。
+   * ・midRenderRaceSelector の最後から window.BRTK_LAMP.apply(box, 開催, races) を呼ぶ（描き直しのたびに付け直す）。 */
+  var lampQueue = [], lampRunning = 0, lampWait = {};
+  function lampKey(v, n){ return v.venueId + '|' + v.raceCode + '|' + (v.dayNum || 1) + '|' + n; }
+  function lampPaint(box, n, gen){
+    if (!box) return;
+    var b = box.querySelector('.mid-race-btn[data-race-num="' + n + '"]');
+    if (!b || b.classList.contains('ended')) return;
+    var l = b.querySelector('.mid-lamp');
+    if (gen && !l) { l = document.createElement('span'); l.className = 'mid-lamp'; l.setAttribute('aria-hidden', 'true'); b.appendChild(l); }
+    else if (!gen && l) { l.remove(); }
+  }
+  function lampDone(key, n){
+    var e = evalCache[key], boxes = lampWait[key] || [];
+    delete lampWait[key];
+    if (e && e.status === 'ok') boxes.forEach(function(bx){ lampPaint(bx, n, e.gen); });
+  }
+  function lampPump(){
+    while (lampRunning < BRTK.CONCURRENCY && lampQueue.length) {
+      var job = lampQueue.shift();
+      lampRunning++;
+      (function(j){
+        evalOne(j.c).then(function(){ lampRunning--; lampDone(j.c.key, j.c.r.n); render(); lampPump(); });
+      })(job);
+    }
+  }
+  window.BRTK_LAMP = {
+    apply: function(box, v, races){
+      if (!box || !v || !races) return;
+      var ns = nowSec();
+      races.forEach(function(r){
+        if (typeof r.closeAt === 'number' && r.closeAt <= ns) return;   // 終了
+        var key = lampKey(v, r.number), e = evalCache[key];
+        if (e && e.status === 'ok') { lampPaint(box, r.number, e.gen); return; }
+        if (lampWait[key]) { if (lampWait[key].indexOf(box) < 0) lampWait[key].push(box); return; }   // 取得中
+        if (failSkippable(e)) return;
+        lampWait[key] = [box];
+        lampQueue.push({ c: { v: v, r: { n: r.number }, key: key } });
+      });
+      lampPump();
+    }
+  };
 
   async function scan(){
     if (scanning) return;
