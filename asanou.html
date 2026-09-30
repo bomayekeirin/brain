@@ -8,9 +8,9 @@
   window.addEventListener("load", function(){ window.scrollTo(0, 0); });
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#E39213"><!-- ★2026-09-30 #ffffff→#E39213（ヘッダー画像最上部のオレンジ） -->
+<meta name="theme-color" content="#ffffff">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><!-- ★2026-09-30 default→black-translucent（ホーム画面起動時にステータスバーまでオレンジにするため） -->
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <!-- ホーム画面アイコン（2026-09-22：ページごとに分離。朝脳） -->
 <link rel="apple-touch-icon" sizes="180x180" href="/icon-asanou-180.png">
 <link rel="icon" type="image/png" sizes="192x192" href="/icon-asanou-192.png">
@@ -80,10 +80,11 @@
 
   /* ===== 電光掲示板（2026-09-30・Brain本体・ミッド脳トップと同じ要領） =====
      ステータスバー領域（.mid-statusbar）とヘッダー画像の間の帯。
-     ★帯とステータスバーの色は、ヘッダー画像（asanou-ogp.jpg）最上部の左端のオレンジを実測した #E39213（rgb(227,146,19)）。
+     ★朝脳は白テーマ：帯は白（最上部と同じ #fff）、文字はテーマのオレンジ --sun-3 #FF7A14、「おまかせ生成」は濃い緑 #1e9e4a、
+       「○分前」は赤 #e03040、無料バッジは地がオレンジ・文字が白（ミッド脳の逆）。2026-09-30 ボンバイエ指示でオレンジの帯から変更。
      ★帯はヘッダー画像の直前の通常要素。家ボタンはヘッダー画像の中なので、画像に対する位置は変わらない。 */
   .brtk{
-    position:relative;height:24px;background:#E39213;overflow:hidden;
+    position:relative;height:24px;background:#fff;overflow:hidden;
     -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 14px,#000 calc(100% - 14px),transparent 100%);
             mask-image:linear-gradient(90deg,transparent 0,#000 14px,#000 calc(100% - 14px),transparent 100%);
     -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
@@ -96,18 +97,18 @@
     display:inline-block;margin-right:64px;
     font-family:-apple-system,BlinkMacSystemFont,'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;
     font-size:12px;font-weight:700;line-height:24px;letter-spacing:.04em;
-    color:#f4f4f2;text-shadow:0 0 5px rgba(255,255,255,.22);
+    color:var(--sun-3);text-shadow:none;   /* 朝脳：オレンジの文字（白地なので発光なし） */
     font-variant-numeric:tabular-nums;backface-visibility:hidden;
     cursor:pointer;transition:filter .15s ease;
   }
   .brtk-item[data-kind="pr"]{cursor:default;}
-  .brtk-item[data-kind="dbg"]{cursor:default;color:#d8c24a;text-shadow:none;font-weight:500;}
-  .brtk-min{font-style:normal;color:#e03040;text-shadow:0 0 6px rgba(224,48,64,.45);}
-  .brtk-hl{color:#4fdc78;text-shadow:0 0 6px rgba(79,220,120,.5);}
-  /* 1〜3R の「無料」バッジ：白地・角丸・濃いオレンジの文字 */
+  .brtk-item[data-kind="dbg"]{cursor:default;color:#7D6B58;text-shadow:none;font-weight:500;}   /* 白地なので補助色 */
+  .brtk-min{font-style:normal;color:#e03040;text-shadow:none;}
+  .brtk-hl{color:#1e9e4a;text-shadow:none;}   /* 朝脳：緑を濃く（#4fdc78→#1e9e4a） */
+  /* 1〜3R の「無料」バッジ：地がオレンジ・文字が白（ボンバイエ指示で反転） */
   .brtk-free{
     display:inline-block;vertical-align:1px;margin-right:7px;padding:0 5px;
-    background:rgba(255,255,255,.86);color:var(--sun-3);border-radius:4px;   /* 朝脳：文字は濃いオレンジ --sun-3 #FF7A14 */
+    background:var(--sun-3);color:#fff;border-radius:4px;   /* 朝脳：地 --sun-3 #FF7A14・文字 白 */
     font-size:11px;font-weight:800;line-height:16px;letter-spacing:.06em;text-shadow:none;   /* ★09-30改：10px→11px */
   }
   .brtk-item.tapped{filter:brightness(1.7);}
@@ -634,7 +635,7 @@
 html{background:#fff !important;}
 body{background:#fff !important;color:var(--ink) !important;}
 #midnight{background:#fff !important;}
-.mid-statusbar{background:#E39213 !important;}   /* ★2026-09-30 #fff→#E39213（ヘッダー画像最上部のオレンジ・帯と同色） */
+.mid-statusbar{background:#fff !important;}
 .mid-hero{background:#fff !important;}
 .mid-home-btn{
   color:#fff !important;background:rgba(255,255,255,.22) !important;
@@ -1949,7 +1950,8 @@ async function asanouHomeAgariPrefetch(){
  *   ・モーニングの「おまかせ生成可能」レース（朝脳出走表の緑ランプと同じ判定）を締切の早い順に流す。
  *     まず2件（MIN_ITEMS）、読み込みを続けて締切60分以内（WITHIN_MIN）は全て。
  *     文言：「松阪3R A級一般 締切08:25 (5分前) おまかせ生成可能」。( ) は20分以内のみ・括弧の中だけ赤。
- *     文字は白、「おまかせ生成」だけ緑。1〜3R（無料）は先頭に「無料」バッジ（白地・角丸・濃いオレンジの文字）。
+ *     朝脳は白テーマ：帯は白、文字はオレンジ、「おまかせ生成」は濃い緑、「○分前」は赤。
+ *     1〜3R（無料）は先頭に「無料」バッジ（地がオレンジ・文字が白）。
  *   ・該当なしは帯だけ（BRTK.PR_TEXT で後日差し込み）。周回の頭でだけ組み替え（ガタつき防止）。
  *   ・流すのは「今日」の開催だけ（MID_ALL.today）。明日タブを表示中でも今日のレースを流す。
  *
