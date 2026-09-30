@@ -271,6 +271,7 @@ body::before{
 .app-menu-btn:active span{background:#fff;}
 
 /* ===== ホーム電光掲示板（2026-09-30） =====
+   ★2026-09-30改：文字は白、「おまかせ生成」だけ緑 #4fdc78。
    ヘッダー画像とステータスバー領域の間の帯。ホーム（#screen-races）の .app-header の中にだけある。
    ★最上部（body::before・theme-color）には触れていない。帯の色を最上部と同じ #0f0f0f にしてつなげている。
    ★帯の高さは --brtk-h の1箇所で管理（メニューボタンの位置もこの値で下げている）。
@@ -282,13 +283,16 @@ body::before{
           mask-image:linear-gradient(90deg,transparent 0,#000 14px,#000 calc(100% - 14px),transparent 100%);
   -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
 }
-.brtk-track{position:absolute;top:0;left:0;height:100%;display:flex;align-items:center;white-space:nowrap;will-change:transform;}
+.brtk-track{position:absolute;top:0;left:0;height:100%;display:flex;align-items:center;white-space:nowrap;will-change:transform;backface-visibility:hidden;}
 .brtk-item{
   display:inline-block;margin-right:64px;
   font-family:'Noto Sans JP',sans-serif;font-size:12px;font-weight:700;line-height:var(--brtk-h);letter-spacing:.04em;
-  color:#2a9d5c;text-shadow:0 0 6px rgba(42,157,92,.45);
+  color:#f4f4f2;text-shadow:0 0 5px rgba(255,255,255,.22);   /* ★2026-09-30 白文字に変更（旧：緑 #2a9d5c） */
   cursor:pointer;transition:filter .15s ease;
+  font-variant-numeric:tabular-nums;
+  backface-visibility:hidden;
 }
+.brtk-hl{color:#4fdc78;text-shadow:0 0 6px rgba(79,220,120,.5);}   /* ★2026-09-30「おまかせ生成」だけ緑。旧 #2a9d5c より明るく少し黄寄り */
 .brtk-item[data-kind="pr"]{cursor:default;}
 .brtk-item[data-kind="dbg"]{cursor:default;color:#d8c24a;text-shadow:none;font-weight:500;}   /* ★2026-09-30 診断表示（?brtk=debug のときだけ） */
 .brtk-min{font-style:normal;color:#e03040;text-shadow:0 0 6px rgba(224,48,64,.45);}
@@ -25811,7 +25815,9 @@ const TL_WINDOW_OVERRIDE = {
  *
  * ■表示
  *   ・デイ・ナイターの「おまかせ生成可能」（出走表の緑ランプと同じ判定＝glCanGenerate）の
- *     締切前レースを、締切の早い順に最大2件、右から左へ流す。
+ *     締切前レースを、締切の早い順に右から左へ流す。★2026-09-30改：まず2件（MIN_ITEMS）を流し、
+ *     読み込みを続けて、締切60分以内（WITHIN_MIN）の生成可能レースは全て流す。
+ *     流している最中は組み替えず、一周して右端へ戻る瞬間にだけ最新の並びへ組み替える（ガタつき防止）。
  *     文言：「大宮7R A級準決勝 締切14:25 (5分前) おまかせ生成可能」
  *     （ ）は締切20分以内のときだけ出し、括弧の中だけ赤。
  *   ・締め切ったレースは外れ、次の直近が先頭・その次が2番目になる。
@@ -25840,9 +25846,10 @@ const TL_WINDOW_OVERRIDE = {
  * =================================================================== */
 (function(){
   var BRTK = {
-    MAX_ITEMS: 2,             // 流すレース数
+    MIN_ITEMS: 2,             // ★2026-09-30改 まず流すレース数（締切が遠くてもこの件数は流す）
+    WITHIN_MIN: 60,           // ★2026-09-30改 締切までこの分数以内の生成可能レースは全て流す
     SOON_MIN: 20,             // 「(○分前)」を出す締切までの分数
-    SPEED: 56,                // 流れる速さ（px/秒）
+    SPEED: 46,                // 流れる速さ（px/秒）★2026-09-30 56→46（少し遅く）
     TICK_MS: 15000,           // 再判定・カウントダウン更新の間隔
     CONCURRENCY: 3,           // 同時に取得する出走表の数
     FAIL_WAIT_MS: 120000,     // 取得失敗から引き直すまでの間隔
@@ -25855,7 +25862,8 @@ const TL_WINDOW_OVERRIDE = {
     MIDNIGHT_TEXT: '現在の時間帯はミッドナイト競輪専用ページ「ミッド脳」で買い目が生成可能です',
     MORNING_HREF:  '/asanou',
     MIDNIGHT_HREF: '/midnight',
-    RACE_SUFFIX: 'おまかせ生成可能',
+    RACE_SUFFIX_HL: 'おまかせ生成',   // ★2026-09-30 緑で表示する部分
+    RACE_SUFFIX_REST: '可能',         // 白のまま続く部分
     PR_TEXT: ''               // 該当なしのときに流す文言。空なら帯だけ
   };
   window.BRTK_CONFIG = BRTK;
@@ -26005,7 +26013,8 @@ const TL_WINDOW_OVERRIDE = {
 
   function failSkippable(e){ return e && e.status === 'fail' && (e.tries >= BRTK.FAIL_MAX || (Date.now() - e.at) < BRTK.FAIL_WAIT_MS); }
 
-  /* 近い順に取得し、生成可能が MAX_ITEMS 件そろったら打ち切る */
+  /* 近い順に取得する。★2026-09-30改：生成可能が MIN_ITEMS 件そろい、
+     かつ締切 WITHIN_MIN 分以内の候補が全て判定済みになったら打ち切る */
   async function scan(){
     if (scanning) return;
     if (windowMode()) return;
@@ -26014,15 +26023,16 @@ const TL_WINDOW_OVERRIDE = {
     try {
       for (var guard = 0; guard < 200; guard++) {
         if (!homeVisible()) break;
-        var list = candidates(), need = [], gens = 0;
+        var list = candidates(), need = [], gens = 0, nn = nowMin();
         for (var i = 0; i < list.length; i++) {
           var c = list[i], e = evalCache[c.key];
-          if (e && e.status === 'ok') { if (e.gen && ++gens >= BRTK.MAX_ITEMS) break; continue; }
+          if (gens >= BRTK.MIN_ITEMS && c.m > nn + BRTK.WITHIN_MIN) break;
+          if (e && e.status === 'ok') { if (e.gen) gens++; continue; }
           if (failSkippable(e)) continue;
           need.push(c);
           if (need.length >= BRTK.CONCURRENCY) break;
         }
-        if (gens >= BRTK.MAX_ITEMS || !need.length) break;
+        if (!need.length) break;
         await Promise.all(need.map(evalOne));
         render();
       }
@@ -26037,8 +26047,9 @@ const TL_WINDOW_OVERRIDE = {
     if (mode === 'morning')  return [{ kind:'page', text: BRTK.MORNING_TEXT,  href: BRTK.MORNING_HREF }];
     if (mode === 'midnight') return [{ kind:'page', text: BRTK.MIDNIGHT_TEXT, href: BRTK.MIDNIGHT_HREF }];
     var items = [], list = candidates(), n = nowMin();
-    for (var i = 0; i < list.length && items.length < BRTK.MAX_ITEMS; i++) {
+    for (var i = 0; i < list.length; i++) {
       var c = list[i], e = evalCache[c.key];
+      if (items.length >= BRTK.MIN_ITEMS && c.m > n + BRTK.WITHIN_MIN) break;
       if (!e) break;                              // 手前が未判定なら順序が確定しないので、そこまでで止める
       if (e.status !== 'ok') { if (failSkippable(e)) continue; break; }
       if (!e.gen) continue;
@@ -26077,25 +26088,35 @@ const TL_WINDOW_OVERRIDE = {
     if (it.kind !== 'race') return esc(it.text);
     return esc(it.venue + it.raceNum + 'R') + (it.cls ? ' ' + esc(it.cls) : '')
          + (it.deadline ? ' 締切' + esc(it.deadline) : (it.start ? ' 発走' + esc(it.start) : ''))
-         + '<span class="brtk-soon">' + soonHTML(it.remain) + '</span> ' + esc(BRTK.RACE_SUFFIX);
+         + '<span class="brtk-soon">' + soonHTML(it.remain) + '</span> '
+         + '<span class="brtk-hl">' + esc(BRTK.RACE_SUFFIX_HL) + '</span>' + esc(BRTK.RACE_SUFFIX_REST);
   }
 
+  /* ★2026-09-30改：ガタつき防止のため、流している最中は並び・文字を一切組み替えない。
+     組み替えるのは (1) 何も流れていないとき（即時）と (2) 最後尾が左端へ抜けて右端へ戻る瞬間（frame）だけ。
+     追加で読み込めたレース・締め切ったレース・カウントダウンは、次の周回の頭で反映される
+     （反映の遅れは最大で1周ぶん）。診断表示だけは末尾にあるので、その場で書き換える。 */
+  function sigOf(items){
+    return items.map(function(it){ return it.kind === 'dbg' ? 'dbg' : (it.kind + ':' + (it.key || it.text) + ':' + (it.cls || '') + ':' + (it.deadline || it.start || '') + ':' + soonHTML(it.remain)); }).join('|');
+  }
+  function hasContent(){ return !!(track && track.querySelector('.brtk-item:not([data-kind="dbg"])')); }
+  function updateDbg(items){
+    var dnode = track.querySelector('.brtk-item[data-kind="dbg"]');
+    var dit = items.filter(function(it){ return it.kind === 'dbg'; })[0];
+    if (dnode && dit) dnode.textContent = dit.text;
+  }
   function render(){
     if (!track) return;
     var items = buildItems();
-    var sig = items.map(function(it){ return it.kind === 'dbg' ? 'dbg' : (it.kind + ':' + (it.key || it.text) + ':' + (it.cls || '') + ':' + (it.deadline || it.start || '')); }).join('|');
-    if (sig === lastSig) {
-      var dnode = track.querySelector('.brtk-item[data-kind="dbg"]');
-      var dit = items.filter(function(it){ return it.kind === 'dbg'; })[0];
-      if (dnode && dit) dnode.textContent = dit.text;
-      /* 同じ並び：カウントダウンだけ書き換える（アニメーションを止めない） */
-      var nodes = track.querySelectorAll('.brtk-item[data-kind="race"]');
-      items.forEach(function(it, i){
-        var sp = nodes[i] && nodes[i].querySelector('.brtk-soon');
-        if (sp) { var h = soonHTML(it.remain); if (sp.innerHTML !== h) sp.innerHTML = h; }
-      });
-      return;
-    }
+    if (!reduceMotion && hasContent()) { updateDbg(items); return; }   // 流している最中：周回の頭まで待つ
+    /* 最初の表示は MIN_ITEMS 件そろってから（読み込み中に1件だけ流れ出すのを避ける）。読み込みが終われば1件でも流す */
+    var raceN = items.filter(function(it){ return it.kind === 'race'; }).length;
+    if (scanning && raceN > 0 && raceN < BRTK.MIN_ITEMS) { updateDbg(items); return; }
+    var sig = sigOf(items);
+    if (sig === lastSig) { updateDbg(items); return; }
+    applyItems(items, sig);
+  }
+  function applyItems(items, sig){
     lastSig = sig;
     track.innerHTML = '';
     items.forEach(function(it){
@@ -26154,14 +26175,21 @@ const TL_WINDOW_OVERRIDE = {
     }, 140);
   }
 
+  var visCache = false, visAt = 0;
   function frame(ts){
     requestAnimationFrame(frame);
     if (!track || reduceMotion) { lastTs = ts; return; }
-    if (!track.firstChild || !homeVisible()) { lastTs = ts; return; }
+    if (ts - visAt > 500) { visCache = homeVisible(); visAt = ts; }
+    if (!track.firstChild || !visCache) { lastTs = ts; return; }
     var dt = lastTs ? Math.min(ts - lastTs, 100) : 0;
     lastTs = ts;
     x -= BRTK.SPEED * dt / 1000;
-    if (x < -track.scrollWidth) x = band.clientWidth;
+    if (x < -track.scrollWidth) {
+      /* 周回の頭：ここでだけ最新の項目に組み替える（applyItems が x を右端に戻す） */
+      var items = buildItems();
+      applyItems(items, sigOf(items));
+      return;
+    }
     track.style.transform = 'translate3d(' + x + 'px,0,0)';
   }
 
