@@ -107,8 +107,8 @@
   /* 1〜3R の「無料」バッジ：白地・角丸・テーマ紫の文字 */
   .brtk-free{
     display:inline-block;vertical-align:1px;margin-right:7px;padding:0 5px;
-    background:#fff;color:var(--mid);border-radius:4px;
-    font-size:10px;font-weight:800;line-height:15px;letter-spacing:.06em;text-shadow:none;
+    background:rgba(255,255,255,.86);color:var(--mid-deep);border-radius:4px;   /* ★09-30改：白地を少し透過（#fff→.86）・文字を暗い紫（--mid→--mid-deep #4a2a6a） */
+    font-size:11px;font-weight:800;line-height:16px;letter-spacing:.06em;text-shadow:none;   /* ★09-30改：10px→11px */
   }
   .brtk-item.tapped{filter:brightness(1.7);}
   @media (prefers-reduced-motion: reduce){
