@@ -8,9 +8,9 @@
   window.addEventListener("load", function(){ window.scrollTo(0, 0); });
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#ffffff">
+<meta name="theme-color" content="#E39213"><!-- ★2026-09-30 #ffffff→#E39213（ヘッダー画像最上部のオレンジ） -->
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><!-- ★2026-09-30 default→black-translucent（ホーム画面起動時にステータスバーまでオレンジにするため） -->
 <!-- ホーム画面アイコン（2026-09-22：ページごとに分離。朝脳） -->
 <link rel="apple-touch-icon" sizes="180x180" href="/icon-asanou-180.png">
 <link rel="icon" type="image/png" sizes="192x192" href="/icon-asanou-192.png">
@@ -74,6 +74,46 @@
   /* standalone（ホーム画面から起動）時は確実に黒帯を出す */
   @media (display-mode:standalone){
     .mid-statusbar{ height:max(env(safe-area-inset-top, 0px), 20px); }
+    /* ★2026-09-30：上余白を黒帯と同じ高さにする（ミッド脳で判明した、ページ先頭が最上部の帯の下に隠れる不具合の予防） */
+    #midnight{ padding-top:max(env(safe-area-inset-top, 0px), 20px); }
+  }
+
+  /* ===== 電光掲示板（2026-09-30・Brain本体・ミッド脳トップと同じ要領） =====
+     ステータスバー領域（.mid-statusbar）とヘッダー画像の間の帯。
+     ★帯とステータスバーの色は、ヘッダー画像（asanou-ogp.jpg）最上部の左端のオレンジを実測した #E39213（rgb(227,146,19)）。
+     ★帯はヘッダー画像の直前の通常要素。家ボタンはヘッダー画像の中なので、画像に対する位置は変わらない。 */
+  .brtk{
+    position:relative;height:24px;background:#E39213;overflow:hidden;
+    -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 14px,#000 calc(100% - 14px),transparent 100%);
+            mask-image:linear-gradient(90deg,transparent 0,#000 14px,#000 calc(100% - 14px),transparent 100%);
+    -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
+    opacity:0;                                   /* 起動演出の解除と一緒にふわっと出す */
+  }
+  .reveal .brtk{animation:brtkFade .5s ease 0s forwards;}
+  @keyframes brtkFade{from{opacity:0;}to{opacity:1;}}
+  .brtk-track{position:absolute;top:0;left:0;height:100%;display:flex;align-items:center;white-space:nowrap;will-change:transform;backface-visibility:hidden;}
+  .brtk-item{
+    display:inline-block;margin-right:64px;
+    font-family:-apple-system,BlinkMacSystemFont,'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;
+    font-size:12px;font-weight:700;line-height:24px;letter-spacing:.04em;
+    color:#f4f4f2;text-shadow:0 0 5px rgba(255,255,255,.22);
+    font-variant-numeric:tabular-nums;backface-visibility:hidden;
+    cursor:pointer;transition:filter .15s ease;
+  }
+  .brtk-item[data-kind="pr"]{cursor:default;}
+  .brtk-item[data-kind="dbg"]{cursor:default;color:#d8c24a;text-shadow:none;font-weight:500;}
+  .brtk-min{font-style:normal;color:#e03040;text-shadow:0 0 6px rgba(224,48,64,.45);}
+  .brtk-hl{color:#4fdc78;text-shadow:0 0 6px rgba(79,220,120,.5);}
+  /* 1〜3R の「無料」バッジ：白地・角丸・濃いオレンジの文字 */
+  .brtk-free{
+    display:inline-block;vertical-align:1px;margin-right:7px;padding:0 5px;
+    background:rgba(255,255,255,.86);color:var(--sun-3);border-radius:4px;   /* 朝脳：文字は濃いオレンジ --sun-3 #FF7A14 */
+    font-size:11px;font-weight:800;line-height:16px;letter-spacing:.06em;text-shadow:none;   /* ★09-30改：10px→11px */
+  }
+  .brtk-item.tapped{filter:brightness(1.7);}
+  @media (prefers-reduced-motion: reduce){
+    .brtk{overflow-x:auto;-webkit-mask-image:none;mask-image:none;}
+    .brtk-track{position:static;transform:none !important;padding:0 12px;}
   }
 
   /* ===== 登場アニメ（ローディング解除後：ヘッダー→見出し→バー→カード1,2,3…）===== */
@@ -594,7 +634,7 @@
 html{background:#fff !important;}
 body{background:#fff !important;color:var(--ink) !important;}
 #midnight{background:#fff !important;}
-.mid-statusbar{background:#fff !important;}
+.mid-statusbar{background:#E39213 !important;}   /* ★2026-09-30 #fff→#E39213（ヘッダー画像最上部のオレンジ・帯と同色） */
 .mid-hero{background:#fff !important;}
 .mid-home-btn{
   color:#fff !important;background:rgba(255,255,255,.22) !important;
@@ -832,6 +872,9 @@ body{background:#fff !important;color:var(--ink) !important;}
   <div class="mn-boot" id="mnBoot">
     <img onerror="this.style.visibility='hidden'" src="asanou-logo.png" alt="" class="mn-boot-logo" id="mnBootLogo">
   </div>
+
+  <!-- ★2026-09-30：電光掲示板。中身は末尾の「電光掲示板」スクリプトが入れる -->
+  <div class="brtk" id="brTicker" aria-label="お知らせ"><div class="brtk-track" id="brTickerTrack"></div></div>
 
   <!-- ヘッダー画像 -->
   <div class="mid-hero">
@@ -1898,6 +1941,725 @@ async function asanouHomeAgariPrefetch(){
 
 </script>
 
+<script>
+/* ===================================================================
+ * 朝脳トップ 電光掲示板（2026-09-30・ボンバイエ指示。Brain本体・ミッド脳トップと同じ要領）
+ *
+ * ■表示（Brain本体・ミッド脳と同じ）
+ *   ・モーニングの「おまかせ生成可能」レース（朝脳出走表の緑ランプと同じ判定）を締切の早い順に流す。
+ *     まず2件（MIN_ITEMS）、読み込みを続けて締切60分以内（WITHIN_MIN）は全て。
+ *     文言：「松阪3R A級一般 締切08:25 (5分前) おまかせ生成可能」。( ) は20分以内のみ・括弧の中だけ赤。
+ *     文字は白、「おまかせ生成」だけ緑。1〜3R（無料）は先頭に「無料」バッジ（白地・角丸・濃いオレンジの文字）。
+ *   ・該当なしは帯だけ（BRTK.PR_TEXT で後日差し込み）。周回の頭でだけ組み替え（ガタつき防止）。
+ *   ・流すのは「今日」の開催だけ（MID_ALL.today）。明日タブを表示中でも今日のレースを流す。
+ *
+ * ■判定（asarace.html の isV3Generatable と同じ）
+ *   ・選手2人以上・並びあり・ASANOU_V1.ENABLED・asanouGenerate(並び, asanouPlayersOf(race)).status === 'ok'。
+ *   ・そのため asarace.html の「朝脳ロジック v1.2」スクリプト一式（ASANOU_V1・asanouGenerate・asanouE1 ほか）、
+ *     extractPlayers、asanouPlayersOf を「そのまま」複製した。extractLineup は midrace／asarace と同一。
+ *   ★asarace.html の朝脳ロジック（ASANOU_V1 のスイッチを含む）・extractPlayers・asanouPlayersOf・isV3Generatable
+ *     を変えたときは、ここも同期すること。
+ *   ・ミッドナイトの初日特例（荒れ指数30%）は朝脳には入れない（ボンバイエ確認済み）。
+ *
+ * ■データ・診断：ミッド脳トップと同じ（cups API で締切順 → 近い順に出走表を取得・時間制限・?brtk=debug）
+ *
+ * ■タップ：そのレースの /asarace?…（midSelectRace と同じ組み立て）。4R以降のコード入力は出走表側。空白は無反応。
+ * =================================================================== */
+(function(){
+  var BRTK = {
+    MIN_ITEMS: 2,
+    WITHIN_MIN: 60,
+    SOON_MIN: 20,
+    FREE_MAX_RACE: 3,           // この番号までのレースに「無料」バッジ
+    SPEED: 46,
+    TICK_MS: 15000,
+    CONCURRENCY: 3,
+    FAIL_WAIT_MS: 120000,
+    FAIL_MAX: 3,
+    FETCH_TIMEOUT_MS: 10000,
+    INFO_TIMEOUT_MS: 8000,
+    RACE_SUFFIX_HL: 'おまかせ生成',
+    RACE_SUFFIX_REST: '可能',
+    PR_TEXT: ''
+  };
+  window.BRTK_CONFIG = BRTK;
+
+  var evalCache = {};   // key -> { status:'ok'|'fail', gen, tries, at }
+  var cupCache = {};    // raceCode|day -> { status:'ok'|'fail', races:[{n,closeAt,cls}], tries, at }
+  var cupPending = {};
+  var scanning = false, lastSig = null, band = null, track = null, x = 0, lastTs = 0;
+  var reduceMotion = false;
+  try { reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch(e){}
+  var DEBUG = /(?:^|[?&])brtk=debug(?:&|$)/.test(location.search || '');
+  var dbg = { ticks: 0, scans: 0, fetched: 0, ok: 0, fail: 0, timeout: 0, cupOk: 0, cupFail: 0, lastErr: '' };
+
+  function nowSec(){ return Math.floor(Date.now() / 1000); }
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  /* 今日の開催（明日タブ表示中でも今日を流す） */
+  function venuesList(){ try { return (typeof MID_ALL !== 'undefined' && MID_ALL && MID_ALL.today) ? MID_ALL.today : []; } catch(e){ return []; } }
+  function pageVisible(){ return !document.visibilityState || document.visibilityState === 'visible'; }
+  function withTimeout(promise, ms, label){
+    var t;
+    return Promise.race([
+      promise,
+      new Promise(function(_, rej){ t = setTimeout(function(){ dbg.timeout++; rej(new Error('timeout:' + label)); }, ms); })
+    ]).finally(function(){ clearTimeout(t); });
+  }
+  function proxy(u){ return PROXY_URL + '?url=' + encodeURIComponent(u); }
+  function hhmm(sec){ var d = new Date((sec + 9*3600) * 1000); return String(d.getUTCHours()).padStart(2,'0') + ':' + String(d.getUTCMinutes()).padStart(2,'0'); }
+  /* レース種別の短縮（midRenderRaceSelector と同じ置換） */
+  function shortCls(c){
+    return String(c || '').replace(/チャレンジ/g,'チ').replace(/ガールズケイリン|ガールズ/g,'L級')
+      .replace(/初日特選/g,'初特選').replace(/一次予選/g,'一予選').replace(/二次予選/g,'二予選');
+  }
+
+  /* ---- 以下は asarace.html からそのまま複製（2026-09-30）。変更禁止・asarace 側と同期すること ---- */
+  /* (1) 朝脳ロジック v1.2 スクリプト一式 */
+/* ===================================================================
+ * 朝脳ロジック v1.2（分析チャット 2026-09-25・asanou_logic.js v1.2 を貼付）
+ *   原本からの変更は「本番スイッチ」（C1_ENABLED・A1_ROWS_V2・ENGINE と、それを使う2か所）と module.exports の削除のみ。
+ * =================================================================== */
+/* =====================================================================
+ * 朝脳（モーニング）買い目生成ロジック v1.2  ― 2026-09-25 分析チャット
+ * ---------------------------------------------------------------------
+ * v1.1 変更点：A-2 を v2（10点・3行表示）に変更。A-1 / C-1 は v1 のまま
+ * v1.2 変更点：E-1（ライン構成 3=2=1=1・8点）を新設。A-1 / A-2 / C-1 は v1.1 のまま
+ * ---------------------------------------------------------------------
+ * 入力  lineup  : 並び。ライン単位の配列（前→後の順）。車番は文字列でも数値でも可
+ *                 例 [["1","4","6"],["5","2"],["7","3"]]
+ *       players : [{ car, pt }]  pt = 競走得点
+ * 出力  { status, pattern, points, bets, compressed, display, roles, axisScores, reason }
+ *       compressed : 買い目のデータ（1要素＝1矩形。"-" 区切りのみ）… オッズ・購入・ログ用
+ *       display    : 画面表示用（[{ label, items[] }]）… 同じ行の items は " / " でつないで表示
+ * ---------------------------------------------------------------------
+ * 使わないもの：荒れ指数・AI印・決まり手・EX・柔軟枠（すべて不要）
+ * ===================================================================== */
+const ASANOU_V1 = {
+  ENABLED: true,
+  W_LINE_POS:  1.00,   // (2 - ライン位置)  前方=2 / 中団=1 / 後方=0
+  W_LINE_SIZE: 1.26,   // ライン人数
+  W_PT:        0.149,  // 競走得点（ライン先頭の選手）
+  ADD_ANA_A1:  true,   // A-1 の穴目「三頭-軸頭-軸番」を出すか
+  A2_V2:       true,   // ★v1.1 追加：A-2 を v2（10点）にする。false で v1（8点）に戻る
+  E1:          true,   // ★v1.2 追加：E-1（3=2=1=1）を出す。false で従来どおり skip
+  /* ===== ここから Brain 本番側で重ねたスイッチ（分析チャット原本には無い）=====
+   * 2026-09-24 ボンバイエ指示（朝脳 v2・STATUS 6-4）で本番に入っていた判断を、v1.2 の上に残す。
+   *   C1_ENABLED : false の間は C-1 を生成しない（対象外）。true で分析原本どおり
+   *   A1_ROWS_V2 : true で A-1 を「1段目[軸頭,軸番]-[軸頭,軸番]-[軸3,対頭] 4点／2段目 対頭-対番-[軸頭,三頭] 2点
+   *                ／3段目 三頭-軸頭-軸番 1点」の7点にする。false で分析原本（v1）どおり
+   * 両方を分析原本の値（C1_ENABLED:true・A1_ROWS_V2:false）にすると、asanou_logic.js v1.2 と完全に同じ出力になる。 */
+  C1_ENABLED:  false,
+  A1_ROWS_V2:  true,
+  ENGINE:      'asanou-v1.2'   // 記録の版名（指示書 8-2）。スイッチの状態は記録の engineFlags に残す
+};
+
+function asanouGenerate(lineup, players) {
+  const S = v => String(v);
+  const lines = (lineup || []).map(g => g.map(S));
+  const big   = lines.filter(g => g.length >= 2);      // 2車以上ライン（前→後）
+  const tanki = lines.filter(g => g.length === 1).map(g => g[0]);
+
+  // ⓪ E-1：ライン構成 3=2=1=1（7車・3車ライン1本・2車ライン1本・単騎2人）
+  //    並び順は問わない。競走得点は使わない（欠損でも skip しない）
+  if (ASANOU_V1.E1) {
+    const nCar = lines.reduce((a, g) => a + g.length, 0);
+    const L3c = big.filter(g => g.length === 3), L2c = big.filter(g => g.length === 2);
+    if (nCar === 7 && big.length === 2 && L3c.length === 1 && L2c.length === 1 && tanki.length === 2) {
+      return asanouE1(lines, big, L3c[0], L2c[0], tanki);
+    }
+  }
+
+  // ① 対象判定：2車以上ラインが3本（三分戦）のみ生成
+  if (big.length !== 3) {
+    return { status: 'skip', reason: `2車以上ラインが${big.length}本（三分戦のみ対象）` };
+  }
+
+  // ② 軸選定：各ライン先頭のスコアが最大のライン（同点は前のライン）
+  const ptOf = {};
+  (players || []).forEach(p => { ptOf[S(p.car)] = Number(p.pt) || 0; });
+  // ライン先頭の競走得点が取れない場合は見送る（0扱いにすると軸選定が壊れるため）
+  const noPt = big.map(g => g[0]).filter(c => !(ptOf[c] > 0));
+  if (noPt.length) {
+    return { status: 'skip', reason: `ライン先頭の競走得点が取得できない（${noPt.join(',')}番）` };
+  }
+  const W = ASANOU_V1;
+  const axisScores = big.map((g, i) => ({
+    lineIndex: i, head: g[0], size: g.length, pt: ptOf[g[0]],
+    score: (2 - Math.min(i, 2)) * W.W_LINE_POS + g.length * W.W_LINE_SIZE + ptOf[g[0]] * W.W_PT
+  }));
+  let ai = 0;
+  for (let i = 1; i < 3; i++) if (axisScores[i].score > axisScores[ai].score) ai = i;   // 厳密に大きい時のみ更新＝同点は前（丸めない）
+
+  // ③ 対抗：残りのうち並びが前のライン。第3ライン：残り1本
+  const rest = [0, 1, 2].filter(i => i !== ai);
+  const ti = rest[0], si = rest[1];
+  const L1 = big[ai], L2 = big[ti], L3 = big[si];
+
+  const AX = L1[0], AB = L1[1], A3 = L1[2] || null;    // 軸頭・軸番・軸3
+  const TA = L2[0], TB = L2[1];                         // 対頭・対番
+  const SH = L3[0], SB = L3[1];                         // 三頭・三番（第3ラインは必ず2車以上）
+
+  // ④ パターン
+  const pattern = tanki.length ? 'C-1' : (A3 ? 'A-1' : 'A-2');
+
+  // ★本番スイッチ：C-1 の生成停止（2026-09-24）
+  if (pattern === 'C-1' && W.C1_ENABLED === false) {
+    return { status: 'skip', reason: 'C-1は現在生成を停止しています', pattern: 'C-1',
+             roles: { axis: AX, axisBante: AB, axis3rd: A3, taisho: TA, taishoBante: TB,
+                      line3Head: SH, line3Bante: SB, tanki: tanki[0] || null,
+                      axisLineIndex: ai, taishoLineIndex: ti },
+             axisScores };
+  }
+
+  // ⑤ 買い目：行（label）ごとに矩形（[1着群, 2着群, 3着群]）を並べる
+  let groups;
+  if (pattern === 'A-1' && W.A1_ROWS_V2) {                             // ★本番スイッチ：A-1 の段組み（朝脳 v2）
+    groups = [
+      { label: null, boxes: [[[AX, AB], [AX, AB], [A3, TA]]] },        //   1段目 4点
+      { label: null, boxes: [[[TA], [TB], [AX, SH]]] },                //   2段目 2点
+    ];
+    if (W.ADD_ANA_A1) groups.push({ label: null, boxes: [[[SH], [AX], [AB]]] });   // 3段目 1点
+  } else if (pattern === 'A-1') {
+    groups = [
+      { label: null, boxes: [[[AX, AB], [AX, AB], [A3, TA, TB]]] },     // 6点
+    ];
+    if (W.ADD_ANA_A1) groups.push({ label: null, boxes: [[[SH], [AX], [AB]]] });   // 穴 1点
+  } else if (pattern === 'A-2') {
+    if (W.A2_V2) {
+      groups = [                                                        // ★A-2 v2（10点）
+        { label: '軸',   boxes: [[[AX], [AB], [TA, SH, SB]],             //   3点
+                                 [[AB], [AX], [TB, SH]]] },              //   2点
+        { label: '対抗', boxes: [[[TA], [AX, AB], [AX, AB, TB]]] },      //   4点
+        { label: '穴',   boxes: [[[SH], [SB], [AX]]] },                  //   1点
+      ];
+    } else {
+      groups = [                                                        // A-2 v1（8点）
+        { label: null, boxes: [[[AX, AB], [AX, AB], [TA, TB]]] },
+        { label: null, boxes: [[[TA], [AX, AB], [AX, AB, TB]]] },
+      ];
+    }
+  } else {                                                              // C-1（6点）
+    groups = [
+      { label: null, boxes: [[[AX, AB], [AX, AB], [TA, TB]]] },
+      { label: null, boxes: [[[TA], [AX], [AB, TB]]] },
+    ];
+  }
+
+  const bets = [], seen = new Set();
+  const srt = arr => [...new Set(arr.filter(Boolean))].sort((x, y) => Number(x) - Number(y)).join('');
+  const compressed = [], display = [];
+  for (const g of groups) {
+    const items = [];
+    for (const [A, B, C] of g.boxes) {
+      for (const a of A) for (const b of B) for (const c of C) {
+        if (!a || !b || !c || a === b || a === c || b === c) continue;
+        const k = `${a}-${b}-${c}`;
+        if (!seen.has(k)) { seen.add(k); bets.push(k); }
+      }
+      const box = `${srt(A)}-${srt(B)}-${srt(C)}`;
+      compressed.push(box);       // データ：1要素＝1矩形
+      items.push(box);
+    }
+    display.push({ label: g.label, items });   // 表示：items を " / " でつなぐ
+  }
+
+  return {
+    status: 'ok', pattern, points: bets.length, bets, compressed, display,
+    roles: { axis: AX, axisBante: AB, axis3rd: A3, taisho: TA, taishoBante: TB,
+             line3Head: SH, line3Bante: SB, tanki: tanki[0] || null,
+             axisLineIndex: ai, taishoLineIndex: ti },
+    axisScores
+  };
+}
+
+
+/* ---------------------------------------------------------------------
+ * E-1（v1.2 新設）
+ *   軸   ＝3車ライン（無条件。得点・位置では選ばない）
+ *   対抗 ＝2車ライン（無条件）
+ *   単前・単後 ＝単騎2人のうち並びで前／後ろ（入れ替えない）
+ *   段1  軸頭-軸番-[軸三,対頭,対番,単前,単後]      5点
+ *   段2  軸番-軸頭-軸三 ／ 軸番-軸三-軸頭          2点（表示は同じ段）
+ *   段3  単前-軸頭-対頭                          1点
+ * --------------------------------------------------------------------- */
+function asanouE1(lines, big, L3, L2, tanki) {
+  const flat = lines.flat();
+  const [SZ, SK] = [...tanki].sort((a, b) => flat.indexOf(a) - flat.indexOf(b));   // 単前・単後
+  const [AX, AB, A3] = L3, [TA, TB] = L2;
+  const asc = arr => [...arr].sort((x, y) => Number(x) - Number(y));
+  const groups = [
+    { label: null, boxes: [[[AX], [AB], asc([A3, TA, TB, SZ, SK])]] },   // 段1 5点
+    { label: null, boxes: [[[AB], [AX], [A3]],                          // 段2 2点（1矩形ずつ）
+                           [[AB], [A3], [AX]]] },
+    { label: null, boxes: [[[SZ], [AX], [TA]]] },                        // 段3 1点
+  ];
+  const bets = [], compressed = [], display = [];
+  for (const g of groups) {
+    const items = [];
+    for (const [A, B, C] of g.boxes) {
+      for (const a of A) for (const b of B) for (const c of C) {
+        if (a === b || a === c || b === c) continue;
+        bets.push(`${a}-${b}-${c}`);
+      }
+      const box = `${A.join('')}-${B.join('')}-${C.join('')}`;
+      compressed.push(box); items.push(box);
+    }
+    display.push({ label: g.label, items });
+  }
+  return {
+    status: 'ok', pattern: 'E-1', points: bets.length, bets, compressed, display,
+    roles: { axis: AX, axisBante: AB, axis3rd: A3, taisho: TA, taishoBante: TB,
+             senzen: SZ, sengo: SK, line3Head: null, line3Bante: null, tanki: null,
+             axisLineIndex: big.indexOf(L3), taishoLineIndex: big.indexOf(L2) },
+    axisScores: null
+  };
+}
+
+/* 圧縮形 → 買い目（検算用）。"-" 区切りのみ。" / " も "=" も使わない */
+function asanouExpand(compressed) {
+  const out = new Set();
+  for (const row of compressed) {
+    const [A, B, C] = row.split('-').map(s => s.split(''));
+    for (const a of A) for (const b of B) for (const c of C)
+      if (a !== b && a !== c && b !== c) out.add(`${a}-${b}-${c}`);
+  }
+  return [...out];
+}
+
+/* 表示用の文字列（参考実装） */
+function asanouDisplayText(display) {
+  return display.map(r => (r.label ? `${r.label}　` : '') + r.items.join(' / '));
+}
+
+  /* (2) 選手の抽出 */
+function extractPlayers(doc) {
+  const tables = doc.querySelectorAll('table');
+  if (tables.length < 2) return [];
+  
+  const table = tables[1]; // 2つ目のテーブル
+  const rows = table.querySelectorAll('tbody tr');
+  const players = [];
+  
+  let currentWaku = 1;
+  
+  rows.forEach((row, idx) => {
+    const cells = row.querySelectorAll('td');
+    if (cells.length < 5) return;
+    
+    // 車番を探す
+    const bibEl = row.querySelector('[class*="Bib___Wrapper"]');
+    const num = bibEl ? parseInt(bibEl.textContent.trim()) : null;
+    if (!num) return;
+    
+    // 枠番（rowspanで複数行にまたがる場合がある）
+    const wakuCell = row.querySelector('td[rowspan]');
+    if (wakuCell) {
+      currentWaku = parseInt(wakuCell.textContent.trim()) || currentWaku;
+    }
+    
+    // 選手情報
+    const playerInfo = row.querySelector('[class*="PlayerInfo"]');
+    const nameEl = playerInfo?.querySelector('a');
+    
+    const name = nameEl?.textContent?.trim() || '';
+    
+    // 選手情報は名前(a)の親spanの次の兄弟span
+    // "岡山 A1 54歳 67期" をパース
+    let pref = '', cls = '', age = null, ki = null;
+    const allSpans = playerInfo?.querySelectorAll('span[class*="Text___Text"]');
+    if (allSpans) {
+      for (const span of allSpans) {
+        const txt = span.textContent?.trim() || '';
+        // 名前と同じでなく、県名+クラス+年齢+期のパターンを含むものを探す
+        if (txt !== name && txt.includes('歳') && txt.includes('期')) {
+          const infoParts = txt.split(/\s+/);
+          pref = infoParts[0] || '';
+          cls = infoParts[1] || '';
+          age = parseInt(infoParts[2]) || null;
+          ki = parseInt(infoParts[3]) || null;
+          break;
+        }
+      }
+    }
+    
+    // AI予想（複数の方法で取得を試みる）
+    let aiPred = '';
+    // 方法1: PredictionIconのsvg titleから
+    const aiEl = row.querySelector('[class*="PredictionIcon"] svg title');
+    if (aiEl) {
+      aiPred = aiEl.textContent || '';
+    }
+    // 方法2: セルから直接「本命」「対抗」「単穴」「連下」を探す
+    if (!aiPred) {
+      for (const cell of cells) {
+        const txt = cell.textContent.trim();
+        if (['本命', '対抗', '単穴', '連下'].includes(txt)) {
+          aiPred = txt;
+          break;
+        }
+      }
+    }
+    
+    // 各セルの値を取得（spanの入れ子構造からテキストを抽出）
+    const cellValues = Array.from(cells).map(cell => {
+      // コメントセルは特別扱い
+      const commentEl = cell.querySelector('[class*="Comment"]');
+      if (commentEl) return { type: 'comment', value: commentEl.textContent.trim() };
+      
+      // ギヤ倍率
+      const gearEl = cell.querySelector('[class*="GearRatio"]');
+      if (gearEl) return { type: 'gear', value: parseFloat(gearEl.textContent.trim()) || null };
+      
+      // 通常のセル
+      const text = cell.textContent.trim();
+      return { type: 'normal', value: text };
+    });
+    
+    // セルインデックスを計算（枠番セルの有無で調整）
+    const hasWakuCell = wakuCell !== null;
+    const baseOffset = hasWakuCell ? 0 : -1;
+    
+    // 各データのインデックス（0-indexed）
+    // 枠, 車, 名前, AI, 得点, S, B, 脚, 逃, 捲, 差, マ, 1着, 2着, 3着, 着外, 勝率, 2連, 3連, ギヤ, コメント
+    const getVal = (idx) => {
+      const adjusted = idx + baseOffset;
+      if (adjusted < 0 || adjusted >= cellValues.length) return null;
+      const v = cellValues[adjusted].value;
+      return v === '' || v === '-' ? null : v;
+    };
+    
+    const getNumVal = (idx) => {
+      const v = getVal(idx);
+      if (v === null) return null;
+      const n = parseFloat(v);
+      return isNaN(n) ? null : n;
+    };
+    
+    // 競走得点（セル4, 0-indexed）
+    const pt = getNumVal(4);
+    
+    // S, B
+    const S = getNumVal(5);
+    const H = getNumVal(6);  // 新規追加
+    const B = getNumVal(7);
+    
+    // 脚質
+    const style = getVal(8) || '';
+    
+    // 決まり手
+    const nige = getNumVal(9);
+    const maki = getNumVal(10);
+    const sashi = getNumVal(11);
+    const mark = getNumVal(12);
+    
+    // 着数
+    const w1 = getNumVal(13);
+    const w2 = getNumVal(14);
+    const w3 = getNumVal(15);
+    const wout = getNumVal(16);
+    
+    // 勝率、連対率
+    const win = getNumVal(17);
+    const r2 = getNumVal(18);
+    const r3 = getNumVal(19);
+    
+    // ギヤ倍率
+    const gearCell = cellValues.find(c => c.type === 'gear');
+    const gear = gearCell?.value || null;
+    
+    // コメント
+    const commentCell = cellValues.find(c => c.type === 'comment');
+    const comment = commentCell?.value || '';
+    
+    players.push({
+      car: num,  // brainlogic用
+      n: num,    // テーブル表示用（互換性維持）
+      waku: currentWaku,
+      name,
+      pref,
+      cls,
+      age,
+      ki,
+      ai: aiPred,  // AI予想（本命/対抗/単穴/連下）
+      pt,
+      style,
+      S,
+      H,  // 新規追加
+      B,
+      nige,
+      makuri: maki,  // brainlogic用
+      maki,          // テーブル表示用（互換性維持）
+      sashi,
+      mark,
+      w1,
+      w2,
+      w3,
+      wout,
+      win,
+      r2,
+      rentai3: r3,  // brainlogic用
+      r3,           // テーブル表示用（互換性維持）
+      gear,
+      comment
+    });
+  });
+  
+  return players;
+}
+
+  /* (3) 出走表の選手 → asanouGenerate の入力 */
+function asanouPlayersOf(race){
+  return ((race && race.players) || []).map(function(p){
+    var car = (p.n != null) ? p.n : p.car;
+    var pt  = (p.pt != null && p.pt !== '' && !isNaN(Number(p.pt))) ? Number(p.pt) : null;
+    return { car: String(car), pt: pt };
+  });
+}
+  /* ---- 複製ここまで ---- */
+
+  /* ---- 並びの抽出（midrace／asarace と同一） ---- */
+  function extractLineup(doc){
+    var sec = doc.querySelector('[class*="LinePrediction"]');
+    if (!sec) return null;
+    var lineup = [], cur = [];
+    sec.querySelectorAll('[class*="Bib___Wrapper"], [class*="Chain___Wrapper"]').forEach(function(item){
+      var cn = item.className || '';
+      if (cn.indexOf('Chain') >= 0) { if (cur.length) { lineup.push(cur); cur = []; } }
+      else if (cn.indexOf('Bib') >= 0) { var n = parseInt(item.textContent.trim()); if (!isNaN(n)) cur.push(n); }
+    });
+    if (cur.length) lineup.push(cur);
+    return lineup.length ? lineup : null;
+  }
+  /* 緑ランプの判定（asarace.html isV3Generatable と同じ） */
+  function isGeneratable(lineup, players){
+    try{
+      if (!players || players.length < 2) return false;
+      if (!lineup || !lineup.length) return false;
+      if (typeof ASANOU_V1 === 'undefined' || !ASANOU_V1.ENABLED) return false;
+      return asanouGenerate(lineup, asanouPlayersOf({ players: players, lineup: lineup })).status === 'ok';
+    }catch(e){ return false; }
+  }
+
+  /* ---- 開催ごとのレース一覧（cups API） ---- */
+  function cupKey(v){ return v.raceCode + '|' + (v.dayNum || 1); }
+  function loadCup(v){
+    var k = cupKey(v), e = cupCache[k];
+    if (e && e.status === 'ok') return Promise.resolve();
+    if (e && e.status === 'fail' && (e.tries >= BRTK.FAIL_MAX || Date.now() - e.at < BRTK.FAIL_WAIT_MS)) return Promise.resolve();
+    if (cupPending[k]) return cupPending[k];
+    cupPending[k] = withTimeout(fetch(proxy('https://api.winticket.jp/v1/keirin/cups/' + v.raceCode + '?pfm=web')).then(function(r){ return r.text(); }), BRTK.INFO_TIMEOUT_MS, 'cup')
+      .then(function(txt){
+        var j = JSON.parse(txt);
+        var sch = (j.schedules || []).find(function(s){ return String(s.day) === String(v.dayNum); });
+        if (!sch) throw new Error('no-schedule');
+        var races = (j.races || []).filter(function(r){ return r.scheduleId === sch.id; })
+          .map(function(r){ return { n: r.number, closeAt: (typeof r.closeAt === 'number' ? r.closeAt : null), cls: shortCls(r.raceType3 || r.raceType || '') }; })
+          .sort(function(a, b){ return a.n - b.n; });
+        cupCache[k] = { status: 'ok', races: races };
+        dbg.cupOk++;
+      })
+      .catch(function(err){
+        dbg.cupFail++; dbg.lastErr = String(err && err.message || err);
+        cupCache[k] = { status: 'fail', tries: ((e && e.tries) || 0) + 1, at: Date.now() };
+      })
+      .finally(function(){ delete cupPending[k]; });
+    return cupPending[k];
+  }
+
+  function activeVenues(){ return venuesList().filter(function(v){ return v && v.linkType !== 'raceresult' && v.raceCode; }); }
+
+  /* 候補：締切前のレースを締切順に */
+  function candidates(){
+    var ns = nowSec(), list = [];
+    activeVenues().forEach(function(v){
+      var c = cupCache[cupKey(v)];
+      if (!c || c.status !== 'ok') return;
+      c.races.forEach(function(r){
+        if (r.closeAt === null || r.closeAt <= ns) return;
+        list.push({ v: v, r: r, t: r.closeAt, key: v.venueId + '|' + v.raceCode + '|' + (v.dayNum || 1) + '|' + r.n });
+      });
+    });
+    list.sort(function(a, b){
+      if (a.t !== b.t) return a.t - b.t;
+      if (a.v.venue !== b.v.venue) return String(a.v.venue).localeCompare(String(b.v.venue), 'ja');
+      return a.r.n - b.r.n;
+    });
+    return list;
+  }
+
+  async function evalOne(c){
+    var prev = evalCache[c.key];
+    try {
+      dbg.fetched++;
+      var url = 'https://www.winticket.jp/keirin/' + c.v.venueId + '/racecard/' + c.v.raceCode + '/' + (c.v.dayNum || '1') + '/' + c.r.n;
+      var html = await withTimeout(fetch(proxy(url)).then(function(r){ return r.text(); }), BRTK.FETCH_TIMEOUT_MS, 'race');
+      if (!html) throw new Error('fetch-empty');
+      var doc = new DOMParser().parseFromString(html, 'text/html');
+      var players = extractPlayers(doc), lineup = extractLineup(doc);
+      evalCache[c.key] = { status: 'ok', gen: isGeneratable(lineup, players) };
+      dbg.ok++;
+    } catch(e) {
+      dbg.fail++; dbg.lastErr = String(e && e.message || e);
+      evalCache[c.key] = { status: 'fail', tries: ((prev && prev.tries) || 0) + 1, at: Date.now() };
+    }
+  }
+  function failSkippable(e){ return e && e.status === 'fail' && (e.tries >= BRTK.FAIL_MAX || (Date.now() - e.at) < BRTK.FAIL_WAIT_MS); }
+
+  async function scan(){
+    if (scanning) return;
+    scanning = true; dbg.scans++;
+    try {
+      await Promise.all(activeVenues().map(loadCup));
+      render();
+      for (var guard = 0; guard < 200; guard++) {
+        if (!pageVisible()) break;
+        var list = candidates(), need = [], gens = 0, ns = nowSec();
+        for (var i = 0; i < list.length; i++) {
+          var c = list[i], e = evalCache[c.key];
+          if (gens >= BRTK.MIN_ITEMS && c.t > ns + BRTK.WITHIN_MIN * 60) break;
+          if (e && e.status === 'ok') { if (e.gen) gens++; continue; }
+          if (failSkippable(e)) continue;
+          need.push(c);
+          if (need.length >= BRTK.CONCURRENCY) break;
+        }
+        if (!need.length) break;
+        await Promise.all(need.map(evalOne));
+        render();
+      }
+    } catch(e) { console.log('電光掲示板：判定エラー', e); }
+    scanning = false;
+    render();
+  }
+
+  var itemVenue = {};   // 項目キー → 開催（タップ時に使う）
+  function buildItems(){
+    var items = [], list = candidates(), ns = nowSec();
+    for (var i = 0; i < list.length; i++) {
+      var c = list[i], e = evalCache[c.key];
+      if (items.length >= BRTK.MIN_ITEMS && c.t > ns + BRTK.WITHIN_MIN * 60) break;
+      if (!e) break;                              // 手前が未判定なら順序が確定しないので止める
+      if (e.status !== 'ok') { if (failSkippable(e)) continue; break; }
+      if (!e.gen) continue;
+      itemVenue[c.key] = c.v;
+      items.push({ kind: 'race', key: c.key, raceNum: c.r.n, venue: c.v.venue,
+                   cls: c.r.cls, deadline: hhmm(c.r.closeAt), remain: Math.floor((c.r.closeAt - ns) / 60) });
+    }
+    if (!items.length && BRTK.PR_TEXT) items.push({ kind: 'pr', text: BRTK.PR_TEXT });
+    if (DEBUG) items.push({ kind: 'dbg', text: debugText() });
+    return items;
+  }
+
+  function debugText(){
+    var vs = venuesList(), act = activeVenues().length, co = 0, cf = 0;
+    Object.keys(cupCache).forEach(function(k){ if (cupCache[k].status === 'ok') co++; else cf++; });
+    var ec = 0, eok = 0, egen = 0, efail = 0;
+    Object.keys(evalCache).forEach(function(k){ var e = evalCache[k]; ec++; if (e.status === 'ok') { eok++; if (e.gen) egen++; } else efail++; });
+    var d = new Date(), hh = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0') + ':' + String(d.getSeconds()).padStart(2,'0');
+    return '[診断 ' + hh + '] 開催' + vs.length + '(開催中' + act + ') cup成功' + co + '/失敗' + cf
+         + ' 候補' + candidates().length + ' 判定' + eok + '/' + ec + ' 可' + egen + ' 失敗' + efail
+         + ' 取得' + dbg.fetched + ' 超過' + dbg.timeout + ' tick' + dbg.ticks + ' scan' + dbg.scans + (scanning ? '(中)' : '')
+         + (dbg.lastErr ? ' 最終エラー:' + dbg.lastErr.slice(0, 60) : '');
+  }
+
+  function soonHTML(remain){ return (remain > 0 && remain <= BRTK.SOON_MIN) ? ' (<em class="brtk-min">' + remain + '分前</em>)' : ''; }
+  function itemHTML(it){
+    if (it.kind !== 'race') return esc(it.text);
+    return (it.raceNum <= BRTK.FREE_MAX_RACE ? '<span class="brtk-free">無料</span>' : '')
+         + esc(it.venue + it.raceNum + 'R') + (it.cls ? ' ' + esc(it.cls) : '') + ' 締切' + esc(it.deadline)
+         + '<span class="brtk-soon">' + soonHTML(it.remain) + '</span> '
+         + '<span class="brtk-hl">' + esc(BRTK.RACE_SUFFIX_HL) + '</span>' + esc(BRTK.RACE_SUFFIX_REST);
+  }
+  function sigOf(items){
+    return items.map(function(it){ return it.kind === 'dbg' ? 'dbg' : (it.kind + ':' + (it.key || it.text) + ':' + (it.cls || '') + ':' + (it.deadline || '') + ':' + soonHTML(it.remain)); }).join('|');
+  }
+  function hasContent(){ return !!(track && track.querySelector('.brtk-item:not([data-kind="dbg"])')); }
+  function updateDbg(items){
+    var dnode = track.querySelector('.brtk-item[data-kind="dbg"]');
+    var dit = items.filter(function(it){ return it.kind === 'dbg'; })[0];
+    if (dnode && dit) dnode.textContent = dit.text;
+  }
+  /* 流している最中は組み替えない。組み替えは (1) 何も流れていないとき (2) 周回の頭（frame）だけ */
+  function render(){
+    if (!track) return;
+    var items = buildItems();
+    if (!reduceMotion && hasContent()) { updateDbg(items); return; }
+    var raceN = items.filter(function(it){ return it.kind === 'race'; }).length;
+    if (scanning && raceN > 0 && raceN < BRTK.MIN_ITEMS) { updateDbg(items); return; }
+    var sig = sigOf(items);
+    if (sig === lastSig) { updateDbg(items); return; }
+    applyItems(items, sig);
+  }
+  function applyItems(items, sig){
+    lastSig = sig;
+    track.innerHTML = '';
+    items.forEach(function(it){
+      var el = document.createElement('span');
+      el.className = 'brtk-item';
+      el.setAttribute('data-kind', it.kind);
+      el.innerHTML = itemHTML(it);
+      if (it.kind === 'race') {
+        el.setAttribute('data-key', it.key);
+        el.setAttribute('data-race-num', String(it.raceNum));
+        el.addEventListener('click', onRaceTap);
+      }
+      track.appendChild(el);
+    });
+    x = reduceMotion ? 0 : (band ? band.clientWidth : 0);
+    track.style.transform = 'translate3d(' + x + 'px,0,0)';
+  }
+
+  /* レース → 出走表（asanou の midSelectRace と同じ URL） */
+  function onRaceTap(e){
+    var el = e.currentTarget;
+    var v = itemVenue[el.getAttribute('data-key')];
+    var raceNum = Number(el.getAttribute('data-race-num'));
+    if (!v) return;
+    el.classList.add('tapped');
+    var q = new URLSearchParams({
+      venue: v.venueId || '', name: v.venue || '', code: v.raceCode || '', day: String(v.dayNum || 1),
+      race: String(raceNum), grade: v.grade || 'F2', dayLabel: v.day || ''
+    });
+    setTimeout(function(){ location.href = '/asarace?' + q.toString(); }, 140);
+  }
+
+  var visCache = true, visAt = 0;
+  function frame(ts){
+    requestAnimationFrame(frame);
+    if (!track || reduceMotion) { lastTs = ts; return; }
+    if (ts - visAt > 500) { visCache = pageVisible(); visAt = ts; }
+    if (!track.firstChild || !visCache) { lastTs = ts; return; }
+    var dt = lastTs ? Math.min(ts - lastTs, 100) : 0;
+    lastTs = ts;
+    x -= BRTK.SPEED * dt / 1000;
+    if (x < -track.scrollWidth) { var items = buildItems(); applyItems(items, sigOf(items)); return; }
+    track.style.transform = 'translate3d(' + x + 'px,0,0)';
+  }
+
+  function tick(){
+    dbg.ticks++;
+    try { render(); if (pageVisible() && venuesList().length) scan(); } catch(e) { console.log('電光掲示板：tick エラー', e); }
+  }
+
+  function init(){
+    band = document.getElementById('brTicker');
+    track = document.getElementById('brTickerTrack');
+    if (!band || !track) return;
+    render();
+    requestAnimationFrame(frame);
+    var waited = 0;
+    var w = setInterval(function(){
+      waited++;
+      if (venuesList().length || waited > 90) { clearInterval(w); tick(); }
+    }, 1000);
+    setInterval(tick, BRTK.TICK_MS);
+    if (DEBUG) setInterval(function(){ try { render(); } catch(e){} }, 2000);
+    document.addEventListener('visibilitychange', function(){ if (pageVisible()) tick(); });
+  }
+  window.BRTK_DEBUG = { dbg: dbg, debugText: function(){ return debugText(); }, evalCache: evalCache, cupCache: cupCache,
+                        render: function(){ lastSig = null; render(); }, scan: scan, buildItems: buildItems, setX: function(v){ x = v; } };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
+</script>
 <!-- 管理コード入力（→ /asarace?admin=1 へ遷移） -->
 <div id="admGate">
   <div class="adm-gate-box">
