@@ -2196,6 +2196,7 @@ body::before{
 .arerace-back-btn:active, .arerace-home-btn:active{
   opacity:.6;
 }
+body.are-v2 .are-v1-note{display:none;}   /* ★2026-10-01 v2 では v1 用の説明文を出さない */
 .arerace-header-title{
   /* ★2026-10-01：上にステータスバー分の余白を足したので、中央はその下（ボタンと同じ高さ）に置く */
   position:absolute;left:50%;top:calc(50% + env(safe-area-inset-top, 0px) / 2);transform:translate(-50%,-50%);
@@ -7926,14 +7927,15 @@ body.omk-shake{animation:omkShake .42s linear;}
   <div class="arerace-title">本日の荒れ予報レース一覧</div>
   <div class="arerace-notes">
     ※対象：3分戦＋単騎含む3分戦<br>
-    ※20%以上のレースのみ表示<br>
-    ※配当の大小の予想ではありません<br>
-    <span class="arerace-notes-odds">※荒れ予報ページ内の買い目は<br>
+    <!-- ★2026-10-01：are-v1-note の行は荒れ買い目 v2 のとき出さない（ARE_V2.ENABLED と同期。v1 に戻すと再び出る） -->
+    <span class="are-v1-note">※20%以上のレースのみ表示<br></span>
+    <span class="are-v1-note">※配当の大小の予想ではありません<br></span>
+    <span class="are-v1-note"><span class="arerace-notes-odds">※荒れ予報ページ内の買い目は<br>
     オッズにより点数が調整されます<br>
     読み込むタイミングで<br>
-    買い目が異なる場合があります</span><br>
-    <span class="arerace-notes-grade">※注意：グレードレースは三分戦のみ荒れ予報の対象です<br>
-    （荒れ指数20%以上のレースを表示）</span><br>
+    買い目が異なる場合があります</span><br></span>
+    <span class="are-v1-note"><span class="arerace-notes-grade">※注意：グレードレースは三分戦のみ荒れ予報の対象です<br>
+    （荒れ指数20%以上のレースを表示）</span><br></span>
     <br>
     <span class="arerace-notes-omake">※おまけ：レースカードをタップすることで<br>
     買い目が表示されますが参考程度に<br>
@@ -19497,6 +19499,17 @@ async function showAreRaceScreen() {
   logo.classList.remove('visible','shake');
   areScreen.classList.remove('are-enter');
   areTransitioning = false;
+
+  /* ★2026-10-01 v2：開いたら自動で読み込む。直前（REUSE_MIN 分以内）に読み込んでいればそのまま表示 */
+  if (areLoadFast() && ARE_LOAD.AUTO_LOAD) {
+    const _fresh = window.ARE_RACE_RESULTS && window.ARE_LOADED_AT && (Date.now() - window.ARE_LOADED_AT) < ARE_LOAD.REUSE_MIN * 60000;
+    if (_fresh) {
+      document.getElementById('areLoadWrap').style.display = 'none';
+      finishAreLoading(window.ARE_RACE_RESULTS);
+    } else {
+      loadAreRaceData();
+    }
+  }
 }
 
 // ===== ローテーションメッセージ =====
@@ -19556,6 +19569,17 @@ function saveAreCache(results) {
   } catch(e) { console.log('キャッシュ保存エラー:', e); }
 }
 
+/* ===== 荒れ予報の読み込みの速さ（2026-10-01・ボンバイエ指示） =====
+ * v2 はオッズを使わないので、読み込みで時間がかかるのは「開催ごとに全12Rの出走表を取る」部分だけ。
+ * ここを次のように軽くする。どれも ARE_V2.ENABLED が true のときだけ効く（v1 に戻すと元の読み込み経路に戻る）。
+ *   DN_ONLY        デイ・ナイターの開催だけ取る（v2 の対象外のモーニング・ミッドナイトを取らない）
+ *   VENUE_PARALLEL 何開催ずつ同時に取るか（元は1開催ずつ順番）。1 で元と同じ順番取り
+ *   AUTO_LOAD      荒れ予報の画面を開いたら自動で読み込む（「読み込む」ボタンを押さなくてよい）
+ *   REUSE_MIN      直前の読み込みからこの分数以内に開き直したら、取り直さずにそのまま表示する
+ * 終了したレースも取る（結果一覧の照合に使うため）。 */
+const ARE_LOAD = { DN_ONLY: true, VENUE_PARALLEL: 3, AUTO_LOAD: true, REUSE_MIN: 3 };
+function areLoadFast(){ return (typeof areV2On === 'function') && areV2On(); }
+
 // ===== 荒れ予報データ読み込み（ボタンから） =====
 async function loadAreRaceData() {
   document.getElementById('areLoadWrap').style.display = 'none';
@@ -19570,7 +19594,9 @@ async function loadAreRaceData() {
   
   startAreMessages();
   
-  const activeVenues = VENUES.filter(v => v.linkType !== 'raceresult');
+  const _fast = areLoadFast();
+  const activeVenues = VENUES.filter(v => v.linkType !== 'raceresult'
+    && (!_fast || !ARE_LOAD.DN_ONLY || v.timeSlot === 'day' || v.timeSlot === 'nighter'));   /* ★v2：デイナイターのみ */
   
   if (activeVenues.length === 0) {
     fill.style.width = '100%';
@@ -19613,7 +19639,8 @@ async function loadAreRaceData() {
   let completed = 0;
   const totalVenues = activeVenues.length;
   
-  for (const venue of activeVenues) {
+  /* ★2026-10-01：1開催分の処理を関数にした（中身は元の for 文と同じ）。v2 は ARE_LOAD.VENUE_PARALLEL 開催ずつ同時に、v1 は元どおり1開催ずつ */
+  const _processVenue = async (venue) => {
     try {
       // 全12Rを取得（venue.racesに過去レースが含まれない場合があるため）
       const targetRaces = Array.from({length:12}, (_, i) => i + 1);
@@ -19664,7 +19691,16 @@ async function loadAreRaceData() {
     const pct = Math.round((completed / totalVenues) * 100);
     fill.style.width = pct + '%';
     pctText.textContent = pct + '%';
+  };
+  const _par = _fast ? Math.max(1, ARE_LOAD.VENUE_PARALLEL | 0) : 1;
+  if (_par <= 1) {
+    for (const venue of activeVenues) { await _processVenue(venue); }
+  } else {
+    let _next = 0;
+    const _worker = async () => { while (_next < activeVenues.length) { const v = activeVenues[_next++]; await _processVenue(v); } };
+    await Promise.all(Array.from({ length: Math.min(_par, activeVenues.length) }, _worker));
   }
+  /* 並べ順は後段で締切順に並べ直すので、取得の順番が変わっても一覧は同じ */
   
   // キャッシュから過去データを統合
   const cached = loadAreCache();
@@ -19705,8 +19741,9 @@ async function loadAreRaceData() {
   
   window.ARE_RACE_RESULTS = sortedRaces;
   window.ARE_ALL_RESULTS = results;
+  window.ARE_LOADED_AT = Date.now();   /* ★2026-10-01：開き直したときの再利用判定に使う */
   
-  await new Promise(r => setTimeout(r, 400));
+  await new Promise(r => setTimeout(r, _fast ? 0 : 400));   /* ★v2：最後の待ち時間を省く */
   finishAreLoading(sortedRaces);
 }
 
@@ -20891,6 +20928,9 @@ const ARE_V2 = {
 };
 
 function areV2On(){ return !!(ARE_V2 && ARE_V2.ENABLED); }
+/* ★2026-10-01：v2 のときだけ v1 用の説明文（.are-v1-note）を隠す */
+(function(){ function mark(){ try{ document.body.classList.toggle('are-v2', areV2On()); }catch(e){} }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mark); else mark(); })();
 
 /* 印（calcAllMarks と同じ入力） */
 function areV2MarksOf(race){
