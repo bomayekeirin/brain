@@ -443,6 +443,54 @@
     animation:brrTekichu .5s cubic-bezier(.2,1.4,.4,1) both;z-index:3;pointer-events:none;}
   @keyframes brrTekichu{0%{opacity:0;transform:rotate(-8deg) scale(.3);}70%{opacity:1;transform:rotate(-8deg) scale(1.12);}100%{opacity:1;transform:rotate(-8deg) scale(1);}}
   .brr-card.hit{border-color:#f3c9c9;box-shadow:0 2px 11px rgba(224,52,47,.12);}
+
+/* ===== 入場コード入力（2026-09-30・Brain本体 app.html の新しい入力画面 #bGate をそのまま移植） =====
+ * 旧ログイン（#login・1245の固定コードを端末内で照合）は使わない。Brain本体と同じ Worker の /auth（realm:brain）で
+ * 今月の入場コードを照合する。Brain本体で認証済みなら（同じ Cookie）コード入力は出ない。 */
+/* ===================================================================
+ * Brain本体：ホームから先へ進むときのコード入力（2026-09-23・方式A）
+ *   Worker のログイン画面（明るい配色・ローズピンク）に見た目をそろえる。
+ *   ★既存の古いログイン画面（#screen-login）と class 名が重ならないよう bg- 接頭辞を使う。
+ * =================================================================== */
+#bGate{position:fixed;inset:0;z-index:5000;display:none;background:rgba(245,245,247,.97);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);overflow-y:auto;-webkit-overflow-scrolling:touch;}
+#bGate.show{display:block;}
+.bg-inner{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:calc(24px + env(safe-area-inset-top, 0px)) 22px calc(28px + env(safe-area-inset-bottom, 0px));}
+.bg-close{position:absolute;top:calc(12px + env(safe-area-inset-top, 0px));right:14px;width:38px;height:38px;border-radius:50%;
+  border:1px solid rgba(0,0,0,.08);background:#fff;color:#777;font-size:19px;line-height:1;cursor:pointer;
+  box-shadow:0 4px 12px rgba(0,0,0,.08);}
+.bg-logo{width:84px;height:auto;}
+.bg-sub{margin-top:8px;font-size:13px;color:#888;letter-spacing:.2em;}
+.bg-msg{margin-top:18px;font-size:12.5px;line-height:1.8;color:#666;text-align:center;}
+.bg-agree{width:100%;max-width:320px;display:flex;flex-direction:column;gap:12px;margin:20px 0 4px;}
+.bg-agree-item{display:flex;align-items:flex-start;gap:12px;cursor:pointer;user-select:none;}
+.bg-agree-box{width:20px;height:20px;min-width:20px;border-radius:5px;border:1.5px solid rgba(0,0,0,.15);background:#fff;
+  display:flex;align-items:center;justify-content:center;margin-top:1px;font-size:12px;color:transparent;}
+.bg-agree-item.checked .bg-agree-box{border-color:#c0446e;background:rgba(192,68,110,.1);color:#c0446e;}
+.bg-agree-text{font-size:10.5px;color:#666;line-height:1.6;}
+.bg-pin{display:flex;gap:11px;margin-top:22px;}
+.bg-pin input{width:54px;height:62px;text-align:center;font-size:26px;font-weight:700;color:#c0446e;background:#fff;
+  border:1px solid rgba(0,0,0,.08);border-radius:14px;outline:none;box-shadow:0 2px 8px rgba(0,0,0,.06);
+  font-family:'Bebas Neue','Noto Sans JP',sans-serif;}
+.bg-pin input:focus{border-color:rgba(192,68,110,.45);box-shadow:0 0 0 3px rgba(192,68,110,.1);}
+.bg-pin.error input{border-color:#ff4455;}
+.bg-pin.error{animation:bgShake .38s ease;}
+@keyframes bgShake{0%,100%{transform:translateX(0);}20%{transform:translateX(-7px);}40%{transform:translateX(7px);}60%{transform:translateX(-4px);}80%{transform:translateX(4px);}}
+.bg-err{height:18px;margin-top:12px;font-size:11.5px;color:#e03040;letter-spacing:.04em;}
+.bg-ms{width:100%;max-width:330px;margin:12px auto 0;text-align:center;}
+.bg-ms-toggle{background:none;border:none;padding:6px 4px;cursor:pointer;font-family:inherit;font-size:12px;color:#8a8a92;
+  text-decoration:underline;text-underline-offset:4px;}
+.bg-ms-panel{max-height:0;overflow:hidden;opacity:0;transition:max-height .42s cubic-bezier(.22,1,.36,1),opacity .3s ease;}
+.bg-ms.open .bg-ms-panel{max-height:560px;opacity:1;}
+.bg-ms-inner{padding:14px 0 4px;}
+.bg-ms-img{display:block;border-radius:14px;overflow:hidden;border:1px solid rgba(0,0,0,.08);box-shadow:0 8px 20px rgba(0,0,0,.1);}
+.bg-ms-img img{display:block;width:100%;height:auto;}
+.bg-ms-note{margin-top:12px;font-size:11.5px;line-height:1.75;color:#666;text-align:left;}
+.bg-ms-cta{display:block;margin-top:14px;padding:13px 16px;border-radius:12px;color:#fff;text-decoration:none;
+  font-size:14px;font-weight:600;letter-spacing:.06em;background:linear-gradient(135deg,#c0446e,#e06090);box-shadow:0 8px 20px rgba(0,0,0,.1);}
+@media (prefers-reduced-motion:reduce){ .bg-ms-panel{transition:none;} .bg-pin.error{animation:none;} }
+
 </style>
 </head>
 <body>
@@ -465,6 +513,39 @@
     <input type="tel" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="パスコード4桁目">
   </div>
   <div class="login-err" id="loginErr">パスコードが違います</div>
+</div>
+
+<!-- ★2026-09-30 入場コード入力（Brain本体と同じ新しい入力画面・メンバーシップ案内つき） -->
+<div id="bGate" role="dialog" aria-modal="true" aria-label="入場コード">
+  <button type="button" class="bg-close" id="bgClose" aria-label="閉じる">×</button>
+  <div class="bg-inner">
+    <img class="bg-logo" src="brain-logo-pink.png" alt="Brain">
+    <div class="bg-sub">競輪買い目生成ツール</div>
+    <div class="bg-msg">Brain Race Result はメンバー限定です<br>メンバーシップに記載の入場コードを入力してください</div>
+    <div class="bg-agree">
+      <div class="bg-agree-item" id="bgAgree1"><div class="bg-agree-box">✓</div>
+        <span class="bg-agree-text">本サービスはベータ版であり、予告なく変更・終了する場合があることを理解しました</span></div>
+      <div class="bg-agree-item" id="bgAgree2"><div class="bg-agree-box">✓</div>
+        <span class="bg-agree-text">提供される買い目は的中を保証するものではないことを理解しました</span></div>
+    </div>
+    <div class="bg-pin" id="bgPin">
+      <input type="tel" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="コード1桁目">
+      <input type="tel" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="コード2桁目">
+      <input type="tel" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="コード3桁目">
+      <input type="tel" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="コード4桁目">
+    </div>
+    <div class="bg-err" id="bgErr"></div>
+    <div class="bg-ms" id="bgMs">
+      <button type="button" class="bg-ms-toggle" id="bgMsToggle" aria-expanded="false">※コードをお持ちでない方はコチラ</button>
+      <div class="bg-ms-panel">
+        <div class="bg-ms-inner">
+          <a class="bg-ms-img" href="https://note.com/brainkeirin/membership/join" target="_blank" rel="noopener"><img src="membership-card.jpg" alt="Brain メンバーシップ" loading="lazy"></a>
+          <div class="bg-ms-note">月額390円でBrainの全機能が利用可能（モーニング･デイナイター･ミッドナイトのおまかせ生成含む）</div>
+          <a class="bg-ms-cta" href="https://note.com/brainkeirin/membership/join" target="_blank" rel="noopener">メンバーシップに入会する</a>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- ③ データバンク ホーム -->
@@ -1793,15 +1874,83 @@ const pin=document.getElementById('pin');
 const inputs=[...pin.querySelectorAll('input')];
 const loginErr=document.getElementById('loginErr');
 
-/* ===== セッション内のアンロック状態 ===== */
-function getUnlocked(){ try{ return sessionStorage.getItem('db_unlock')==='1'; }catch(e){ return false; } }
-function setUnlocked(){ try{ sessionStorage.setItem('db_unlock','1'); }catch(e){} }
+/* ===== セッション内のアンロック状態 =====
+   ★2026-09-30：キーを db_unlock_v2 に変更（旧1245コードで開けた状態を引き継がない） */
+function getUnlocked(){ try{ return sessionStorage.getItem('db_unlock_v2')==='1'; }catch(e){ return false; } }
+function setUnlocked(){ try{ sessionStorage.setItem('db_unlock_v2','1'); }catch(e){} }
+
+/* ===== Brain の入場コード（2026-09-30：Brain本体 app.html の #bGate と同じ照合） ===== */
+async function brrAuthStatus(){
+  try{
+    const r = await fetch('/auth-status?realm=brain', { credentials:'same-origin', cache:'no-store' });
+    if (r.ok){ const j = await r.json(); return !!(j && j.authed); }
+  }catch(e){}
+  return false;
+}
+function brrOpenGate(){
+  const g = document.getElementById('bGate'); if (!g) return;
+  [...document.querySelectorAll('#bgPin input')].forEach(i=>{ i.value=''; });
+  document.getElementById('bgErr').textContent = '';
+  g.classList.add('show');
+  setTimeout(()=>{ const f=document.querySelector('#bgPin input'); if(f) f.focus(); }, 250);
+}
+let brrChecking = false;
+async function brrVerify(){
+  if (brrChecking) return;
+  const $ = id => document.getElementById(id);
+  const a1 = $('bgAgree1').classList.contains('checked'), a2 = $('bgAgree2').classList.contains('checked');
+  const pinEl = $('bgPin'), ins = [...pinEl.querySelectorAll('input')];
+  const c = ins.map(i=>i.value).join('');
+  if (!a1 || !a2){ $('bgErr').textContent = '上記項目にチェックを入れてください'; return; }
+  brrChecking = true;
+  try{
+    const r = await fetch('/auth', { method:'POST', credentials:'same-origin',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify({ code: c, realm: 'brain' }) });
+    if (r.ok){
+      brrChecking = false;
+      $('bGate').classList.remove('show');
+      ins.forEach(i=>i.blur());
+      onSuccess();
+      return;
+    }
+  }catch(e){}
+  brrChecking = false;
+  $('bgErr').textContent = 'コードが違います';
+  pinEl.classList.remove('error'); void pinEl.offsetWidth; pinEl.classList.add('error');
+  setTimeout(()=>{ ins.forEach(i=>{ i.value=''; }); ins[0].focus(); pinEl.classList.remove('error'); }, 450);
+}
+function brrInitGate(){
+  const $ = id => document.getElementById(id);
+  const ins = [...document.querySelectorAll('#bgPin input')];
+  ins.forEach((inp, idx)=>{
+    inp.addEventListener('input', ()=>{
+      inp.value = inp.value.replace(/[^0-9]/g,'').slice(0,1);
+      $('bgErr').textContent = '';
+      if (inp.value && idx < ins.length-1) ins[idx+1].focus();
+      if (ins.every(i=>i.value!=='')) brrVerify();
+    });
+    inp.addEventListener('keydown', e=>{
+      if (e.key === 'Backspace' && !inp.value && idx > 0){ ins[idx-1].focus(); ins[idx-1].value=''; }
+    });
+  });
+  ['bgAgree1','bgAgree2'].forEach(id=>{
+    $(id).addEventListener('click', function(){ this.classList.toggle('checked'); if (ins.every(i=>i.value!=='')) brrVerify(); });
+  });
+  /* 閉じる＝Brainホームへ戻る（このページはコードを通さないと何も表示しないため） */
+  $('bgClose').addEventListener('click', ()=>{ location.href = 'https://brainkeirin.jp'; });
+  $('bgMsToggle').addEventListener('click', function(){
+    const w = $('bgMs'); const open = w.classList.toggle('open');
+    this.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open) setTimeout(()=>{ w.scrollIntoView({behavior:'smooth', block:'nearest'}); }, 260);
+  });
+}
 
 /* ===== 起動フロー ===== */
 /* ★2026-07-03 一般デモ公開のためログイン画面を復帰（LOGIN_SKIP=false）。
    1245入場コード（PASS_HASH）で認証。LOGIN_SKIP=trueにすると再度スキップ可能。 */
 const LOGIN_SKIP = false;
 window.addEventListener('load', ()=>{
+  try{ brrInitGate(); }catch(e){ console.error('入場コード画面の初期化エラー', e); }
   if(LOGIN_SKIP){
     try{ setUnlocked(); }catch(e){}
     runBootThenHome();
@@ -1830,11 +1979,14 @@ function runBootThenHome(){
 function runBoot(){
   setTimeout(()=>bootLogo.classList.add('in'), 120);
   setTimeout(()=>bootWord.classList.add('in'), 480);
-  setTimeout(()=>{
+  /* ★2026-09-30：旧ログイン（#login）は出さない。Brain の認証済みならそのままホーム、未認証なら新しい入力画面 */
+  const authP = brrAuthStatus();
+  setTimeout(async ()=>{
+    const authed = await authP;
     boot.classList.add('hide');
     setTimeout(()=>{ boot.style.display='none'; }, 600);
-    login.classList.add('show');
-    setTimeout(()=>inputs[0].focus(), 250);
+    if (authed){ onSuccess(); }
+    else { brrOpenGate(); }
   }, 3000);
 }
 
