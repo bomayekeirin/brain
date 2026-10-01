@@ -2197,7 +2197,8 @@ body::before{
   opacity:.6;
 }
 .arerace-header-title{
-  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  /* ★2026-10-01：上にステータスバー分の余白を足したので、中央はその下（ボタンと同じ高さ）に置く */
+  position:absolute;left:50%;top:calc(50% + env(safe-area-inset-top, 0px) / 2);transform:translate(-50%,-50%);
   font-size:15px;
   font-weight:700;
   color:#fff;
