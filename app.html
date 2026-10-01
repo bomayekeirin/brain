@@ -1074,6 +1074,10 @@ body::before{
   min-height:52px;
   position:sticky;top:0;z-index:100;
   background:#0f0f0f;
+  /* ★2026-09-30：ステータスバー分を空ける（荒れ予報画面のヘッダーと同じ不具合。ホーム画面起動時に戻る・家ボタンが最上部の黒帯の下に隠れていた） */
+  padding-top:env(safe-area-inset-top, 0px);
+  min-height:calc(52px + env(safe-area-inset-top, 0px));
+  box-sizing:border-box;
 }
 .gl-header-side{width:44px;display:flex;}
 .gl-header-right{justify-content:flex-end;}
@@ -2168,6 +2172,11 @@ body::before{
   background:#0f0f0f;
   padding:0 12px;
   min-height:52px;
+  /* ★2026-09-30：ステータスバー分を空ける。ホーム画面起動時、最上部の黒帯（body::before・z-index:200）の下に
+     戻るボタン・家ボタンが隠れていた（荒れ予報レース一覧・荒れ予報テキスト一覧の両方がこのヘッダー） */
+  padding-top:env(safe-area-inset-top, 0px);
+  min-height:calc(52px + env(safe-area-inset-top, 0px));
+  box-sizing:border-box;
 }
 .arerace-header-left{
   display:flex;
@@ -26162,7 +26171,8 @@ const TL_WINDOW_OVERRIDE = {
        タップした表記で遷移先を切り替える（おまかせ生成可能→出走表／荒れ予報買い目あり→荒れ買い目ページ）。
        V2_PRIORITY:false でおまかせのみ。v2 自体がオフ（ARE_V2.ENABLED:false）でも従来どおり */
     V2_PRIORITY: true,
-    ARE_LABEL: '荒れ予報買い目あり',   // 黄文字（色は .brtk-are）
+    ARE_LABEL_HL: '荒れ予報買い目',   // 黄文字（色は .brtk-are）
+    ARE_LABEL_REST: 'あり',           // 白文字（★2026-09-30 ボンバイエ指示）
     PR_TEXT: ''               // 該当なしのときに流す文言。空なら帯だけ
   };
   window.BRTK_CONFIG = BRTK;
@@ -26409,7 +26419,7 @@ const TL_WINDOW_OVERRIDE = {
   /* おまかせ生成可能（緑＋白）／荒れ予報買い目あり（青）。両方なら「・」で並べ、表記ごとに遷移先を持たせる */
   function labelsHTML(it){
     var omk = '<span class="brtk-go" data-go="race"><span class="brtk-hl">' + esc(BRTK.RACE_SUFFIX_HL) + '</span>' + esc(BRTK.RACE_SUFFIX_REST) + '</span>';
-    var are = '<span class="brtk-go brtk-are" data-go="are">' + esc(BRTK.ARE_LABEL) + '</span>';
+    var are = '<span class="brtk-go" data-go="are"><span class="brtk-are">' + esc(BRTK.ARE_LABEL_HL) + '</span>' + esc(BRTK.ARE_LABEL_REST) + '</span>';
     if (it.omk && it.v2) return omk + '・' + are;
     return it.v2 ? are : omk;
   }
