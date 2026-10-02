@@ -2431,6 +2431,20 @@ body.are-v2 .are-v1-note{display:none;}   /* ★2026-10-01 v2 では v1 用の�
   cursor:pointer;padding:4px 8px;transition:opacity .15s ease;
 }
 .arerace-textlink:active{opacity:.5;}
+/* ★2026-10-01 再読み込みボタン（アイコン付き） */
+.arerace-reload-btn{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:9px 18px;border-radius:999px;
+  background:#fff;border:1px solid #d7dbe3;color:#1a2a4a;
+  font-family:inherit;font-size:13px;font-weight:600;letter-spacing:.04em;
+  box-shadow:0 1px 3px rgba(20,30,50,.08);cursor:pointer;-webkit-tap-highlight-color:transparent;
+  transition:transform .12s ease, background .15s ease, box-shadow .15s ease;
+}
+.arerace-reload-btn:active{transform:scale(.96);background:#f4f6f9;box-shadow:none;}
+.arerace-reload-ic{flex:none;}
+.arerace-reload-btn.spin .arerace-reload-ic{animation:areReloadSpin .8s linear infinite;}
+@keyframes areReloadSpin{to{transform:rotate(360deg);}}
+@media (prefers-reduced-motion: reduce){ .arerace-reload-btn.spin .arerace-reload-ic{animation:none;} }
 /* テキスト一覧画面 */
 #screen-aretext{
   display:none;width:100%;max-width:100%;overflow-x:clip;min-height:100vh;
@@ -7947,7 +7961,11 @@ body.omk-shake{animation:omkShake .42s linear;}
   </div>
   
   <div class="arerace-textlink-wrap" id="areReloadWrap" style="display:none;padding-top:0;">
-    <a class="arerace-textlink" id="areReloadLink" onclick="loadAreRaceData()">荒れ予報レースの再読み込み</a>
+    <!-- ★2026-10-01：テキストリンクをやめ、アイコン付きのボタンにした -->
+    <button type="button" class="arerace-reload-btn" id="areReloadLink" onclick="this.classList.add('spin');loadAreRaceData()" aria-label="荒れ予報レースを再読み込み">
+      <svg class="arerace-reload-ic" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M20 4v4.5h-4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>再読み込み</span>
+    </button>
   </div>
   
   <div class="arerace-load-wrap" id="areLoadWrap">
@@ -19577,7 +19595,12 @@ function saveAreCache(results) {
  *   AUTO_LOAD      荒れ予報の画面を開いたら自動で読み込む（「読み込む」ボタンを押さなくてよい）
  *   REUSE_MIN      直前の読み込みからこの分数以内に開き直したら、取り直さずにそのまま表示する
  * 終了したレースも取る（結果一覧の照合に使うため）。 */
-const ARE_LOAD = { DN_ONLY: true, VENUE_PARALLEL: 3, AUTO_LOAD: true, REUSE_MIN: 3 };
+/* ★2026-10-01 改：確実に取れることを優先（ボンバイエ指示「遅くなってもいいから確実に」）。
+ *   VENUE_PARALLEL 3→1（元どおり1開催ずつ。同時通信を増やして取りこぼすのを避ける）
+ *   RETRY          出走表の取得に失敗したレースを、0.4秒空けて最大この回数まで取り直す（開催のレース数を超える番号は取り直さない）
+ *   DN_ONLY        v2 モードのときだけ効く（hybrid は全開催が対象なので全開催を取る）
+ *   一覧の読み込みは元々オッズを取っていない（オッズは荒れ買い目カードを開いたとき・テキスト一覧・結果一覧で取る）。高速化でオッズを省いたことはない */
+const ARE_LOAD = { DN_ONLY: true, VENUE_PARALLEL: 1, RETRY: 2, AUTO_LOAD: true, REUSE_MIN: 3 };
 function areLoadFast(){ return (typeof areV2On === 'function') && areV2On(); }
 
 // ===== 荒れ予報データ読み込み（ボタンから） =====
@@ -19596,7 +19619,7 @@ async function loadAreRaceData() {
   
   const _fast = areLoadFast();
   const activeVenues = VENUES.filter(v => v.linkType !== 'raceresult'
-    && (!_fast || !ARE_LOAD.DN_ONLY || v.timeSlot === 'day' || v.timeSlot === 'nighter'));   /* ★v2：デイナイターのみ */
+    && (!_fast || areMode() !== 'v2' || !ARE_LOAD.DN_ONLY || v.timeSlot === 'day' || v.timeSlot === 'nighter'));   /* ★v2 モードのみデイナイターに絞る */
   
   if (activeVenues.length === 0) {
     fill.style.width = '100%';
@@ -19648,12 +19671,20 @@ async function loadAreRaceData() {
       if (targetRaces.length > 0) {
         const racePromises = targetRaces.map(r =>
           (async () => {
-            try {
-              const raceData = await fetchSingleRace(venue, r);
-              return { raceNum: r, ...raceData };
-            } catch (e) {
-              return { raceNum: r, error: true };
+            /* ★2026-10-01：v1 以外は失敗したら取り直す（開催のレース数が分かっていれば、それを超える番号は取り直さない） */
+            const _maxR = (venue.races && venue.races.length) ? Math.max.apply(null, venue.races.map(x => Number(x.raceNum) || 0)) : 12;
+            const _tries = (_fast && r <= _maxR) ? 1 + Math.max(0, ARE_LOAD.RETRY | 0) : 1;
+            for (let _t = 0; _t < _tries; _t++) {
+              try {
+                const raceData = await fetchSingleRace(venue, r);
+                if (raceData && raceData.players && raceData.lineup) return { raceNum: r, ...raceData };
+                if (_t === _tries - 1) return { raceNum: r, ...(raceData || {}), error: !raceData };
+              } catch (e) {
+                if (_t === _tries - 1) return { raceNum: r, error: true };
+              }
+              await new Promise(res => setTimeout(res, 400));
             }
+            return { raceNum: r, error: true };
           })()
         );
         
@@ -19755,6 +19786,7 @@ function finishAreLoading(races) {
     renderAreRaceCards(races);
     const rw = document.getElementById('areReloadWrap');
     if (rw) rw.style.display = '';
+    const rb = document.getElementById('areReloadLink'); if (rb) rb.classList.remove('spin');
   }, 500);
 }
 
@@ -20920,6 +20952,13 @@ async function buildCarettaForRace(race){
  * ===================================================================== */
 const ARE_V2 = {
   ENABLED:     true,
+  /* ★2026-10-01 MODE（ENABLED:true のとき）：
+     'hybrid' … 新旧混合（納品時）。一覧は旧ロジックどおり荒れ指数60%以上。3連複は全て新ロジック（オッズ参照・絞り込みなし）。
+                2車単は「絶対条件＋ライン条件」で新ロジックの買い目が出れば新ロジック、出なければ旧ロジック（オッズの帯で絞る）。
+                ワイドは2車単が新ロジックなら新ワイド（2車単と同じ組）、旧ロジックなら旧ワイド。全開催（モーニング・ミッドナイト含む）
+     'v2'     … 2026-09-30 の v2（絶対条件だけで判定・デイナイターのみ・60%未満は特例表示）
+     ENABLED:false で完全な v1 */
+  MODE:        'hybrid',
   TANKI_OK:    true,
   WIDE_SHOW:   true,
   ODDS_CUT_2T: false,
@@ -20927,7 +20966,8 @@ const ARE_V2 = {
   PSEUDO_PCT:  { ENABLED: true, BELOW: 60, MIN: 70.1, MAX: 75.0 }
 };
 
-function areV2On(){ return !!(ARE_V2 && ARE_V2.ENABLED); }
+function areV2On(){ return !!(ARE_V2 && ARE_V2.ENABLED); }   /* v1 以外（hybrid／v2）なら true */
+function areMode(){ return !areV2On() ? 'v1' : (ARE_V2.MODE === 'v2' ? 'v2' : 'hybrid'); }
 /* ★2026-10-01：v2 のときだけ v1 用の説明文（.are-v1-note）を隠す */
 (function(){ function mark(){ try{ document.body.classList.toggle('are-v2', areV2On()); }catch(e){} }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mark); else mark(); })();
@@ -20955,7 +20995,7 @@ function areV2Target(race, markMap, timeSlot){
   const res = { ok:false, reason:'', lines:null, marks:markMap || null };
   if (!race || !race.lineup || !race.lineup.length) { res.reason = '並びなし'; return res; }
   const ts = timeSlot || race.timeSlot || '';
-  if (ts && ts !== 'day' && ts !== 'nighter') { res.reason = 'デイナイター以外'; return res; }
+  if (areMode() === 'v2' && ts && ts !== 'day' && ts !== 'nighter') { res.reason = 'デイナイター以外'; return res; }   /* hybrid は全開催 */
   const total = race.lineup.reduce((s, g) => s + ((g && g.length) || 0), 0);
   if (total !== 7) { res.reason = '7車立てでない'; return res; }
   const L = areV2Lines(race.lineup);
@@ -21042,9 +21082,9 @@ function areV2Wide(A, oddsWide){
 }
 
 /* 3連複：1着 ○× ｜ 2着 △● ｜ 3着 ◎⑳★☆▲ */
-function areV2Trio(markMap, T, odds3f){
+function areV2Trio(markMap, T, odds3f, ignoreTarget){
   const empty = { bets:[], count:0, range:null, gosei:null, compressed:[] };
-  if (!T || !T.ok) return empty;
+  if (!ignoreTarget && (!T || !T.ok)) return empty;
   const carsOf = ms => Object.keys(markMap || {}).filter(c => ms.indexOf(markMap[c].mark) >= 0).map(Number);
   const col1 = carsOf(['○','×']), col2 = carsOf(['△','●']), col3 = carsOf(['◎','⑳','★','☆','▲']);
   if (!col1.length || !col2.length || !col3.length) return Object.assign(empty, { cols:{ col1, col2, col3 } });
@@ -21059,8 +21099,31 @@ function areV2Trio(markMap, T, odds3f){
            compressed, cols:{ col1, col2, col3 } };
 }
 
+/* ★2026-10-01 新旧混合：{ target, marks, A, W, Tr, src2:'v2'|'v1' } */
+function areHybridBuild(race, odds, timeSlot){
+  const mk = areV2MarksOf(race);
+  const T = areV2Target(race, mk, timeSlot);
+  const o2 = odds && odds['2t'], ow = odds && odds.wide, o3 = odds && odds['3f'];
+  const Tr = areV2Trio(mk, T, o3, true);                       // 3連複は全て新ロジック（オッズ参照・絞り込みなし）
+  let A = T.ok ? areV2A(mk, T, o2) : null, W = null, src2 = 'v2';
+  if (A && A.count > 0) {
+    W = ARE_V2.WIDE_SHOW ? areV2Wide(A, ow) : null;            // 新2車単 → 新ワイド（2車単と同じ組）
+  } else {
+    src2 = 'v1';                                                // 新2車単が出ない → 旧ロジック（オッズの帯で絞る）
+    const isG = (typeof daiFromGrade === 'function') && daiFromGrade(race && race.grade) === 'G';
+    A = generateCarettaA(o2, (race && race.lineup) || null, mk, isG);
+    W = ARE_V2.WIDE_SHOW ? generateCarettaWide(o2, ow, mk, (race && race.lineup) || null) : null;
+  }
+  return { target:T, marks:mk, A, W, Tr, src2 };
+}
+function areNaText(scope){
+  if (areMode() === 'v2') return scope === '3f' ? '該当する3連複買い目がありません。' : '生成対象外';
+  return scope === '3f' ? '該当する3連複買い目がありません。' : scope === 'wide' ? '該当するワイド買い目がありません。' : '該当する2車単買い目がありません。';
+}
+
 /* レース1つ分：{ T(絶対条件), A, W, Tr(3連複) } */
 function areV2Build(race, odds, timeSlot){
+  if (areMode() === 'hybrid') return areHybridBuild(race, odds, timeSlot);
   const mk = areV2MarksOf(race);
   const T = areV2Target(race, mk, timeSlot);
   const A = areV2A(mk, T, odds && odds['2t']);
@@ -21079,13 +21142,16 @@ function areV2PseudoPct(key){
   return Math.round((P.MIN * 10) + (h % (steps + 1))) / 10;
 }
 function areV2DispPct(realPct, key, isTarget){
-  if (!areV2On() || !ARE_V2.PSEUDO_PCT.ENABLED || !isTarget) return realPct;
+  if (areMode() !== 'v2' || !ARE_V2.PSEUDO_PCT.ENABLED || !isTarget) return realPct;   /* hybrid は実値（一覧は60%以上のみ） */
   if (realPct == null || Number(realPct) < ARE_V2.PSEUDO_PCT.BELOW) return areV2PseudoPct(key);
   return realPct;
 }
 function areV2KeyOf(r){ return [r.venueId, r.raceCode, (r.dayNum || '1'), r.raceNum].join('|'); }
 /* 一覧・結果・テキストのレース（loadAreRaceData のエントリ）用 */
-function areV2EntryTarget(r){ return areV2Target(r, null, r.timeSlot).ok; }
+function areV2EntryTarget(r){
+  if (areMode() === 'hybrid') return r.percentage != null && r.percentage >= ARE_CARD_MIN_PCT && r.percentage <= 100;   /* ★hybrid：旧の荒れ判定（60%以上） */
+  return areV2Target(r, null, r.timeSlot).ok;
+}
 function areV2EntryPct(r){ return areV2DispPct(r.percentage, areV2KeyOf(r), areV2EntryTarget(r)); }
 
 
@@ -21097,6 +21163,10 @@ async function buildCarettaForRaceV2(race){
     if(!venue) return null;
     const o={ '2t':await fetchOddsDataFor(venue,race,'2t'), wide:ARE_V2.WIDE_SHOW?await fetchOddsDataFor(venue,race,'wide'):null, '3f':await fetchOddsDataFor(venue,race,'3f') };
     const R=areV2Build(race,o,race.timeSlot);
+    if(areMode()==='hybrid'){   /* ★新旧混合：対象は一覧と同じ（60%以上）。何も出ないときだけ null */
+      const has=(R.Tr&&R.Tr.count>0)||(R.A&&R.A.count>0)||(R.W&&R.W.count>0);
+      return has?{ A:R.A, W:(ARE_V2.WIDE_SHOW?R.W:null), T:R.Tr, S:null, v2:true, src2:R.src2 }:null;
+    }
     if(!R.target.ok) return null;
     return { A:R.A, W:(ARE_V2.WIDE_SHOW?R.W:null), T:R.Tr, S:null, v2:true };
   }catch(e){ console.error('buildCarettaForRaceV2',e); return null; }
@@ -21241,7 +21311,7 @@ async function loadAreTextData(){
     if(pct) pct.textContent=Math.round(done/total*100)+'%';
     if(msg) msg.textContent=`買い目生成中… ${done}/${total}`;
     // 荒れ指数20.0%以上のみ対象（未満・指数なしはスキップ）★v2：荒れ指数は問わず絶対条件を満たすレースのみ
-    if(areV2On()){ if(!areV2EntryTarget(r)) continue; }
+    if(areV2On()){ if(!areV2EntryTarget(r)) continue; }   /* hybrid：60%以上（一覧と同じ）／v2：絶対条件 */
     else if(r.percentage==null || Number(r.percentage) < 20.0) continue;
     let caretta=null;
     try{ caretta=await buildCarettaForRace(r); }catch(e){ caretta=null; }
@@ -21503,7 +21573,15 @@ function renderAreBuyCardsV2(container,currentRace,odds2t){
   window.AREBUY_V2=R;
   let html='<div class="crt-section-head"><span class="crt-mk-red">カレッタ式</span> 荒れレース買い目</div>';
   html+='<div class="crt-card crt-ab-card">';
-  if(!R.target.ok){
+  if(areMode()==='hybrid'){   /* ★2026-10-01 新旧混合：3連複→2車単→ワイド。対象外の判定はしない（一覧に出ているレース＝60%以上） */
+    html+='<div class="crt-block">'+(R.Tr.count>0?crtBlockHTML('3連複',R.Tr,odds['3f'],'3f'):areV2NaBlock('3連複',areNaText('3f')))+'</div>';
+    html+='<div class="crt-divider"></div>';
+    html+='<div class="crt-block">'+(R.A&&R.A.count>0?crtBlockHTML('2車単',R.A,odds['2t'],'2t'):areV2NaBlock('2車単',areNaText('2t')))+'</div>';
+    if(ARE_V2.WIDE_SHOW){
+      html+='<div class="crt-divider"></div>';
+      html+='<div class="crt-block">'+(R.W&&R.W.count>0?crtBlockHTML('ワイド',R.W,odds.wide,'wide'):areV2NaBlock('ワイド',areNaText('wide')))+'</div>';
+    }
+  }else if(!R.target.ok){
     html+='<div class="crt-block">'+areV2NaBlock('3連複','対象外')+'</div>';
     html+='<div class="crt-divider"></div><div class="crt-block">'+areV2NaBlock('2車単','生成対象外')+'</div>';
     if(ARE_V2.WIDE_SHOW) html+='<div class="crt-divider"></div><div class="crt-block">'+areV2NaBlock('ワイド','生成対象外')+'</div>';
@@ -21844,8 +21922,8 @@ async function loadAreResults() {
     let carettaHtml = '', tekichu = false;
     if (caretta && caretta.v2) {   /* ★2026-09-30 v2：3連単なし。2車単・ワイドが生成対象外なら照合しない */
       const tr = crtBlockResultHTML('3連複', caretta.T, top3, '3f');
-      const a2 = (caretta.A && caretta.A.count > 0) ? crtBlockResultHTML('2車単', caretta.A, win2, '2t') : { html: areV2NaBlock('2車単','生成対象外'), hit:false };
-      const wd = !ARE_V2.WIDE_SHOW ? null : ((caretta.W && caretta.W.count > 0) ? crtBlockResultHTML('ワイド', caretta.W, top3, 'wide') : { html: areV2NaBlock('ワイド','生成対象外'), hit:false });
+      const a2 = (caretta.A && caretta.A.count > 0) ? crtBlockResultHTML('2車単', caretta.A, win2, '2t') : { html: areV2NaBlock('2車単',areNaText('2t')), hit:false };
+      const wd = !ARE_V2.WIDE_SHOW ? null : ((caretta.W && caretta.W.count > 0) ? crtBlockResultHTML('ワイド', caretta.W, top3, 'wide') : { html: areV2NaBlock('ワイド',areNaText('wide')), hit:false });
       if (tr.hit || a2.hit || (wd && wd.hit)) tekichu = true;
       carettaHtml = `<div class="crt-result-embed">${tr.html}<div class="crt-divider"></div>${a2.html}${wd ? '<div class="crt-divider"></div>' + wd.html : ''}</div>`;
     } else if (caretta) {
@@ -26272,11 +26350,14 @@ const TL_WINDOW_OVERRIDE = {
   }
 
   /* 候補：デイ・ナイターの締切前レースを締切順に */
+  /* ★2026-10-01：モーニング・ミッドナイトの時間帯も、荒れ予報買い目のあるレースを案内文の後に流す */
+  function areInWindow(){ return !!(BRTK.V2_PRIORITY && typeof areV2On === 'function' && areV2On()); }
   function candidates(){
     var n = nowMin(), list = [];
+    var wm = windowMode(), slots = wm ? [wm] : ['day', 'nighter'];   // 時間帯の開催だけを候補にする
     venuesList().forEach(function(v){
       if (!v || v.linkType === 'raceresult') return;
-      if (v.timeSlot !== 'day' && v.timeSlot !== 'nighter') return;
+      if (slots.indexOf(v.timeSlot) < 0) return;
       /* ★2026-09-30 対策D：開催一覧で races が取れなかった開催（詳細取得の失敗など）。
          本番の診断表示で「DN1・R無1」＝デイナイター開催の races が空で候補0件だったため追加。
          生成可能レース一覧（glLoad）は races に頼らず1〜12Rを直接取得するので、そちらには出ていた。
@@ -26357,7 +26438,12 @@ const TL_WINDOW_OVERRIDE = {
       var v2 = false;
       try {
         if (typeof areV2On === 'function' && areV2On() && BRTK.V2_PRIORITY) {
-          v2 = !!areV2Target(race, areV2MarksOf(race), v.timeSlot).ok;
+          if (areMode() === 'hybrid') {   /* ★2026-10-01：荒れ予報買い目あり＝荒れ指数60%以上（一覧と同じ判定） */
+            var _ar = calcAreScore(race);
+            v2 = !!(_ar && _ar.percentage != null && _ar.percentage >= ARE_CARD_MIN_PCT && _ar.percentage <= 100);
+          } else {
+            v2 = !!areV2Target(race, areV2MarksOf(race), v.timeSlot).ok;
+          }
         }
       } catch(_e) { v2 = false; }
       evalCache[c.key] = { status: 'ok', gen: !!glCanGenerate(race), v2: v2, cls: cls, deadline: race.deadline || '', start: race.start || '' };
@@ -26374,7 +26460,7 @@ const TL_WINDOW_OVERRIDE = {
      かつ締切 WITHIN_MIN 分以内の候補が全て判定済みになったら打ち切る */
   async function scan(){
     if (scanning) return;
-    if (windowMode()) return;
+    if (windowMode() && !areInWindow()) return;
     scanning = true;
     dbg.scans++; dbg.scanAt = Date.now();
     try {
@@ -26401,26 +26487,28 @@ const TL_WINDOW_OVERRIDE = {
   /* 流す項目を決める */
   function buildItems(){
     var mode = windowMode();
-    if (mode === 'morning')  return [{ kind:'page', text: BRTK.MORNING_TEXT,  href: BRTK.MORNING_HREF }];
-    if (mode === 'midnight') return [{ kind:'page', text: BRTK.MIDNIGHT_TEXT, href: BRTK.MIDNIGHT_HREF }];
-    var items = [], list = candidates(), n = nowMin();
+    var items = [];
+    if (mode === 'morning')  items.push({ kind:'page', text: BRTK.MORNING_TEXT,  href: BRTK.MORNING_HREF });
+    if (mode === 'midnight') items.push({ kind:'page', text: BRTK.MIDNIGHT_TEXT, href: BRTK.MIDNIGHT_HREF });
+    if (mode && !areInWindow()) { if (DEBUG) items.push({ kind:'dbg', text: debugText() }); return items; }
+    var list = candidates(), n = nowMin(), base = items.length;
     /* 判定済みの手前部分（順序が確定している範囲）だけを使う */
     var ready = [];
     for (var i = 0; i < list.length; i++) {
       var c = list[i], e = evalCache[c.key];
       if (!e) break;                              // 手前が未判定なら順序が確定しないので、そこまでで止める
       if (e.status !== 'ok') { if (failSkippable(e)) continue; break; }
-      if (e.gen || e.v2) ready.push({ c: c, e: e });
+      if (mode ? e.v2 : (e.gen || e.v2)) ready.push({ c: c, e: e });   // 時間帯（モーニング・ミッドナイト）は荒れ予報買い目のみ
     }
     var mkItem = function(c, e){
       var _dl = c.r.deadline || e.deadline || '';
-      return { kind:'race', omk: !!e.gen, v2: !!e.v2, key: c.key, venueId: c.v.venueId, raceCode: c.v.raceCode, raceNum: c.r.raceNum,
+      return { kind:'race', omk: (!mode && !!e.gen), v2: !!e.v2, key: c.key, venueId: c.v.venueId, raceCode: c.v.raceCode, raceNum: c.r.raceNum,
                venue: c.v.venue, cls: shortCls(e.cls), deadline: _dl, start: (_dl ? '' : (c.r.start || e.start || '')),
                remain: c.m - n };
     };
     /* ★v2 連動（改）：おまかせと荒れ買い目を混ぜて締切順。60分以内は全て、少なくとも MIN_ITEMS 件 */
     ready.forEach(function(x){
-      if (items.length >= BRTK.MIN_ITEMS && x.c.m > n + BRTK.WITHIN_MIN) return;
+      if (items.length - base >= BRTK.MIN_ITEMS && x.c.m > n + BRTK.WITHIN_MIN) return;
       items.push(mkItem(x.c, x.e));
     });
     if (!items.length && BRTK.PR_TEXT) items.push({ kind:'pr', text: BRTK.PR_TEXT });
@@ -26596,7 +26684,7 @@ const TL_WINDOW_OVERRIDE = {
     dbg.ticks++;
     try {
       render();
-      if (!windowMode() && homeVisible() && venuesList().length) scan();
+      if ((!windowMode() || areInWindow()) && homeVisible() && venuesList().length) scan();
     } catch(e) { console.log('電光掲示板：tick エラー', e); }
   }
 
