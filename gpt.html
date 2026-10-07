@@ -623,13 +623,29 @@ body{min-height:100vh;display:flex;flex-direction:column;}
   animation:lampBlink 2.5s ease-in-out infinite;
 }
 
-/* AI軸選出対象レース（赤）
-   ★app.html の .rt-race-lamp / .rt-race-lamp.axis と同系統。
-   ★点滅を変えるときは app.html 側と必ず両方直すこと。 */
-.rt-race-lamp.ai{
-  background:#e03040;
-  box-shadow:0 0 5px rgba(224,48,64,.6);
+/* ★2026-10-08：AI軸選出対象レースの赤ランプ（.rt-race-lamp.ai）は廃止 */
+
+/* ★2026-10-08 追加：全○R（まとめて取得）セレクター。個別レースと区別するため薄いグレー */
+.rt-race-btn.all{
+  background:linear-gradient(180deg,#eceef2 0%,#e3e5ea 55%,#d9dce2 100%);
+  border-color:rgba(0,0,0,.2);
+  gap:5px;
 }
+.rt-race-btn.all .rt-race-btn-num{font-size:16px;color:#3f434e;letter-spacing:-.02em;}
+.rt-race-btn-allsub{font-size:9.5px;font-weight:600;color:#6a6d78;white-space:nowrap;line-height:1.1;}
+.rt-race-btn.all.active{
+  background:linear-gradient(180deg,#eceef2 0%,#e3e5ea 55%,#d9dce2 100%);
+  border-color:rgba(192,68,110,.5);
+  border-width:1.5px;
+  box-shadow:0 3px 8px rgba(192,68,110,.35),inset 0 1px 1px rgba(255,255,255,.7);
+}
+/* 全○R選択中：出走表テーブル・切り替えタブ・レース個別の情報は出さない（黒帯の生成ゾーンから表示） */
+#gptRaceTable.all-mode .rt-tabs-wrap,
+#gptRaceTable.all-mode .rt-tab-content,
+#gptRaceTable.all-mode .grt-conditions,
+#gptRaceTable.all-mode .rt-info-right{display:none !important;}
+.gen-all-prog{display:none;margin-top:9px;text-align:center;font-size:11px;font-weight:600;color:#6a6d78;letter-spacing:.04em;}
+.gen-all-prog.show{display:block;}
 
 /* ★2026-09-11 追加：gpt.html には lampBlink の定義が無く、
    .rt-race-lamp が参照だけしている状態だった（点滅しない）。
@@ -2173,6 +2189,7 @@ body{min-height:100vh;display:flex;flex-direction:column;}
         <div class="gen-radio gen-fmt" data-fmt="md"><span class="gen-lamp"></span><span class="gen-fmt-txt">マークダウン形式<small id="genSizeMd"></small></span></div>
       </div>
       <button class="gen-btn" id="genBtn"><span class="gen-btn-label">テキスト生成</span></button>
+      <div class="gen-all-prog" id="genAllProg"></div>
     </div>
     <div class="gen-result" id="genResult" style="display:none;"></div>
   </div>
@@ -2486,6 +2503,7 @@ function showRaceTableScreen(){
   document.getElementById('gptHome').style.display = 'none';
   document.getElementById('gptRaceTable').classList.add('show');
   window.scrollTo(0, 0);
+  grtSelectorPosition(false);   // 画面が見えてからでないと横スクロール位置を決められない
 }
 
 /* ===== カードタップ → 遷移 → 出走表ページ ===== */
@@ -2493,6 +2511,7 @@ let selectedVenueIdx = null;
 let GRT_VENUE = null;
 let GRT_RACES = [];
 let GRT_RACE_INDEX = 0;
+let GRT_ALL = false;   // ★2026-10-08：全○R（まとめて取得）を選択中か
 
 function selectVenue(idx){
   const v = VENUES[idx];
@@ -2540,8 +2559,9 @@ function setupRaceTableSkeleton(v){
 
   // レースセレクター
   GRT_RACES = v.races.length ? v.races : [{ raceNum: nextR, start: v.startTime, deadline: '' }];
-  GRT_RACE_INDEX = GRT_RACES.findIndex(r => r.raceNum === nextR);
-  if(GRT_RACE_INDEX < 0) GRT_RACE_INDEX = 0;
+  /* ★2026-10-08：出走表を開いたときのデフォルトは先頭のレース（1R）。全○Rの選択状態も解除する */
+  GRT_RACE_INDEX = 0;
+  grtSetAllMode(false);
   renderRaceSelector();
 
   // 並び・テーブルは空（M3で実装）
@@ -2664,44 +2684,67 @@ function applyOddsparkCls(){
   if(changed){
     renderRaceSelector();
     const cur = GRT_RACES[GRT_RACE_INDEX];
-    if(cur && GRT_RACE_DATA[cur.raceNum]){
+    if(!GRT_ALL && cur && GRT_RACE_DATA[cur.raceNum]){
       document.getElementById('grtRaceClass').textContent = GRT_RACE_DATA[cur.raceNum].cls || '';
     }
   }
 }
 
 /* ===== 会場トグル ===== */
-/* ===== AI軸選出 対象レース判定（ホワイトリスト方式） =====
-   ★2026-09-11 追加。既存ロジックからは独立。GRT_RACE_DATA は読むだけ。
-   ・並び順は不問（ラインのサイズをソートして照合）
-   ・初日（dayNum 1）は対象外
-   ・G戦 = G1 / G2 / G3 のみ（GP は含まない）
-   ・app.html のおまかせ生成（2/2/3 と 2/2/2/1）とは重複しないことを
-     7・8・9車立ての全ライン分割で総当たり検証済み                        */
-const AI_WL_COMMON = ['1,3,3', '3,4', '1,1,2,3'];                    // 3/3/1・4/3・3/2/1/1
-const AI_WL_GRADE  = ['1,3,4', '1,4,4', '1,1,3,3',                   // 4/3/1・4/4/1・3/3/1/1
-                      '1,1,1,3,3', '1,1,2,2,3'];                     // 3/3/1/1/1・3/2/2/1/1
-const AI_G_GRADES  = ['G1', 'G2', 'G3'];
+/* ★2026-10-08：AI軸選出対象レースの判定（isAiTargetFormation）と赤ランプは廃止 */
 
-function isAiTargetFormation(lineup, grade, dayNum){
-  if(!Array.isArray(lineup) || lineup.length === 0) return false;
-  if(!lineup.every(g => Array.isArray(g) && g.length > 0)) return false;
-
-  const d = Number(dayNum);
-  if(!Number.isFinite(d) || d < 2) return false;                     // 初日は対象外
-
-  const key = lineup.map(g => g.length).sort((a, b) => a - b).join(',');
-  if(AI_WL_COMMON.includes(key)) return true;                        // 全グレード共通
-  if(AI_WL_GRADE.includes(key))  return AI_G_GRADES.includes(String(grade || '').toUpperCase());
-  return false;
+/* ===== 全○R（まとめて取得）モード =====
+   ★2026-10-08 追加。セレクター左端の「全○R」を選ぶと、出走表テーブルと切り替えタブを出さず、
+   生成ゾーン（黒帯）から表示する。生成するとその会場のその日の全レースが1つの出力になる。 */
+function grtAllLabel(){ return '全' + GRT_RACES.length + 'R'; }
+function grtSetAllMode(on){
+  GRT_ALL = !!on;
+  const page = document.getElementById('gptRaceTable');
+  if(page) page.classList.toggle('all-mode', GRT_ALL);
+}
+function selectAllRaces(){
+  if(GEN.busy) return;
+  grtSetAllMode(true);
+  renderRaceSelector();
+  const lb = grtAllLabel();
+  if(GRT_VENUE) document.getElementById('grtHeaderInfo').textContent = GRT_VENUE.venue + ' ' + lb;
+  document.getElementById('grtRaceNum').textContent = lb;
+  document.getElementById('grtRaceClass').textContent = 'まとめて取得';
+  genZoneSoftReset();
+}
+/* セレクターの横位置：
+   ・全○R選択中 … 左端
+   ・先頭レース（1R）選択中 … 左の「全○R」が3分の1ほど見える位置
+   ・それ以外 … 従来どおり選択中を中央へ */
+function grtSelectorPosition(smooth){
+  const sc = document.getElementById('grtRaceSelector');
+  const inner = document.getElementById('grtRaceSelectorInner');
+  if(!sc || !inner) return;
+  const beh = smooth ? 'smooth' : 'auto';
+  const allBtn = inner.querySelector('.rt-race-btn.all');
+  if(GRT_ALL || !allBtn){ if(GRT_ALL) sc.scrollTo({ left:0, behavior:beh }); 
+    else { const a = inner.querySelector('.rt-race-btn.active'); if(a) a.scrollIntoView({ inline:'center', block:'nearest', behavior:beh }); }
+    return; }
+  if(GRT_RACE_INDEX === 0){
+    const w = allBtn.offsetWidth;
+    if(!w) return;                                   // 画面が非表示の間は測れない（表示時にもう一度呼ばれる）
+    sc.scrollTo({ left: Math.max(0, allBtn.offsetLeft + Math.round(w * 2 / 3)), behavior:beh });
+    return;
+  }
+  const active = inner.querySelector('.rt-race-btn.active');
+  if(active) active.scrollIntoView({ inline:'center', block:'nearest', behavior:beh });
 }
 
 function renderRaceSelector(){
   const inner = document.getElementById('grtRaceSelectorInner');
   const now = new Date();
   const nowMin = now.getHours()*60 + now.getMinutes();
-  inner.innerHTML = GRT_RACES.map((r, i) => {
-    const isActive = i === GRT_RACE_INDEX;
+  const allBtnHtml = '<button class="rt-race-btn all'+(GRT_ALL?' active':'')+'" onclick="selectAllRaces()">'
+    +'<span class="rt-race-btn-num">'+grtAllLabel()+'</span>'
+    +'<span class="rt-race-btn-allsub">まとめて取得</span>'
+    +'</button>';
+  inner.innerHTML = allBtnHtml + GRT_RACES.map((r, i) => {
+    const isActive = !GRT_ALL && i === GRT_RACE_INDEX;
     let cls = (r.cls || '').replace(/チャレンジ/g,'チ').replace(/ガールズケイリン|ガールズ/g,'L級')
       .replace(/初日特選/g,'初特選').replace(/二日目特選/g,'二特選')
       .replace(/一次予選/g,'一予選').replace(/二次予選/g,'二予選').replace(/三次予選/g,'三予選');
@@ -2713,26 +2756,13 @@ function renderRaceSelector(){
       else if(rem<=20){ dlText='締切'+rem+'分前'; dlClass='countdown'; }
       else { dlText='締切'+r.deadline; }
     }
-    /* AI軸選出対象なら赤ランプ。締切後は app.html と同様に点灯させない */
-    let aiLamp = '';
-    if(dlClass !== 'ended'){
-      const lu = GRT_RACE_DATA[r.raceNum] && GRT_RACE_DATA[r.raceNum].lineup;
-      if(lu && GRT_VENUE && isAiTargetFormation(lu, GRT_VENUE.grade, GRT_VENUE.dayNum)){
-        aiLamp = '<span class="rt-race-lamp ai"></span>';
-      }
-    }
-
     return '<button class="rt-race-btn'+(isActive?' active':'')+'" onclick="selectRace('+i+')">'
-      +aiLamp
       +'<span class="rt-race-btn-num">'+r.raceNum+'R</span>'
       +'<span class="rt-race-btn-deadline '+dlClass+'">'+dlText+'</span>'
       +'<span class="rt-race-btn-class">'+cls+'</span>'
       +'</button>';
   }).join('');
-  setTimeout(() => {
-    const active = inner.querySelector('.rt-race-btn.active');
-    if(active) active.scrollIntoView({ inline:'center', block:'nearest', behavior:'smooth' });
-  }, 50);
+  setTimeout(() => grtSelectorPosition(true), 50);
 }
 
 /* ===== 全レースデータ並列取得 ===== */
@@ -2784,8 +2814,8 @@ async function fetchAllRaces(venue){
   fetchCupName(venue);
 
   // ターゲットレースのインデックス
-  GRT_RACE_INDEX = GRT_RACES.findIndex(r => r.raceNum === targetRace);
-  if(GRT_RACE_INDEX < 0) GRT_RACE_INDEX = 0;
+  /* ★2026-10-08：デフォルトは先頭のレース（1R）。旧：次に締切を迎えるレース */
+  GRT_RACE_INDEX = 0;
 
   // レースセレクター更新
   renderRaceSelector();
@@ -2822,7 +2852,7 @@ function renderCurrentRace(raceNum){
     data._enrichTried = true;
     enrichPlayersFromApi(data, raceNum).then(changed=>{
       const cur=GRT_RACES[GRT_RACE_INDEX];
-      if(changed && cur && cur.raceNum===raceNum) renderCurrentRace(raceNum);
+      if(changed && !GRT_ALL && cur && cur.raceNum===raceNum) renderCurrentRace(raceNum);
     });
   }
 
@@ -3444,7 +3474,14 @@ document.querySelectorAll('#genBody .gen-ai').forEach(el=>{
 /* ---- サイズ見積（キャッシュがあれば実測、無ければ概算レンジ） ---- */
 function genByteKb(str){ return new Blob([str]).size/1024; }
 function genEstimate(fmt){
-  const rn=genCurrentRaceNum();
+  if(GRT_ALL){                                   // 全○R：全レース分を合算
+    let mn=0,mx=0,any=false;
+    genAllRaceNums().forEach(rn=>{ const e=genEstimateRace(fmt,rn); if(e){ any=true; mn+=e.min; mx+=e.max; } });
+    return any?{min:mn,max:mx}:null;
+  }
+  return genEstimateRace(fmt, genCurrentRaceNum());
+}
+function genEstimateRace(fmt, rn){
   const data=rn?GRT_RACE_DATA[rn]:null;
   if(!data) return null;
   let min=0,max=0;
@@ -3701,21 +3738,38 @@ function genBuildCmMd(data){
 }
 
 /* ---- 全体組み立て ---- */
-function genBuildAll(fmt){
-  const rn=genCurrentRaceNum();
+const GEN_MD_FOOT='---\n*このデータは競輪の出走表・補足データ・選手コメントをAI予想用に構造化したものです。*';
+/* 1レース分（個別レースの出力と同じ中身。mdの末尾注記は含めない） */
+function genBuildRaceParts(fmt, rn){
   const data=GRT_RACE_DATA[rn];
   const parts=[];
   if(fmt==='md'){
     if(GEN.items.table) parts.push(genBuildTableMd(data,rn));
     if(GEN.items.ex) parts.push(genBuildExMd(data));
     if(GEN.items.cm) parts.push(genBuildCmMd(data));
-    parts.push('---\n*このデータは競輪の出走表・補足データ・選手コメントをAI予想用に構造化したものです。*');
-    return parts.join('\n\n');
+    return parts;
   }
   if(GEN.items.table) parts.push(genBuildTableText(data,rn));
   if(GEN.items.ex) parts.push(genBuildExText(data));
   if(GEN.items.cm) parts.push(genBuildCmText(data));
+  return parts;
+}
+function genBuildAll(fmt){
+  const rn=genCurrentRaceNum();
+  const parts=genBuildRaceParts(fmt, rn);
+  if(fmt==='md'){ parts.push(GEN_MD_FOOT); return parts.join('\n\n'); }
   return parts.join('\n\n------------------------------\n\n');
+}
+/* ★2026-10-08 追加：全○R。各レースを個別レースと同じ形で作り、レース番号順に1つへ連結する */
+function genAllRaceNums(){
+  return GRT_RACES.map(r=>r.raceNum).filter(rn=>GRT_RACE_DATA[rn]);
+}
+function genBuildAllRaces(fmt){
+  const rns=genAllRaceNums();
+  if(fmt==='md'){
+    return rns.map(rn=>genBuildRaceParts('md',rn).join('\n\n')).concat([GEN_MD_FOOT]).join('\n\n---\n\n').replace(/\n\n---\n\n---\n/,'\n\n---\n');
+  }
+  return rns.map(rn=>genBuildRaceParts('text',rn).join('\n\n------------------------------\n\n')).join('\n\n\n');
 }
 
 /* ---- 不足データの取得保証 ---- */
@@ -3730,6 +3784,36 @@ async function genEnsureData(rn){
     await loadCommentTab(rn);
     let w=0; while(data.cmLoading && w<60){ await genSleep(250); w++; }
   }
+}
+
+/* ★2026-10-08 追加：全○R用。全レースの不足データを取得してから組み立てる（同時3レースまで）。
+   個別レースは出走表を表示した時に年齢・期別などを補完しているので、ここでも同じ補完を行う。 */
+async function genEnsureAllRaces(){
+  const rns=genAllRaceNums();
+  const prog=document.getElementById('genAllProg');
+  let done=0;
+  const show=()=>{ if(prog){ prog.textContent='データ取得中 '+done+' / '+rns.length+'R'; prog.classList.add('show'); } };
+  show();
+  const queue=rns.slice();
+  const worker=async()=>{
+    while(queue.length){
+      const rn=queue.shift();
+      const data=GRT_RACE_DATA[rn];
+      try{
+        if(data.players && data.players.some(p=>p.age==null||p.ki==null||!p.playerId) && !data._enrichTried){
+          data._enrichTried=true;
+          await enrichPlayersFromApi(data, rn);
+        }
+        await genEnsureData(rn);
+      }catch(e){ console.error('[gen/all] R'+rn, e); }
+      done++; show();
+    }
+  };
+  await Promise.all([worker(),worker(),worker()]);
+}
+function genAllProgHide(){
+  const prog=document.getElementById('genAllProg');
+  if(prog){ prog.classList.remove('show'); prog.textContent=''; }
 }
 
 /* ---- 演出 ---- */
@@ -3766,26 +3850,38 @@ function genParticles(btn){
 document.getElementById('genBtn').addEventListener('click', async ()=>{
   if(GEN.busy) return;
   if(!GEN.items.table&&!GEN.items.ex&&!GEN.items.cm) return;
-  const rn=genCurrentRaceNum();
-  if(!rn||!GRT_RACE_DATA[rn]) return;
+  const isAll=GRT_ALL;                               // 押した時点のモードで確定
+  const rn=isAll?null:genCurrentRaceNum();
+  if(isAll){ if(!genAllRaceNums().length) return; }
+  else if(!rn||!GRT_RACE_DATA[rn]) return;
   GEN.busy=true;
   const btn=document.getElementById('genBtn');
   genParticles(btn);
   setTimeout(()=>btn.classList.add('loading'),180);
   try{
     const [out]=await Promise.all([
-      (async()=>{ await genEnsureData(rn); return genBuildAll(GEN.fmt); })(),
+      (async()=>{
+        if(isAll){ await genEnsureAllRaces(); return genBuildAllRaces(GEN.fmt); }
+        await genEnsureData(rn); return genBuildAll(GEN.fmt);
+      })(),
       genSleep(4000) // あえて4秒の演出時間
     ]);
     btn.classList.add('byebye');
     await genSleep(320);
     document.getElementById('genBody').style.display='none';
-    genShowResult(out, GEN.fmt, rn);
+    /* 取得中に別のレースへ切り替えられていたら結果は出さない（切替先の画面を優先） */
+    if(isAll ? GRT_ALL : (!GRT_ALL && genCurrentRaceNum()===rn)){
+      genShowResult(out, GEN.fmt, isAll ? ('全'+genAllRaceNums().length) : rn);
+    }else{
+      document.getElementById('genBody').style.display='block';
+      btn.classList.remove('loading','byebye');
+    }
   }catch(e){
     console.error('[gen]',e);
     btn.classList.remove('loading','byebye');
   }finally{
     GEN.busy=false;
+    genAllProgHide();
   }
 });
 
@@ -3865,6 +3961,8 @@ genSyncLamps();
 /* ===== レース切替 ===== */
 function selectRace(idx){
   if(idx < 0 || idx >= GRT_RACES.length) return;
+  if(GEN.busy) return;                 // 生成中はレースを切り替えない（取得中のデータと画面がずれるため）
+  grtSetAllMode(false);
   GRT_RACE_INDEX = idx;
   const race = GRT_RACES[idx];
   renderRaceSelector();
