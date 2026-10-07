@@ -20948,7 +20948,7 @@ async function buildCarettaForRace(race){
  *   ③-① ライン③の×が3番（4番）で、ライン①に1・4・5番（1・3・5番）が1車以上
  *         → 3-1,3-4,3-5 ／ 4-1,4-3,4-5
  *   ③-② ライン③に○と●（×と✖）が両方 → その2車の折り返し
- * ■3連複（対象レースには必ず出す）：1着 ○× ｜ 2着 △☆✖● ｜ 3着 ◎⑳△▲（★2026-10-03 カレッタさん指示で変更。旧：2着 △● ｜ 3着 ◎⑳★☆▲）。圧縮は carettaCompress3fFormation
+ * ■3連複（対象レースには必ず出す）：1車目 △×○ ｜ 2車目 ○△⑳▲✖ ｜ 3車目 ◎☆★○● の組のうち、3車の車番合計が9以下の組だけ（10以上は削除）（★2026-10-07 変更。旧：1着 ○× ｜ 2着 △☆✖● ｜ 3着 ◎⑳△▲・合計条件なし）。圧縮は areTrioCompressExact
  * ===================================================================== */
 const ARE_V2 = {
   ENABLED:     true,
@@ -21081,20 +21081,79 @@ function areV2Wide(A, oddsWide){
            compressed:carettaCompressWide(keys) };
 }
 
-/* 3連複：1着 ○× ｜ 2着 △☆✖● ｜ 3着 ◎⑳△▲（★2026-10-03 変更。△は2着列・3着列の両方に入る。同じ車が1つの組に2回入ることはない） */
+/* 3連複の厳密圧縮（★2026-10-07 追加）：採用した組の集合を、展開すると「採用集合と完全一致」する最少本数の "X=Y=Z" に分ける。
+   - 各表記は展開した全ての組が採用集合に入っているものだけ（余計な組は絶対に出ない）
+   - 表記どうしで同じ組は重複させない（完全な分割）。本数最少 → 数字の総数が少ない順
+   - 車番合計9以下の組は最大7点（1〜6番車のみ）なので総当たりで最適解を出す。結果はキャッシュ */
+const _areTrioCompCache = {};
+function areTrioCompressExact(combos){
+  const keys = [...new Set((combos || []).map(c => c.split('-').map(Number).sort((x, y) => x - y).join('-')))].sort();
+  if (!keys.length) return [];
+  const ck = keys.join(',');
+  if (_areTrioCompCache[ck]) return _areTrioCompCache[ck].slice();
+  if (keys.length > 16) { _areTrioCompCache[ck] = keys.map(k => k.replace(/-/g, '=')); return _areTrioCompCache[ck].slice(); }
+  const idx = {}; keys.forEach((k, i) => { idx[k] = i; });
+  const cars = [...new Set(keys.join('-').split('-').map(Number))].sort((x, y) => x - y);
+  const n = cars.length, N = 1 << n, FULL = (1 << keys.length) - 1;
+  const sub = m => cars.filter((c, i) => m & (1 << i));
+  const best = {};                                   // 組集合のビット → { digits, label }
+  for (let x = 1; x < N; x++) for (let y = x; y < N; y++) for (let z = y; z < N; z++) {
+    const X = sub(x), Y = sub(y), Z = sub(z);
+    let mask = 0, ok = true;
+    for (let i = 0; i < X.length && ok; i++) for (let j = 0; j < Y.length && ok; j++) for (let k = 0; k < Z.length; k++) {
+      const p = X[i], q = Y[j], r = Z[k];
+      if (p === q || q === r || p === r) continue;
+      const id = idx[[p, q, r].sort((u, v) => u - v).join('-')];
+      if (id === undefined) { ok = false; break; }
+      mask |= (1 << id);
+    }
+    if (!ok || !mask) continue;
+    const digits = X.length + Y.length + Z.length;
+    if (!best[mask] || digits < best[mask].digits) {
+      const parts = [X, Y, Z].slice().sort((u, v) => (u.length - v.length) || (u[0] - v[0]));
+      best[mask] = { digits, label: parts.map(p => p.join('')).join('=') };
+    }
+  }
+  const rects = Object.keys(best).map(Number);
+  const f = new Array(FULL + 1).fill(null); f[0] = { n:0, d:0, list:[] };
+  for (let m = 1; m <= FULL; m++) {
+    const low = m & -m;
+    for (let i = 0; i < rects.length; i++) {
+      const r = rects[i];
+      if (!(r & low) || (r & m) !== r) continue;
+      const prev = f[m ^ r]; if (!prev) continue;
+      const cand = { n:prev.n + 1, d:prev.d + best[r].digits };
+      if (!f[m] || cand.n < f[m].n || (cand.n === f[m].n && cand.d < f[m].d)) { cand.list = prev.list.concat([best[r].label]); f[m] = cand; }
+    }
+  }
+  const out = (f[FULL] ? f[FULL].list : keys.map(k => k.replace(/-/g, '='))).slice().sort();
+  _areTrioCompCache[ck] = out;
+  return out.slice();
+}
+
+/* 3連複：1車目 △×○ ｜ 2車目 ○△⑳▲✖ ｜ 3車目 ◎☆★○●（★2026-10-07 変更）
+   ①上の3列の組み合わせに当たる組を全て挙げる（同じ車が1つの組に2回入ることはない。同じ3車の組は1点）
+   ②3車の車番の合計を出し、10以上の組は削除・9以下の組だけを荒れ買い目として出す
+   ③残った組は areTrioCompressExact でできる限り圧縮して表示する
+   旧（2026-10-03）：1着 ○× ｜ 2着 △☆✖● ｜ 3着 ◎⑳△▲・合計による削除なし */
+const ARE_TRIO_SUM_MAX = 9;
 function areV2Trio(markMap, T, odds3f, ignoreTarget){
   const empty = { bets:[], count:0, range:null, gosei:null, compressed:[] };
   if (!ignoreTarget && (!T || !T.ok)) return empty;
   const carsOf = ms => Object.keys(markMap || {}).filter(c => ms.indexOf(markMap[c].mark) >= 0).map(Number);
-  const col1 = carsOf(['○','×']), col2 = carsOf(['△','☆','✖','●']), col3 = carsOf(['◎','⑳','△','▲']);
+  const col1 = carsOf(['△','×','○']), col2 = carsOf(['○','△','⑳','▲','✖']), col3 = carsOf(['◎','☆','★','○','●']);
   if (!col1.length || !col2.length || !col3.length) return Object.assign(empty, { cols:{ col1, col2, col3 } });
   const set = new Set();
-  col1.forEach(a => col2.forEach(b => { if (a === b) return; col3.forEach(c => { if (a === c || b === c) return; set.add([a,b,c].sort((x, y) => x - y).join('-')); }); }));
+  col1.forEach(a => col2.forEach(b => { if (a === b) return; col3.forEach(c => {
+    if (a === c || b === c) return;
+    if (a + b + c > ARE_TRIO_SUM_MAX) return;                       // 車番合計10以上は削除
+    set.add([a,b,c].sort((x, y) => x - y).join('-'));
+  }); }));
   let bets = [...set].map(k => ({ combo:k, odds:areV2OddsOf(odds3f, k, false) }));
   if (ARE_V2.ODDS_CUT_3F) bets = bets.filter(b => b.odds != null && b.odds >= 10.0);
   bets.sort((x, y) => ((x.odds == null ? 1e9 : x.odds) - (y.odds == null ? 1e9 : y.odds)));
   const arr = bets.map(b => b.odds).filter(v => v != null);
-  const compressed = carettaCompress3fFormation(bets.map(b => b.combo).slice().sort(), col1, col2, col3).map(c => c.replace(/-/g, '='));
+  const compressed = areTrioCompressExact(bets.map(b => b.combo));
   return { bets, count:bets.length, range:arr.length ? carettaRange(arr) : null, gosei:arr.length ? carettaGosei(arr) : null,
            compressed, cols:{ col1, col2, col3 } };
 }
