@@ -20948,7 +20948,7 @@ async function buildCarettaForRace(race){
  *   ③-① ライン③の×が3番（4番）で、ライン①に1・4・5番（1・3・5番）が1車以上
  *         → 3-1,3-4,3-5 ／ 4-1,4-3,4-5
  *   ③-② ライン③に○と●（×と✖）が両方 → その2車の折り返し
- * ■3連複（対象レースには必ず出す）：1車目 △×○ ｜ 2車目 ○△⑳▲✖ ｜ 3車目 ◎☆★○● の組のうち、3車の車番合計が9以下の組だけ（10以上は削除）（★2026-10-07 変更。旧：1着 ○× ｜ 2着 △☆✖● ｜ 3着 ◎⑳△▲・合計条件なし）。圧縮は areTrioCompressExact
+ * ■3連複（対象レースには必ず出す）：1車目 △×○ ｜ 2車目 ○△⑳▲✖ ｜ 3車目 ◎☆★○● の組のうち、3車の車番合計が10以上の組だけ（9以下は削除）（★2026-10-07 変更・10-08 訂正。旧：1着 ○× ｜ 2着 △☆✖● ｜ 3着 ◎⑳△▲・合計条件なし）。圧縮は areTrioCompressExact
  * ===================================================================== */
 const ARE_V2 = {
   ENABLED:     true,
@@ -21081,62 +21081,112 @@ function areV2Wide(A, oddsWide){
            compressed:carettaCompressWide(keys) };
 }
 
-/* 3連複の厳密圧縮（★2026-10-07 追加）：採用した組の集合を、展開すると「採用集合と完全一致」する最少本数の "X=Y=Z" に分ける。
-   - 各表記は展開した全ての組が採用集合に入っているものだけ（余計な組は絶対に出ない）
-   - 表記どうしで同じ組は重複させない（完全な分割）。本数最少 → 数字の総数が少ない順
-   - 車番合計9以下の組は最大7点（1〜6番車のみ）なので総当たりで最適解を出す。結果はキャッシュ */
+/* 3連複の厳密圧縮（★2026-10-07 追加・10-08 作り直し）：採用した組の集合を "X=Y=Z" の行に分ける。
+   - 各行は展開した全ての組が採用集合に入っているものだけ（余計な組は絶対に出ない）
+   - 行どうしで同じ組は重複させない（完全な分割）。全行の展開は採用集合と完全一致
+   - 目標：行数を最少に → 同じ行数なら数字の総数が少ない方 → それも同じなら文字列順
+   - 手順：①作れる行の候補を全部作る（X・Y の全組み合わせ × その X・Y で入れられる最大の Z と、そこから1車外した形）
+           ②「まとめ数の多い候補から」上位10×上位6 を試し、残りは毎回最大の候補で埋める（最良を採用）
+           ③それより行数が少ない分け方が無いか、照合回数の上限つきで完全探索（時間ではなく回数の上限なので端末によらず結果は同じ）
+   - 結果はキャッシュ（同じ組の集合なら再計算しない）
+   ★10-07 版は7点以内を前提にした全探索だったため、合計10以上（点数が多い）では使えず作り直した */
 const _areTrioCompCache = {};
 function areTrioCompressExact(combos){
   const keys = [...new Set((combos || []).map(c => c.split('-').map(Number).sort((x, y) => x - y).join('-')))].sort();
   if (!keys.length) return [];
   const ck = keys.join(',');
   if (_areTrioCompCache[ck]) return _areTrioCompCache[ck].slice();
-  if (keys.length > 16) { _areTrioCompCache[ck] = keys.map(k => k.replace(/-/g, '=')); return _areTrioCompCache[ck].slice(); }
-  const idx = {}; keys.forEach((k, i) => { idx[k] = i; });
   const cars = [...new Set(keys.join('-').split('-').map(Number))].sort((x, y) => x - y);
-  const n = cars.length, N = 1 << n, FULL = (1 << keys.length) - 1;
-  const sub = m => cars.filter((c, i) => m & (1 << i));
-  const best = {};                                   // 組集合のビット → { digits, label }
-  for (let x = 1; x < N; x++) for (let y = x; y < N; y++) for (let z = y; z < N; z++) {
-    const X = sub(x), Y = sub(y), Z = sub(z);
-    let mask = 0, ok = true;
-    for (let i = 0; i < X.length && ok; i++) for (let j = 0; j < Y.length && ok; j++) for (let k = 0; k < Z.length; k++) {
-      const p = X[i], q = Y[j], r = Z[k];
-      if (p === q || q === r || p === r) continue;
-      const id = idx[[p, q, r].sort((u, v) => u - v).join('-')];
-      if (id === undefined) { ok = false; break; }
-      mask |= (1 << id);
-    }
-    if (!ok || !mask) continue;
-    const digits = X.length + Y.length + Z.length;
-    if (!best[mask] || digits < best[mask].digits) {
-      const parts = [X, Y, Z].slice().sort((u, v) => (u.length - v.length) || (u[0] - v[0]));
-      best[mask] = { digits, label: parts.map(p => p.join('')).join('=') };
-    }
+  const n = cars.length;
+  if (n > 10) { _areTrioCompCache[ck] = keys.map(k => k.replace(/-/g, '=')); return _areTrioCompCache[ck].slice(); }
+  const pos = {}; cars.forEach((c, i) => { pos[c] = i; });
+  const E = keys.length, W = Math.ceil(E / 32), N = 1 << n;
+  const eid = new Int16Array(n * n * n).fill(-1);                 // (i,j,k) → 組の番号（並び順を問わない）
+  keys.forEach((k, id) => { const [a, b, c] = k.split('-').map(x => pos[+x]);
+    [[a,b,c],[a,c,b],[b,a,c],[b,c,a],[c,a,b],[c,b,a]].forEach(([p, q, r]) => { eid[(p * n + q) * n + r] = id; }); });
+  const bits = []; for (let m = 0; m < N; m++) { const o = []; for (let i = 0; i < n; i++) if (m & (1 << i)) o.push(i); bits.push(o); }
+  const P = [];                                                    // P[i][j]：{i,j,k} が採用集合にある k（と i・j 自身）
+  for (let i = 0; i < n; i++) { P[i] = []; for (let j = 0; j < n; j++) {
+    let m = (1 << i) | (1 << j);
+    if (i !== j) for (let k = 0; k < n; k++) if (k !== i && k !== j && eid[(i * n + j) * n + k] >= 0) m |= (1 << k);
+    P[i][j] = m; } }
+  const label = (X, Y, Z) => [X, Y, Z].map(m => bits[m].map(i => cars[i])).sort((u, v) => (u.length - v.length) || (u[0] - v[0])).map(p => p.join('')).join('=');
+  // ① 候補
+  const cand = new Map();
+  const add = (X, Y, Z) => {
+    const cv = new Int32Array(W); let cov = 0;
+    for (const i of bits[X]) for (const j of bits[Y]) { if (i === j) continue; for (const k of bits[Z]) { if (k === i || k === j) continue;
+      const id = eid[(i * n + j) * n + k], w = id >> 5, b = 1 << (id & 31); if (!(cv[w] & b)) { cv[w] |= b; cov++; } } }
+    if (!cov) return;
+    const key = cv.join(','), dg = bits[X].length + bits[Y].length + bits[Z].length, p = cand.get(key);
+    if (p && p.dg < dg) return;
+    const lb = label(X, Y, Z);
+    if (p && p.dg === dg && p.lb <= lb) return;
+    cand.set(key, { cv, cov, dg, lb });
+  };
+  for (let X = 1; X < N; X++) for (let Y = X; Y < N; Y++) {
+    let Z = N - 1, pairs = 0;
+    for (const i of bits[X]) { for (const j of bits[Y]) { if (i !== j) { Z &= P[i][j]; pairs++; } } if (!Z) break; }
+    if (!pairs || !Z) continue;
+    add(X, Y, Z);
+    for (const k of bits[Z]) { if (Z & ~(1 << k)) add(X, Y, Z & ~(1 << k)); }
   }
-  const rects = Object.keys(best).map(Number);
-  const f = new Array(FULL + 1).fill(null); f[0] = { n:0, d:0, list:[] };
-  for (let m = 1; m <= FULL; m++) {
-    const low = m & -m;
-    for (let i = 0; i < rects.length; i++) {
-      const r = rects[i];
-      if (!(r & low) || (r & m) !== r) continue;
-      const prev = f[m ^ r]; if (!prev) continue;
-      const cand = { n:prev.n + 1, d:prev.d + best[r].digits };
-      if (!f[m] || cand.n < f[m].n || (cand.n === f[m].n && cand.d < f[m].d)) { cand.list = prev.list.concat([best[r].label]); f[m] = cand; }
-    }
+  keys.forEach(k => { const [a, b, c] = k.split('-').map(x => pos[+x]); add(1 << a, 1 << b, 1 << c); });   // 1点だけの行も必ず候補に入れる（どんな残りでも埋められるように）
+  const list = [...cand.values()].sort((p, q) => (q.cov - p.cov) || (p.dg - q.dg) || (p.lb < q.lb ? -1 : 1));
+  const full = new Int32Array(W); for (let e = 0; e < E; e++) full[e >> 5] |= (1 << (e & 31));
+  const fits = (c, R) => { for (let w = 0; w < W; w++) if ((c.cv[w] & R[w]) !== c.cv[w]) return false; return true; };
+  const take = (R, c) => { const o = Int32Array.from(R); for (let w = 0; w < W; w++) o[w] &= ~c.cv[w]; return o; };
+  const isEmpty = R => { for (let w = 0; w < W; w++) if (R[w]) return false; return true; };
+  const topFits = (R, k) => { const o = []; for (const c of list) { if (fits(c, R)) { o.push(c); if (o.length >= k) break; } } return o; };
+  const greedy = (R, sol) => { while (!isEmpty(R)) { const c = topFits(R, 1)[0]; if (!c) break; sol.push(c); R = take(R, c); } return sol; };
+  const dgOf = s => s.reduce((a, c) => a + c.dg, 0);
+  const keyOf = s => s.map(c => c.lb).sort().join('/');
+  const better = (a, b) => (a.length - b.length) || (dgOf(a) - dgOf(b)) || (keyOf(a) < keyOf(b) ? -1 : keyOf(a) > keyOf(b) ? 1 : 0);
+  // ②
+  let best = greedy(full, []);
+  for (const c1 of topFits(full, 10)) {
+    const R1 = take(full, c1);
+    if (isEmpty(R1)) { if (better([c1], best) < 0) best = [c1]; continue; }
+    for (const c2 of topFits(R1, 6)) { const s = greedy(take(R1, c2), [c1, c2]); if (better(s, best) < 0) best = s; }
   }
-  const out = (f[FULL] ? f[FULL].list : keys.map(k => k.replace(/-/g, '='))).slice().sort();
+  // ③ 行数がもっと少ない分け方の探索（見つかった時だけ置き換える）
+  if (best.length > 2) {
+    const byE = []; for (let e = 0; e < E; e++) byE.push([]);
+    list.forEach(c => { for (let e = 0; e < E; e++) if ((c.cv[e >> 5] >>> (e & 31)) & 1) byE[e].push(c); });
+    const maxCov = list.length ? list[0].cov : 1, WORK_MAX = 400000;   // 照合回数の上限（時間ではなく回数）
+    let work = 0, limit = best.length - 1, found = null;
+    const R = Int32Array.from(full), sol = [];
+    const dfs = rem => {
+      if (!rem) { found = sol.slice(); limit = sol.length - 1; return; }
+      if (sol.length + Math.ceil(rem / maxCov) > limit) return;
+      if (work > WORK_MAX) return;
+      let pick = -1, pc = 1e9;
+      for (let e = 0; e < E; e++) { if (!((R[e >> 5] >>> (e & 31)) & 1)) continue;
+        let c = 0; work += byE[e].length; for (const x of byE[e]) if (fits(x, R)) c++;
+        if (c < pc) { pc = c; pick = e; if (c <= 1) break; } }
+      for (const c of byE[pick]) {
+        if (!fits(c, R)) continue;
+        for (let w = 0; w < W; w++) R[w] &= ~c.cv[w];
+        sol.push(c); dfs(rem - c.cov); sol.pop();
+        for (let w = 0; w < W; w++) R[w] |= c.cv[w];
+        if (work > WORK_MAX) return;
+      }
+    };
+    dfs(E);
+    if (found && better(found, best) < 0) best = found;
+  }
+  const out = best.map(c => c.lb).sort();
   _areTrioCompCache[ck] = out;
   return out.slice();
 }
 
-/* 3連複：1車目 △×○ ｜ 2車目 ○△⑳▲✖ ｜ 3車目 ◎☆★○●（★2026-10-07 変更）
+/* 3連複：1車目 △×○ ｜ 2車目 ○△⑳▲✖ ｜ 3車目 ◎☆★○●（★2026-10-07 変更・10-08 訂正）
    ①上の3列の組み合わせに当たる組を全て挙げる（同じ車が1つの組に2回入ることはない。同じ3車の組は1点）
-   ②3車の車番の合計を出し、10以上の組は削除・9以下の組だけを荒れ買い目として出す
+   ②3車の車番の合計を出し、9以下の組は削除・10以上の組だけを荒れ買い目として出す
+     ★10-07 版は逆（9以下を出す）で実装していた。10-08 ボンバイエ訂正：「出すのは合計10以上のみ。9以下は切る」
    ③残った組は areTrioCompressExact でできる限り圧縮して表示する
    旧（2026-10-03）：1着 ○× ｜ 2着 △☆✖● ｜ 3着 ◎⑳△▲・合計による削除なし */
-const ARE_TRIO_SUM_MAX = 9;
+const ARE_TRIO_SUM_MIN = 10;   // 車番合計がこれ未満の組は削除
 function areV2Trio(markMap, T, odds3f, ignoreTarget){
   const empty = { bets:[], count:0, range:null, gosei:null, compressed:[] };
   if (!ignoreTarget && (!T || !T.ok)) return empty;
@@ -21146,7 +21196,7 @@ function areV2Trio(markMap, T, odds3f, ignoreTarget){
   const set = new Set();
   col1.forEach(a => col2.forEach(b => { if (a === b) return; col3.forEach(c => {
     if (a === c || b === c) return;
-    if (a + b + c > ARE_TRIO_SUM_MAX) return;                       // 車番合計10以上は削除
+    if (a + b + c < ARE_TRIO_SUM_MIN) return;                       // 車番合計9以下は削除
     set.add([a,b,c].sort((x, y) => x - y).join('-'));
   }); }));
   let bets = [...set].map(k => ({ combo:k, odds:areV2OddsOf(odds3f, k, false) }));
