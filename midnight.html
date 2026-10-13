@@ -253,6 +253,9 @@
   color:#e6dcff;font-size:11.5px;font-weight:600;font-family:inherit;cursor:pointer;
 }
 .mid-race-retry:active{transform:scale(.95);}
+.mid-race-loading.fail{flex-direction:column;gap:9px;width:calc(100vw - 72px);max-width:520px;white-space:normal;text-align:center;padding:16px 0;}
+.mid-race-loading.fail .mid-race-retry{margin-left:0;}
+.mid-race-diag{display:block;max-width:300px;text-align:center;font-size:9.5px;line-height:1.4;color:rgba(255,255,255,.32);}
 .mid-race-loading{
   display:flex;align-items:center;justify-content:center;gap:8px;
   padding:18px 0;color:rgba(255,255,255,.45);font-size:11px;
@@ -1035,6 +1038,7 @@ function parseWinticketRaceUrl(link){
   /* ===== 開催のレース一覧の取得（★2026-10-13 二段構え） =====
      ①cup API（1リクエストで番号・クラス・締切）
      ②①が失敗したら、開催の詳細ページ（www.winticket.jp/keirin/{会場}/racecard/{開催}/{日目}）を読む。
+     ③②も失敗したら、1R〜12R のレースページを並列で読み、実在するレースだけ拾う（10-13 夜 追加）。
        Brain本体（app.html）・midrace.html のホームが本番で使っている方法と同じ（Card___Wrapper / CardHeaderTitle / CardMeta）。
      返す形は cup API の races と同じ：{ number, closeAt(UNIX秒・無ければ null), raceType3 }。
      ★レースセレクターと電光掲示板（loadCup）の両方がこれを使う。片方だけ直すと食い違うので必ず両方この関数を通すこと。
@@ -1107,6 +1111,60 @@ function parseWinticketRaceUrl(link){
     if(!races.length) throw new Error('html:no-races');
     return races;
   }
+  /* ③ ★2026-10-13 夜 追加：1R〜12R のレースページを並列で読み、実在するレースだけ拾う（gpt.html の出走表が本番で使っている方式）。
+     実在の判定：ページ内に当該レースの ID（"レース番号2桁＋場コード2桁＋開催日 YYYYMMDD"、例 018720261013）が埋め込まれているか。
+     締切は本文の「締切 HH:MM」、クラスは本文の階級表記（gpt.html の extractRaceInfo と同じ判定） */
+  function _midRaceIdOf(v, n){
+    const rc = String(v.raceCode || ''); if(rc.length < 10) return null;
+    const ds = String(cupDateStr(v.raceCode, v.dayNum) || '').replace(/-/g, '');
+    if(!/^\d{8}$/.test(ds)) return null;
+    return String(n).padStart(2, '0') + rc.slice(8) + ds;
+  }
+  async function _midRacesFromRacePages(v){
+    const dateStr = cupDateStr(v.raceCode, v.dayNum);
+    const one = async n => {
+      const rid = _midRaceIdOf(v, n);
+      const url = `https://www.winticket.jp/keirin/${v.venueId}/racecard/${v.raceCode}/${v.dayNum || '1'}/${n}`;
+      try{
+        const resp = await _midTimeout(fetch(`${PROXY_URL}?url=${encodeURIComponent(url)}`), 12000, 'race' + n);
+        const html = await resp.text();
+        if(!rid || html.indexOf('"' + rid + '"') < 0) return null;
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        const body = (doc.body && doc.body.textContent) || '';
+        const dm = body.match(/締切\s*(\d{1,2}:\d{2})/);
+        let cls = '';
+        const clsEl = doc.querySelector('[class*="RaceClassName"]');
+        if(clsEl){ const t = clsEl.textContent.trim().replace(/発走$/, '').trim(); if(t && t.length < 15) cls = t; }
+        if(!cls){
+          const txt = body.replace(/\s+/g, ' ');
+          const pats = [
+            /(S級|A級)\s*(一次?予選|二次?予選|三次?予選|初日?特選|二日目特選|特別選抜|チ?選抜|準決勝|決勝|予選|敗者戦|一般|特選|特別)/,
+            /(L級)\s*(ガ\s*[予準決]\s*[\d]*|一次?予選|二次?予選|初日?特選|特選|準決勝|決勝|予選|敗者戦|一般|特別)/,
+            /(ガールズケイリン|ガールズ)\s*([予準決][選勝]?\s*[\d]*回?戦?|一次?予選|初日?特選|特選|準決勝|決勝|一般)?/,
+            /(チャレンジ|アドバンス)\s*(準決勝|決勝|一次?予選|予選|一般|特別)?/,
+            /(S級|A級|L級|ガールズケイリン|ガールズ|チャレンジ|アドバンス)/
+          ];
+          let best = null;
+          for(const p of pats){ const m = txt.match(p); if(m && (best === null || m.index < best.index)) best = { index:m.index, text:m[0] }; }
+          if(best) cls = best.text.replace(/\s+/g, '');
+        }
+        return { number:n, closeAt:_midJstSec(dateStr, dm ? dm[1] : ''), raceType3:cls };
+      }catch(e){ return null; }
+    };
+    const list = await Promise.all(Array.from({ length:12 }, (_, i) => one(i + 1)));
+    const races = list.filter(Boolean).sort((a, b) => a.number - b.number);
+    if(!races.length) throw new Error('race:no-races');
+    return races;
+  }
+  function _midErrText(e){
+    const m = String(e && e.message || e || '');
+    if(/timeout/.test(m)) return '時間切れ';
+    if(/empty/.test(m)) return '空の応答';
+    if(/not-json/.test(m)) return 'JSON以外';
+    if(/no-schedule/.test(m)) return '日程なし';
+    if(/no-races/.test(m)) return 'レース0件';
+    return m.slice(0, 40) || '不明';
+  }
   function midLoadRaces(v){
     const k = v.raceCode + '|' + (v.dayNum || 1);
     if(_midRacesOk[k]) return Promise.resolve(_midRacesOk[k]);
@@ -1115,14 +1173,23 @@ function parseWinticketRaceUrl(link){
       let apiErr = null;
       try{ const r = await _midRacesFromApi(v); _midRacesOk[k] = r; return r; }
       catch(e){ apiErr = e; }
+      let htmlErr = null;
       try{
         const r = await _midRacesFromHtml(v); _midRacesOk[k] = r;
         window.MID_RACES_DIAG.push({ at:new Date().toISOString(), key:k, api:String(apiErr && apiErr.message || apiErr), html:'ok:' + r.length });
         return r;
-      }catch(e2){
-        window.MID_RACES_DIAG.push({ at:new Date().toISOString(), key:k, api:String(apiErr && apiErr.message || apiErr), html:String(e2 && e2.message || e2) });
-        console.error('midLoadRaces failed', k, apiErr, e2);
-        throw e2;
+      }catch(e2){ htmlErr = e2; }
+      try{
+        const r = await _midRacesFromRacePages(v); _midRacesOk[k] = r;
+        window.MID_RACES_DIAG.push({ at:new Date().toISOString(), key:k, api:String(apiErr && apiErr.message || apiErr), html:String(htmlErr && htmlErr.message || htmlErr), race:'ok:' + r.length });
+        return r;
+      }catch(e3){
+        const d = { at:new Date().toISOString(), key:k, api:String(apiErr && apiErr.message || apiErr), html:String(htmlErr && htmlErr.message || htmlErr), race:String(e3 && e3.message || e3) };
+        window.MID_RACES_DIAG.push(d);
+        console.error('midLoadRaces failed', d);
+        const err = new Error('all-failed');
+        err.diag = 'API：' + _midErrText(apiErr) + ' ／ 開催ページ：' + _midErrText(htmlErr) + ' ／ レースページ：' + _midErrText(e3);
+        throw err;
       }
     })().finally(()=>{ delete _midRacesPending[k]; });
     return _midRacesPending[k];
@@ -1143,8 +1210,10 @@ function parseWinticketRaceUrl(link){
       MID_RACES_CACHE[idx] = races;
       if(MID_VENUES[idx] === v) midRenderRaceSelector(idx, races);
     }catch(e){
-      box.innerHTML = '<div class="mid-race-loading">レース情報が取得できませんでした'
-        + '<button type="button" class="mid-race-retry" onclick="event.stopPropagation(); midFetchRaces(' + idx + ')">もう一度読み込む</button></div>';
+      box.innerHTML = '<div class="mid-race-loading fail"><span>レース情報が取得できませんでした</span>'
+        + '<button type="button" class="mid-race-retry" onclick="event.stopPropagation(); midFetchRaces(' + idx + ')">もう一度読み込む</button>'
+        + (e && e.diag ? '<span class="mid-race-diag">' + String(e.diag).replace(/[<>&]/g, '') + '</span>' : '')   // ★原因切り分け用（小さく表示）
+        + '</div>';
     }
   }
 
