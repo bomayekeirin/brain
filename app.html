@@ -20948,7 +20948,7 @@ async function buildCarettaForRace(race){
  *   ③-① ライン③の×が3番（4番）で、ライン①に1・4・5番（1・3・5番）が1車以上
  *         → 3-1,3-4,3-5 ／ 4-1,4-3,4-5
  *   ③-② ライン③に○と●（×と✖）が両方 → その2車の折り返し
- * ■3連複（対象レースには必ず出す）：1車目 △×○ ｜ 2車目 ○△⑳▲✖ ｜ 3車目 ◎☆●（10-08 夜に○★を削除） の組のうち、3車の車番合計が10以上の組だけ（9以下は削除）（★2026-10-07 変更・10-08 訂正。旧：1着 ○× ｜ 2着 △☆✖● ｜ 3着 ◎⑳△▲・合計条件なし）。圧縮は areTrioCompressExact
+ * ■3連複（対象レースには必ず出す）：印の組み合わせ20パターン（ARE_TRIO_PATTERNS・T＝無印の単騎の前方1車）のうち、3車の車番合計が9〜14の組だけ（★2026-10-13 夜 全面変更）。圧縮は areTrioCompressExact
  * ===================================================================== */
 const ARE_V2 = {
   ENABLED:     true,
@@ -21180,32 +21180,58 @@ function areTrioCompressExact(combos){
   return out.slice();
 }
 
-/* 3連複：1車目 △×○ ｜ 2車目 ○△⑳▲✖ ｜ 3車目 ◎☆●（★2026-10-07 変更・10-08 訂正・10-08 夜 3車目の○★を削除。直前：3車目 ◎☆★○●）
-   ①上の3列の組み合わせに当たる組を全て挙げる（同じ車が1つの組に2回入ることはない。同じ3車の組は1点）
-   ②3車の車番の合計を出し、9以下の組は削除・10以上の組だけを荒れ買い目として出す
-     ★10-07 版は逆（9以下を出す）で実装していた。10-08 ボンバイエ訂正：「出すのは合計10以上のみ。9以下は切る」
+/* 3連複（★2026-10-13 夜 全面変更・ボンバイエ指示）
+   ①採用ベースの印の組み合わせ 20 パターン（下の ARE_TRIO_PATTERNS）を、そのレースの車番に置き換える
+     ・✕＝AI印「×」（U+00D7）、✖＝カレッタ印（U+2716）、◯＝AI印「○」
+     ・T＝無印の単騎（calcAllMarks で「単」の付く車）。2車以上いれば並びの前方の1車だけを使う（ボンバイエ回答：無印の単騎だけ）
+     ・同じ印が複数の車に付いているときは、その全ての車で組を作る。同じ車が1つの組に2回入る組は作らない
+     ・3連複なので順番は問わず、同じ3車の組は1点
+   ②3車の車番の合計が 9〜14 の組だけ買い。それ以外は削除（ARE_TRIO_SUM_MIN / ARE_TRIO_SUM_MAX）
    ③残った組は areTrioCompressExact でできる限り圧縮して表示する
-   旧（2026-10-03）：1着 ○× ｜ 2着 △☆✖● ｜ 3着 ◎⑳△▲・合計による削除なし */
-const ARE_TRIO_SUM_MIN = 10;   // 車番合計がこれ未満の組は削除
-function areV2Trio(markMap, T, odds3f, ignoreTarget){
+   直前（10-08 夜）：1車目 △×○ ｜ 2車目 ○△⑳▲✖ ｜ 3車目 ◎☆● のフォーメーション・合計10以上 */
+const ARE_TRIO_PATTERNS = [
+  ['○','×','◎'], ['○','△','◎'], ['○','△','×'], ['×','△','◎'], ['×','✖','◎'],
+  ['○','×','✖'], ['○','▲','△'], ['○','△','☆'], ['×','☆','◎'], ['○','△','★'],
+  ['×','★','◎'], ['○','●','×'], ['○','☆','×'], ['○','△','●'], ['○','★','×'],
+  ['○','△','✖'], ['×','▲','◎'], ['○','T','△'], ['×','T','◎'], ['○','T','×']
+];
+const ARE_TRIO_SUM_MIN = 9, ARE_TRIO_SUM_MAX = 14;   // 車番合計がこの範囲（両端含む）の組だけ買い
+/* T（無印の単騎）：並びの前から見て最初の「単」の車。いなければ null */
+function areTrioTankiCar(markMap, race){
+  if (!race) return null;
+  const lineupStr = race.lineupStr || (race.lineup ? race.lineup.map(g => g.join('')).join('-') : '');
+  const lines = (typeof parseLine === 'function') ? parseLine(lineupStr) : [];
+  for (const ln of lines) {
+    if (ln.size !== 1) continue;
+    const car = ln.members[0];
+    if (markMap && markMap[car] && markMap[car].mark === '単') return Number(car);
+  }
+  return null;
+}
+function areV2Trio(markMap, T, odds3f, ignoreTarget, race){
   const empty = { bets:[], count:0, range:null, gosei:null, compressed:[] };
   if (!ignoreTarget && (!T || !T.ok)) return empty;
-  const carsOf = ms => Object.keys(markMap || {}).filter(c => ms.indexOf(markMap[c].mark) >= 0).map(Number);
-  const col1 = carsOf(['△','×','○']), col2 = carsOf(['○','△','⑳','▲','✖']), col3 = carsOf(['◎','☆','●']);   // ★2026-10-08 夜：3車目から ○・★ を削除
-  if (!col1.length || !col2.length || !col3.length) return Object.assign(empty, { cols:{ col1, col2, col3 } });
-  const set = new Set();
-  col1.forEach(a => col2.forEach(b => { if (a === b) return; col3.forEach(c => {
-    if (a === c || b === c) return;
-    if (a + b + c < ARE_TRIO_SUM_MIN) return;                       // 車番合計9以下は削除
-    set.add([a,b,c].sort((x, y) => x - y).join('-'));
-  }); }));
+  const tanki = areTrioTankiCar(markMap, race);
+  const carsOf = m => m === 'T' ? (tanki != null ? [tanki] : [])
+    : Object.keys(markMap || {}).filter(c => markMap[c] && markMap[c].mark === m).map(Number);
+  const set = new Set(), hits = [];
+  ARE_TRIO_PATTERNS.forEach((pt, pi) => {
+    const A = carsOf(pt[0]), B = carsOf(pt[1]), C = carsOf(pt[2]);
+    A.forEach(a => B.forEach(b => { if (a === b) return; C.forEach(c => {
+      if (a === c || b === c) return;
+      const sum = a + b + c;
+      if (sum < ARE_TRIO_SUM_MIN || sum > ARE_TRIO_SUM_MAX) return;   // 合計 9〜14 以外は削除
+      const k = [a,b,c].sort((x, y) => x - y).join('-');
+      set.add(k); hits.push({ pattern:pi + 1, combo:k });
+    }); }));
+  });
   let bets = [...set].map(k => ({ combo:k, odds:areV2OddsOf(odds3f, k, false) }));
   if (ARE_V2.ODDS_CUT_3F) bets = bets.filter(b => b.odds != null && b.odds >= 10.0);
   bets.sort((x, y) => ((x.odds == null ? 1e9 : x.odds) - (y.odds == null ? 1e9 : y.odds)));
   const arr = bets.map(b => b.odds).filter(v => v != null);
   const compressed = areTrioCompressExact(bets.map(b => b.combo));
   return { bets, count:bets.length, range:arr.length ? carettaRange(arr) : null, gosei:arr.length ? carettaGosei(arr) : null,
-           compressed, cols:{ col1, col2, col3 } };
+           compressed, tanki, hits };
 }
 
 /* ★2026-10-01 新旧混合：{ target, marks, A, W, Tr, src2:'v2'|'v1' } */
@@ -21213,7 +21239,7 @@ function areHybridBuild(race, odds, timeSlot){
   const mk = areV2MarksOf(race);
   const T = areV2Target(race, mk, timeSlot);
   const o2 = odds && odds['2t'], ow = odds && odds.wide, o3 = odds && odds['3f'];
-  const Tr = areV2Trio(mk, T, o3, true);                       // 3連複は全て新ロジック（オッズ参照・絞り込みなし）
+  const Tr = areV2Trio(mk, T, o3, true, race);                 // 3連複は全て新ロジック（オッズ参照・絞り込みなし）。race は T（単騎）の判定用
   let A = T.ok ? areV2A(mk, T, o2) : null, W = null, src2 = 'v2';
   if (A && A.count > 0) {
     W = ARE_V2.WIDE_SHOW ? areV2Wide(A, ow) : null;            // 新2車単 → 新ワイド（2車単と同じ組）
@@ -21237,7 +21263,7 @@ function areV2Build(race, odds, timeSlot){
   const T = areV2Target(race, mk, timeSlot);
   const A = areV2A(mk, T, odds && odds['2t']);
   const W = ARE_V2.WIDE_SHOW ? areV2Wide(A, odds && odds.wide) : null;
-  const Tr = areV2Trio(mk, T, odds && odds['3f']);
+  const Tr = areV2Trio(mk, T, odds && odds['3f'], false, race);
   return { target:T, marks:mk, A, W, Tr };
 }
 
